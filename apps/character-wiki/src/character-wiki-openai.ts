@@ -326,11 +326,20 @@ Rarity Rank: #${characterData.rarity_rank}`;
       }
     }
 
-    // Extract image URL
-    const imgMatch = response.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/);
-    if (imgMatch) {
-      data.image_url = imgMatch[1];
-      console.log(`Found image: ${data.image_url}`);
+    // Extract image URL - try multiple patterns
+    const imgPatterns = [
+      /!\[.*?\]\((https?:\/\/[^\s\)]+)\)/,  // ![alt](url) format
+      /\[View.*?\]\((https?:\/\/[^\s\)]+)\)/, // [View text](url) format
+      /(https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp))/  // Direct URL pattern
+    ];
+
+    for (const pattern of imgPatterns) {
+      const imgMatch = response.match(pattern);
+      if (imgMatch) {
+        data.image_url = imgMatch[1];
+        console.log(`Found image: ${data.image_url}`);
+        break;
+      }
     }
 
     console.log('Final parsed data:', data);
