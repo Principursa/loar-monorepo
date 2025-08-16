@@ -9,16 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WikiRouteImport } from './routes/wiki'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WikiIndexRouteImport } from './routes/wiki/index'
+import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 
-const WikiRoute = WikiRouteImport.update({
-  id: '/wiki',
-  path: '/wiki',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -34,50 +30,63 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WikiIndexRoute = WikiIndexRouteImport.update({
+  id: '/wiki/',
+  path: '/wiki/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WikiCharacterIdRoute = WikiCharacterIdRouteImport.update({
+  id: '/wiki/character/$id',
+  path: '/wiki/character/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
-  '/wiki': typeof WikiRoute
+  '/wiki': typeof WikiIndexRoute
+  '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
-  '/wiki': typeof WikiRoute
+  '/wiki': typeof WikiIndexRoute
+  '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
-  '/wiki': typeof WikiRoute
+  '/wiki/': typeof WikiIndexRoute
+  '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/login' | '/wiki'
+  fullPaths: '/' | '/dashboard' | '/login' | '/wiki' | '/wiki/character/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/login' | '/wiki'
-  id: '__root__' | '/' | '/dashboard' | '/login' | '/wiki'
+  to: '/' | '/dashboard' | '/login' | '/wiki' | '/wiki/character/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/wiki/'
+    | '/wiki/character/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
-  WikiRoute: typeof WikiRoute
+  WikiIndexRoute: typeof WikiIndexRoute
+  WikiCharacterIdRoute: typeof WikiCharacterIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/wiki': {
-      id: '/wiki'
-      path: '/wiki'
-      fullPath: '/wiki'
-      preLoaderRoute: typeof WikiRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -99,6 +108,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/wiki/': {
+      id: '/wiki/'
+      path: '/wiki'
+      fullPath: '/wiki'
+      preLoaderRoute: typeof WikiIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wiki/character/$id': {
+      id: '/wiki/character/$id'
+      path: '/wiki/character/$id'
+      fullPath: '/wiki/character/$id'
+      preLoaderRoute: typeof WikiCharacterIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -106,7 +129,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
-  WikiRoute: WikiRoute,
+  WikiIndexRoute: WikiIndexRoute,
+  WikiCharacterIdRoute: WikiCharacterIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

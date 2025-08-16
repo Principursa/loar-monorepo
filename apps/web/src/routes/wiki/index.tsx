@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { trpc } from '@/utils/trpc'
@@ -46,8 +46,9 @@ function WikiPage() {
       <h1 className="text-3xl font-bold mb-6">Character Wiki</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {characters.map((character: Character) => (
-          <Card key={character.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
+          <Link key={character.id} to={`/wiki/character/${character.id}`} className="block">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader>
               <div className="aspect-square w-full mb-4">
                 <img
                   src={character.image_url}
@@ -80,7 +81,8 @@ function WikiPage() {
                 </div>
               )}
             </CardContent>
-          </Card>
+            </Card>
+          </Link>
         ))}
       </div>
       
@@ -93,6 +95,6 @@ function WikiPage() {
   )
 }
 
-export const Route = createFileRoute('/wiki')({
+export const Route = createFileRoute('/wiki/')({
   component: WikiPage,
 })

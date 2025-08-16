@@ -6,6 +6,8 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { db } from "../db";
 import { characters } from "../db/schema/characters";
+import { eq } from "drizzle-orm";
+import { z } from "zod";
 
 export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
@@ -54,6 +56,33 @@ export const appRouter = router({
         }
       }
     }),
+    character: publicProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        try {
+          const result = await db.select().from(characters).where(eq(characters.id, input.id));
+          if (result.length === 0) {
+            throw new Error("Character not found");
+          }
+          
+          const char = result[0];
+          return {
+            id: char.id,
+            character_name: char.character_name,
+            collection: char.collection,
+            token_id: char.token_id,
+            traits: char.traits as Record<string, string>,
+            rarity_rank: char.rarity_rank,
+            rarity_percentage: char.rarity_percentage ? parseFloat(char.rarity_percentage) : 0,
+            image_url: char.image_url,
+            description: char.description,
+            created_at: char.created_at.toISOString()
+          };
+        } catch (error) {
+          console.error("Failed to load character from database:", error);
+          throw new Error("Could not load character");
+        }
+      }),
   }),
 });
 export type AppRouter = typeof appRouter;
