@@ -528,24 +528,52 @@ async function main(): Promise<void> {
     await wiki.connect();
 
     const testNFTs: [string, string][] = [
-      ['Bored Ape Yacht Club', '1234'],
-      ['Doodles', '999']
+      // CryptoPunks
+      ['CryptoPunks', '1000'],
+      ['CryptoPunks', '2500'],
+      ['CryptoPunks', '5000'],
+      
+      // Pudgy Penguins
+      ['Pudgy Penguins', '100'],
+      ['Pudgy Penguins', '500'],
+      ['Pudgy Penguins', '1000'],
+      
+      // Doodles
+      ['Doodles', '250'],
+      ['Doodles', '750'],
+      ['Doodles', '1500'],
+      
+      // Moonbirds
+      ['Moonbirds', '100'],
+      ['Moonbirds', '500'],
+      ['Moonbirds', '1000']
     ];
 
-    for (const [collection, tokenId] of testNFTs) {
+    console.log(`\n🚀 Starting generation of ${testNFTs.length} characters from 4 collections...\n`);
+
+    for (let i = 0; i < testNFTs.length; i++) {
+      const [collection, tokenId] = testNFTs[i];
+      console.log(`\n[${i + 1}/${testNFTs.length}] Processing ${collection} #${tokenId}...`);
+      
       try {
         const character = await wiki.createCharacterFromOpenSea(collection, tokenId);
 
-        console.log(`\n✅ Created: ${character.character_name}`);
-        console.log(`📊 Traits:`, character.traits);
-        console.log(`🎭 Description: ${character.description.substring(0, 200)}...`);
+        console.log(`✅ Created: ${character.character_name}`);
+        console.log(`📊 Traits:`, Object.keys(character.traits).length, 'traits found');
+        console.log(`🎭 Description: ${character.description.substring(0, 100)}...`);
 
         // Export video context
         const context = await wiki.exportVideoContext(character.id);
-        console.log('\n🎬 Video Context saved');
+        console.log('🎬 Video context ready');
 
       } catch (error) {
-        console.log(`❌ Error: ${error}`);
+        console.log(`❌ Error creating ${collection} #${tokenId}: ${error}`);
+      }
+      
+      // Add small delay between requests to be respectful to OpenSea API
+      if (i < testNFTs.length - 1) {
+        console.log('⏳ Waiting 2 seconds before next request...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
 
