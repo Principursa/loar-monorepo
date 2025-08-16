@@ -90,3 +90,4 @@ LOAR is redefining narrative ownership in the digital age. Join our community of
 - **Hono & tRPC** - Performant API layer
 - **Ethereum & OpenSea** - Blockchain integration
 - **Walrus Protocol** - Decentralized content storage
+- **Dynamic** - Wallet Connect
