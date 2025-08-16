@@ -118,6 +118,44 @@ contract Timeline is Ownable{
 
     }
 
+function getFullGraph() public view returns (
+    uint[] memory ids,
+    string[] memory links,
+    string[] memory plots,
+    uint[] memory previousIds,
+    uint[][] memory nextIds,
+    bool[] memory canonFlags
+) {
+    uint total = latestNodeId;
+
+    ids = new uint[](total);
+    links = new string[](total);
+    plots = new string[](total);
+    previousIds = new uint[](total);
+    nextIds = new uint[][](total);
+    canonFlags = new bool[](total);
+
+    for (uint i = 1; i <= total; i++) {
+        VideoNode storage n = nodes[i];
+
+        ids[i-1] = n.id;
+        links[i-1] = n.link;
+        plots[i-1] = n.plot;
+        previousIds[i-1] = n.previous;
+        canonFlags[i-1] = n.canon;
+
+        // Copy next IDs
+        uint len = n.next.length;
+        uint[] memory tmpNext = new uint[](len);
+        for (uint j = 0; j < len; j++) {
+            tmpNext[j] = n.next[j];
+        }
+        nextIds[i-1] = tmpNext;
+    }
+
+    return (ids, links, plots, previousIds, nextIds, canonFlags);
+}
+
      //Handle voting later
 
     // ---- Canon ----

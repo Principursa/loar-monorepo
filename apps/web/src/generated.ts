@@ -6386,6 +6386,20 @@ export const timelineAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'getFullGraph',
+    outputs: [
+      { name: 'ids', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'links', internalType: 'string[]', type: 'string[]' },
+      { name: 'plots', internalType: 'string[]', type: 'string[]' },
+      { name: 'previousIds', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'nextIds', internalType: 'uint256[][]', type: 'uint256[][]' },
+      { name: 'canonFlags', internalType: 'bool[]', type: 'bool[]' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'getLeaves',
     outputs: [{ name: '', internalType: 'uint256[]', type: 'uint256[]' }],
     stateMutability: 'view',
@@ -12796,6 +12810,15 @@ export const useTimeline__GetCanonChain__read =
   /*#__PURE__*/ createUseReadContract({
     abi: timelineAbi,
     functionName: 'getCanonChain',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link timelineAbi}__ and `functionName` set to `"getFullGraph"`
+ */
+export const useTimeline__GetFullGraph__read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: timelineAbi,
+    functionName: 'getFullGraph',
   })
 
 /**
