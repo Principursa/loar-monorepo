@@ -1,92 +1,175 @@
-# LOAR: Decentralized Narrative Control System
+# Loar Fullstack
 
-**LOAR** is a revolutionary platform for decentralized narrative control in collaborative content cinematic universes. We're redefining how canonical content is determined through blockchain-powered consensus mechanisms and NFT ownership.
+A modern fullstack application with Dynamic wallet authentication, built with React 19, Vite, TanStack Router, and tRPC.
 
-## 🚀 Core Features
+## 🚀 Features
 
-- **NFT-Powered Canon Control** - OpenSea NFT integration determines narrative authority and voting power
-- **Decentralized Character Wikis** - Community-built lore with ownership verification
-- **Tokenomics Governance** - Token-weighted voting on canonical storylines and character development
-- **Blockchain Authentication** - Secure wallet-based authentication system
-- **Decentralized Video Storage** - Walrus protocol integration for distributed content hosting
-- **Dynamic Content Markets** - Create, trade, and monetize narrative elements
-- **Cross-Universe Collaboration** - Build interconnected stories across multiple creator universes
+- **Dynamic Wallet Authentication** - Connect with MetaMask, WalletConnect, and more
+- **Modern Tech Stack** - React 19, Vite, TanStack Router, tRPC
+- **Type Safety** - Full TypeScript support
+- **Beautiful UI** - Tailwind CSS with shadcn/ui components
+- **Smart Contracts** - Foundry-based Solidity contracts
+- **Database** - Drizzle ORM with PostgreSQL
 
-## 💎 Why LOAR?
+## 🛠️ Prerequisites
 
-In the expanding multiverse of collaborative content creation, determining what's "canon" has always been centralized and contentious. LOAR disrupts this paradigm by creating a decentralized consensus mechanism where narrative control is determined by community ownership, engagement, and tokenized governance.
+Before you begin, ensure you have the following installed:
 
-## 🔮 Getting Started
-### Prerequisites
+- **Node.js** (v18 or higher) - [Download here](https://nodejs.org/)
+- **Bun** (recommended) - [Install here](https://bun.sh/)
+- **PostgreSQL** - [Install here](https://www.postgresql.org/download/)
+- **Foundry** (for smart contracts) - [Install here](https://book.getfoundry.sh/getting-started/installation)
 
-- Ethereum wallet (MetaMask recommended)
-- NFT holdings (for full governance participation)
-- Node.js environment
+## 📦 Installation
 
-### Installation
+1. **Clone the repository:**
+   ```bash
+   git clone <your-repo-url>
+   cd Loar-Fullstack
+   ```
 
-```bash
-# Install dependencies
-bun install
+2. **Install dependencies:**
+   ```bash
+   # Using Bun (recommended)
+   bun install
+   
+   # Or using npm
+   npm install
+   ```
 
-# Configure your environment
-# Update apps/server/.env with your PostgreSQL and OpenSea API details
+3. **Set up Dynamic Wallet Authentication:**
+   - Go to [Dynamic Dashboard](https://app.dynamic.xyz/)
+   - Create a new project
+   - Copy your Environment ID
+   - Create `.env` file in `apps/web/`:
+     ```env
+     VITE_DYNAMIC_ENVIRONMENT_ID=your_environment_id_here
+     VITE_SERVER_URL=http://localhost:3000
+     ```
 
-# Initialize the database
-bun db:push
+4. **Set up the database:**
+   ```bash
+   cd apps/server
+   # Update database connection in drizzle.config.ts
+   bun run db:generate
+   bun run db:migrate
+   ```
 
-# Launch the platform
-bun dev
+## 🚀 Running the Application
+
+1. **Start the server:**
+   ```bash
+   cd apps/server
+   bun run dev
+   ```
+
+2. **Start the web app:**
+   ```bash
+   cd apps/web
+   bun run dev
+   ```
+
+3. **Deploy smart contracts (optional):**
+   ```bash
+   cd apps/contracts
+   forge build
+   forge test
+   ```
+
+## 🌐 Access the Application
+
+- **Web App:** http://localhost:3001
+- **Server:** http://localhost:3000
+- **API Documentation:** http://localhost:3000/trpc
+
+## 🔐 Dynamic Wallet Features
+
+- **Multi-Wallet Support** - MetaMask, WalletConnect, Coinbase Wallet, and more
+- **Embedded Wallets** - MPC-based wallet creation
+- **Smart Accounts** - Account abstraction support
+- **Multi-Chain** - Ethereum, Polygon, Base, and other EVM chains
+- **Mobile Support** - QR code scanning and mobile wallet integration
+
+## 📁 Project Structure
+
 ```
-
-Open [http://localhost:3001](http://localhost:3001) to access the LOAR platform.
-API endpoints available at [http://localhost:3000](http://localhost:3000).
-
-
-
-## 🏗️ Architecture
-
-```
-loar-fullstack/
+Loar-Fullstack/
 ├── apps/
-│   ├── web/         # Frontend dApp (React + TanStack Router)
-│   └── server/      # Backend API with blockchain integration
-├── packages/
-│   ├── nft-oracle/  # OpenSea data integration
-│   ├── tokenomics/  # Governance and voting mechanisms
-│   └── walrus-sdk/  # Decentralized video storage integration
+│   ├── web/                 # React frontend with Dynamic auth
+│   ├── server/              # tRPC backend
+│   └── contracts/           # Solidity smart contracts
+├── lib/                     # Shared libraries
+└── package.json            # Root package.json
 ```
 
-## 💰 Tokenomics
+## 🎨 Customization
 
-LOAR implements a sophisticated token economy where narrative influence is directly tied to token holdings and NFT ownership:
+### Dynamic Configuration
+Edit `apps/web/src/lib/dynamic.ts` to customize:
+- Wallet connectors
+- Event callbacks
+- UI themes
+- Chain configurations
 
-- **Voting Power** - Proportional to NFT rarity and token holdings
-- **Content Creation Rewards** - Earn tokens by contributing canonical content
-- **Governance Participation** - Stake tokens to participate in major narrative decisions
+### UI Components
+All UI components are in `apps/web/src/components/ui/` using shadcn/ui.
 
-## 🛠️ Development Commands
+## 🔧 Development
 
-- `bun dev`: Launch the full LOAR ecosystem
-- `bun build`: Build all applications for production
-- `bun dev:web`: Start the frontend dApp only
-- `bun dev:server`: Start the blockchain-integrated backend only
-- `bun nft:sync`: Synchronize with OpenSea NFT data
-- `bun governance:simulate`: Test tokenomics voting mechanisms
-- `bun walrus:init`: Initialize decentralized video storage
+### Adding New Routes
+1. Create a new file in `apps/web/src/routes/`
+2. Export a `Route` using `createFileRoute`
+3. The route will be automatically included
 
-## 🔗 Join the Revolution
+### Adding New API Endpoints
+1. Add new procedures in `apps/server/src/routers/`
+2. Export them from `apps/server/src/routers/index.ts`
+3. Use them in the frontend with tRPC
 
-LOAR is redefining narrative ownership in the digital age. Join our community of creators, collectors, and fans to shape the future of collaborative storytelling.
+### Smart Contract Development
+1. Add contracts in `apps/contracts/src/`
+2. Write tests in `apps/contracts/test/`
+3. Deploy scripts in `apps/contracts/script/`
 
-- **Website**: [loar.io](https://loar.io)
-- **Discord**: [discord.gg/loar](https://discord.gg/loar)
-- **Twitter**: [@loarprotocol](https://twitter.com/loarprotocol)
+## 🚀 Deployment
 
-## 🚀 Built on Modern Tech
+### Frontend (Vercel/Netlify)
+```bash
+cd apps/web
+bun run build
+```
 
-- **TypeScript** - Type-safe development
-- **React & TanStack** - Dynamic frontend
-- **Hono & tRPC** - Performant API layer
-- **Ethereum & OpenSea** - Blockchain integration
-- **Walrus Protocol** - Decentralized content storage
+### Backend (Railway/Render)
+```bash
+cd apps/server
+bun run build
+```
+
+### Smart Contracts
+```bash
+cd apps/contracts
+forge build
+forge deploy
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🆘 Support
+
+- **Dynamic Documentation:** [docs.dynamic.xyz](https://docs.dynamic.xyz/)
+- **tRPC Documentation:** [trpc.io](https://trpc.io/)
+- **TanStack Router:** [tanstack.com/router](https://tanstack.com/router)
+
+---
+
+**Gang gang gang! 🚀 LFG!**
