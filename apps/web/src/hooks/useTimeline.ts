@@ -39,6 +39,14 @@ export function useGetCanonChain() {
 
 }
 export function useGetFullGraph() {
+  const chainId = useChainId()
+
+  return useReadContract({
+    abi: timelineAbi,
+    address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
+    functionName: "getFullGraph",
+    args: []
+  })
 
 }
 
