@@ -48,10 +48,15 @@ function UniversesPage() {
                   <p className="text-sm text-muted-foreground line-clamp-2">
                     {universe.description}
                   </p>
-                  <div className="mt-2">
+                  <div className="mt-2 flex items-center justify-between">
                     <Badge variant="outline">
                       {universe.timelines.length} Timeline{universe.timelines.length !== 1 ? 's' : ''}
                     </Badge>
+                    <Button size="sm" variant="ghost" asChild onClick={(e) => e.stopPropagation()}>
+                      <Link to="/universe/$id" params={{ id: universe.id }}>
+                        View Graph →
+                      </Link>
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -174,10 +179,15 @@ function UniversesPage() {
                     ))}
                   </div>
 
-                  <div className="pt-4">
+                  <div className="pt-4 space-y-2">
                     <Button className="w-full" asChild>
                       <Link to="/timeline" search={{ universe: selectedUniverse?.id, timeline: selectedTimeline.id }}>
                         Open Interactive Timeline
+                      </Link>
+                    </Button>
+                    <Button variant="outline" className="w-full" asChild>
+                      <Link to="/universe/$id" params={{ id: selectedUniverse?.id || '' }}>
+                        View Universe Graph
                       </Link>
                     </Button>
                   </div>

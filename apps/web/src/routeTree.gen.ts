@@ -16,6 +16,7 @@ import { Route as FlowRouteImport } from './routes/flow'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WikiIndexRouteImport } from './routes/wiki/index'
+import { Route as UniverseIdRouteImport } from './routes/universe/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 
 const UniversesRoute = UniversesRouteImport.update({
@@ -53,6 +54,11 @@ const WikiIndexRoute = WikiIndexRouteImport.update({
   path: '/wiki/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UniverseIdRoute = UniverseIdRouteImport.update({
+  id: '/universe/$id',
+  path: '/universe/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WikiCharacterIdRoute = WikiCharacterIdRouteImport.update({
   id: '/wiki/character/$id',
   path: '/wiki/character/$id',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/timeline': typeof TimelineRoute
   '/universes': typeof UniversesRoute
+  '/universe/$id': typeof UniverseIdRoute
   '/wiki': typeof WikiIndexRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/timeline': typeof TimelineRoute
   '/universes': typeof UniversesRoute
+  '/universe/$id': typeof UniverseIdRoute
   '/wiki': typeof WikiIndexRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/timeline': typeof TimelineRoute
   '/universes': typeof UniversesRoute
+  '/universe/$id': typeof UniverseIdRoute
   '/wiki/': typeof WikiIndexRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/timeline'
     | '/universes'
+    | '/universe/$id'
     | '/wiki'
     | '/wiki/character/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/timeline'
     | '/universes'
+    | '/universe/$id'
     | '/wiki'
     | '/wiki/character/$id'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/timeline'
     | '/universes'
+    | '/universe/$id'
     | '/wiki/'
     | '/wiki/character/$id'
   fileRoutesById: FileRoutesById
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   TimelineRoute: typeof TimelineRoute
   UniversesRoute: typeof UniversesRoute
+  UniverseIdRoute: typeof UniverseIdRoute
   WikiIndexRoute: typeof WikiIndexRoute
   WikiCharacterIdRoute: typeof WikiCharacterIdRoute
 }
@@ -185,6 +198,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WikiIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/universe/$id': {
+      id: '/universe/$id'
+      path: '/universe/$id'
+      fullPath: '/universe/$id'
+      preLoaderRoute: typeof UniverseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/wiki/character/$id': {
       id: '/wiki/character/$id'
       path: '/wiki/character/$id'
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   TimelineRoute: TimelineRoute,
   UniversesRoute: UniversesRoute,
+  UniverseIdRoute: UniverseIdRoute,
   WikiIndexRoute: WikiIndexRoute,
   WikiCharacterIdRoute: WikiCharacterIdRoute,
 }
