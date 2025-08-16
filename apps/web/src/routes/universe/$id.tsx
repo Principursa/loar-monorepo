@@ -72,7 +72,10 @@ function UniverseViewPage() {
         description: commonStart.description,
         videoUrl: commonStart.videoUrl,
         characters: commonStart.characters,
-        isRoot: true
+        isRoot: true,
+        eventId: commonStart.id,
+        timelineId: universe.timelines[0].id,
+        universeId: universe.id
       }
     });
     
@@ -152,7 +155,10 @@ function UniverseViewPage() {
             videoUrl: node.videoUrl,
             characters: node.characters,
             timelineColor: color,
-            timelineName: timeline.name
+            timelineName: timeline.name,
+            eventId: node.id,
+            timelineId: timeline.id,
+            universeId: universe.id
           }
         });
         

@@ -18,6 +18,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as WikiIndexRouteImport } from './routes/wiki/index'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
+import { Route as EventUniverseIdTimelineIdEventIdRouteImport } from './routes/event/$universeId.$timelineId.$eventId'
 
 const UniversesRoute = UniversesRouteImport.update({
   id: '/universes',
@@ -64,6 +65,12 @@ const WikiCharacterIdRoute = WikiCharacterIdRouteImport.update({
   path: '/wiki/character/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EventUniverseIdTimelineIdEventIdRoute =
+  EventUniverseIdTimelineIdEventIdRouteImport.update({
+    id: '/event/$universeId/$timelineId/$eventId',
+    path: '/event/$universeId/$timelineId/$eventId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/universe/$id': typeof UniverseIdRoute
   '/wiki': typeof WikiIndexRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
+  '/event/$universeId/$timelineId/$eventId': typeof EventUniverseIdTimelineIdEventIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +94,7 @@ export interface FileRoutesByTo {
   '/universe/$id': typeof UniverseIdRoute
   '/wiki': typeof WikiIndexRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
+  '/event/$universeId/$timelineId/$eventId': typeof EventUniverseIdTimelineIdEventIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +107,7 @@ export interface FileRoutesById {
   '/universe/$id': typeof UniverseIdRoute
   '/wiki/': typeof WikiIndexRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
+  '/event/$universeId/$timelineId/$eventId': typeof EventUniverseIdTimelineIdEventIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/universe/$id'
     | '/wiki'
     | '/wiki/character/$id'
+    | '/event/$universeId/$timelineId/$eventId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +133,7 @@ export interface FileRouteTypes {
     | '/universe/$id'
     | '/wiki'
     | '/wiki/character/$id'
+    | '/event/$universeId/$timelineId/$eventId'
   id:
     | '__root__'
     | '/'
@@ -133,6 +145,7 @@ export interface FileRouteTypes {
     | '/universe/$id'
     | '/wiki/'
     | '/wiki/character/$id'
+    | '/event/$universeId/$timelineId/$eventId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +158,7 @@ export interface RootRouteChildren {
   UniverseIdRoute: typeof UniverseIdRoute
   WikiIndexRoute: typeof WikiIndexRoute
   WikiCharacterIdRoute: typeof WikiCharacterIdRoute
+  EventUniverseIdTimelineIdEventIdRoute: typeof EventUniverseIdTimelineIdEventIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +226,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WikiCharacterIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/event/$universeId/$timelineId/$eventId': {
+      id: '/event/$universeId/$timelineId/$eventId'
+      path: '/event/$universeId/$timelineId/$eventId'
+      fullPath: '/event/$universeId/$timelineId/$eventId'
+      preLoaderRoute: typeof EventUniverseIdTimelineIdEventIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -225,6 +246,7 @@ const rootRouteChildren: RootRouteChildren = {
   UniverseIdRoute: UniverseIdRoute,
   WikiIndexRoute: WikiIndexRoute,
   WikiCharacterIdRoute: WikiCharacterIdRoute,
+  EventUniverseIdTimelineIdEventIdRoute: EventUniverseIdTimelineIdEventIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
