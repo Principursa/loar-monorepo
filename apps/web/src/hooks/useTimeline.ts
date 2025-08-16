@@ -17,7 +17,15 @@ export function useGetNode(id: number) {
   })
 
 }
-export function useGetTimeline() {
+export function useGetTimeline(id: number) {
+  const chainId = useChainId()
+
+  return useReadContract({
+    abi: timelineAbi,
+    address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
+    functionName: "getTimeline",
+    args: [id]
+  })
 
 }
 export function useGetLeaves() {
@@ -76,6 +84,16 @@ export function useCreateNode(link: string, plot: string, previous: number) {
   return { writeAsync }
 
 }
-export function useSetMedia() {
+export function useSetMedia(id: number, link: string) {
+  const chainId = useChainId()
+  const contract = useWriteContract()
+
+  const writeAsync = (id: number, link: string) =>
+    contract.writeContractAsync({
+      abi: timelineAbi,
+      address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
+      functionName: 'useSetMedia',
+      args: [id, link]
+    })
 
 }
