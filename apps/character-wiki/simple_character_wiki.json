@@ -1,0 +1,48 @@
+{
+  "metadata": {
+    "version": "4.0",
+    "created_at": "2025-08-16T03:01:07.881Z",
+    "total_characters": 2,
+    "last_updated": "2025-08-16T03:01:45.377Z"
+  },
+  "characters": [
+    {
+      "id": "bored_ape_yacht_club_1234",
+      "character_name": "Captain Bubblenap",
+      "collection": "Bored Ape Yacht Club",
+      "token_id": "1234",
+      "traits": {
+        "Eyes": "Sleepy",
+        "Background": "Army Green",
+        "Clothes": "Leather Jacket",
+        "Fur": "Blue",
+        "Mouth": "Bored Bubblegum",
+        "Hat": "Fisherman's Hat"
+      },
+      "rarity_rank": 0,
+      "rarity_percentage": 30.49,
+      "image_url": "https://i2.seadn.io/base/0x7e72abdf47bd21bf0ed6ea8cb8dad60579f3fb50/34234bf162d45933d645055a11c1b6/a834234bf162d45933d645055a11c1b6.png",
+      "description": "Captain Bubblenap is the world’s most laid-back adventurer, always blowing bubbles as he dozes off mid-quest. His cool blue fur and battered leather jacket hint at wild stories he’ll never finish telling, while his sleepy eyes and trusty fisherman’s hat prove that nap time is the real treasure. If you can keep him awake long enough, he'll lead you to the Yacht Club’s best-kept secrets.",
+      "created_at": "2025-08-16T03:01:26.286Z"
+    },
+    {
+      "id": "doodles_999",
+      "character_name": "Sunny Slice",
+      "collection": "Doodles",
+      "token_id": "999",
+      "traits": {
+        "Face": "Sunglasses",
+        "Hair": "Yellow Bowlcut",
+        "Body": "Combo 2 Puffer",
+        "Background": "Purple",
+        "Head": "Med",
+        "Piercing": "Pearl"
+      },
+      "rarity_rank": 0,
+      "rarity_percentage": 0,
+      "image_url": "https://i2.seadn.io/ethereum/0x8a90cab2b38dba80c64b7734e58ee1db38b8992e/48af7f10ae12f8c7cfd676cf8dcb67b4.png",
+      "description": "Sunny Slice is the eternally chill trendsetter of the Doodles tribe, sporting bold yellow bowlcut hair and glossy sunglasses that always keep their cool secrets hidden. Clad in a vibrant Combo 2 Puffer jacket and flaunting a single pearl piercing, they're effortlessly confident and love sparking laughter wherever the purple skies lead them. Always ready with quick wit and a sly smile, Sunny Slice is a magnetic storyteller with a passion for adventure and new friendships.",
+      "created_at": "2025-08-16T03:01:45.377Z"
+    }
+  ]
+}
