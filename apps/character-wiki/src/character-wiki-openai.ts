@@ -1,6 +1,9 @@
 import { Agent, run, MCPServerStreamableHttp } from '@openai/agents';
 import { config } from 'dotenv';
 import fs from 'fs/promises';
+import { drizzle } from "drizzle-orm/node-postgres";
+import { characters } from '../../server/src/db/schema';
+import { eq } from 'drizzle-orm';
 
 config();
 
@@ -32,8 +35,12 @@ export class SimplifiedCharacterWiki {
   private agent: Agent;
   private wikiFile: string = 'simple_character_wiki.json';
   private wiki: WikiData;
+  private db: ReturnType<typeof drizzle>;
 
   constructor() {
+    // Initialize database connection
+    this.db = drizzle(process.env.DATABASE_URL || "postgresql://postgres:password@127.0.0.1:5432/loar-fullstack");
+
     // Create MCP server connection
     this.mcpServer = new MCPServerStreamableHttp({
       url: 'https://mcp.opensea.io/hCaTcrq7iFjnZO4ho0vhGtCMs2GiC7qP7xVFYvwX0I/mcp',
@@ -326,11 +333,20 @@ Rarity Rank: #${characterData.rarity_rank}`;
       }
     }
 
-    // Extract image URL
-    const imgMatch = response.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)\)/);
-    if (imgMatch) {
-      data.image_url = imgMatch[1];
-      console.log(`Found image: ${data.image_url}`);
+    // Extract image URL - try multiple patterns
+    const imgPatterns = [
+      /!\[.*?\]\((https?:\/\/[^\s\)]+)\)/,  // ![alt](url) format
+      /\[View.*?\]\((https?:\/\/[^\s\)]+)\)/, // [View text](url) format
+      /(https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp))/  // Direct URL pattern
+    ];
+
+    for (const pattern of imgPatterns) {
+      const imgMatch = response.match(pattern);
+      if (imgMatch) {
+        data.image_url = imgMatch[1];
+        console.log(`Found image: ${data.image_url}`);
+        break;
+      }
     }
 
     console.log('Final parsed data:', data);
@@ -380,37 +396,101 @@ Rarity Rank: #${characterData.rarity_rank}`;
     };
 
     // Add to wiki
-    this.addCharacter(character);
+    await this.addCharacter(character);
 
     return character;
   }
 
-  addCharacter(character: CharacterData): void {
-    // Remove if exists (update)
+  async addCharacter(character: CharacterData): Promise<void> {
+    try {
+      // Save to database
+      await this.db.insert(characters).values({
+        id: character.id,
+        character_name: character.character_name,
+        collection: character.collection,
+        token_id: character.token_id,
+        traits: character.traits,
+        rarity_rank: character.rarity_rank,
+        rarity_percentage: character.rarity_percentage?.toString(),
+        image_url: character.image_url,
+        description: character.description,
+        created_at: new Date(character.created_at),
+        updated_at: new Date()
+      }).onConflictDoUpdate({
+        target: characters.id,
+        set: {
+          character_name: character.character_name,
+          collection: character.collection,
+          token_id: character.token_id,
+          traits: character.traits,
+          rarity_rank: character.rarity_rank,
+          rarity_percentage: character.rarity_percentage?.toString(),
+          image_url: character.image_url,
+          description: character.description,
+          updated_at: new Date()
+        }
+      });
+
+      console.log(`💾 Character saved to database: ${character.character_name}`);
+    } catch (error) {
+      console.error('Error saving character to database:', error);
+    }
+
+    // Still maintain JSON file for backup
     this.wiki.characters = this.wiki.characters.filter(c => c.id !== character.id);
-
-    // Add new character
     this.wiki.characters.push(character);
-
-    // Update metadata
     this.wiki.metadata.total_characters = this.wiki.characters.length;
     this.wiki.metadata.last_updated = new Date().toISOString();
-
-    // Save
     this.saveWiki();
   }
 
-  getCharacter(characterId: string): CharacterData | null {
-    const character = this.wiki.characters.find(c => c.id === characterId);
-    return character || null;
+  async getCharacter(characterId: string): Promise<CharacterData | null> {
+    try {
+      const result = await this.db.select().from(characters).where(eq(characters.id, characterId));
+      if (result.length > 0) {
+        const char = result[0];
+        return {
+          id: char.id,
+          character_name: char.character_name,
+          collection: char.collection,
+          token_id: char.token_id,
+          traits: char.traits as Record<string, string>,
+          rarity_rank: char.rarity_rank,
+          rarity_percentage: char.rarity_percentage ? parseFloat(char.rarity_percentage) : 0,
+          image_url: char.image_url,
+          description: char.description,
+          created_at: char.created_at.toISOString()
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching character from database:', error);
+    }
+    return null;
   }
 
-  getAllCharacters(): CharacterData[] {
-    return this.wiki.characters;
+  async getAllCharacters(): Promise<CharacterData[]> {
+    try {
+      const result = await this.db.select().from(characters);
+      return result.map(char => ({
+        id: char.id,
+        character_name: char.character_name,
+        collection: char.collection,
+        token_id: char.token_id,
+        traits: char.traits as Record<string, string>,
+        rarity_rank: char.rarity_rank,
+        rarity_percentage: char.rarity_percentage ? parseFloat(char.rarity_percentage) : 0,
+        image_url: char.image_url,
+        description: char.description,
+        created_at: char.created_at.toISOString()
+      }));
+    } catch (error) {
+      console.error('Error fetching characters from database:', error);
+      return [];
+    }
   }
 
-  exportVideoContext(characterId: string): string | null {
-    const character = this.getCharacter(characterId);
+  async exportVideoContext(characterId: string): Promise<string | null> {
+    const character = await this.getCharacter(characterId);
     if (!character) {
       return null;
     }
@@ -448,24 +528,52 @@ async function main(): Promise<void> {
     await wiki.connect();
 
     const testNFTs: [string, string][] = [
-      ['Bored Ape Yacht Club', '1234'],
-      ['Doodles', '999']
+      // CryptoPunks
+      ['CryptoPunks', '1000'],
+      ['CryptoPunks', '2500'],
+      ['CryptoPunks', '5000'],
+      
+      // Pudgy Penguins
+      ['Pudgy Penguins', '100'],
+      ['Pudgy Penguins', '500'],
+      ['Pudgy Penguins', '1000'],
+      
+      // Doodles
+      ['Doodles', '250'],
+      ['Doodles', '750'],
+      ['Doodles', '1500'],
+      
+      // Moonbirds
+      ['Moonbirds', '100'],
+      ['Moonbirds', '500'],
+      ['Moonbirds', '1000']
     ];
 
-    for (const [collection, tokenId] of testNFTs) {
+    console.log(`\n🚀 Starting generation of ${testNFTs.length} characters from 4 collections...\n`);
+
+    for (let i = 0; i < testNFTs.length; i++) {
+      const [collection, tokenId] = testNFTs[i];
+      console.log(`\n[${i + 1}/${testNFTs.length}] Processing ${collection} #${tokenId}...`);
+      
       try {
         const character = await wiki.createCharacterFromOpenSea(collection, tokenId);
 
-        console.log(`\n✅ Created: ${character.character_name}`);
-        console.log(`📊 Traits:`, character.traits);
-        console.log(`🎭 Description: ${character.description.substring(0, 200)}...`);
+        console.log(`✅ Created: ${character.character_name}`);
+        console.log(`📊 Traits:`, Object.keys(character.traits).length, 'traits found');
+        console.log(`🎭 Description: ${character.description.substring(0, 100)}...`);
 
         // Export video context
-        const context = wiki.exportVideoContext(character.id);
-        console.log('\n🎬 Video Context saved');
+        const context = await wiki.exportVideoContext(character.id);
+        console.log('🎬 Video context ready');
 
       } catch (error) {
-        console.log(`❌ Error: ${error}`);
+        console.log(`❌ Error creating ${collection} #${tokenId}: ${error}`);
+      }
+      
+      // Add small delay between requests to be respectful to OpenSea API
+      if (i < testNFTs.length - 1) {
+        console.log('⏳ Waiting 2 seconds before next request...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
 

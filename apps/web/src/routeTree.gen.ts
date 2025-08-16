@@ -13,6 +13,8 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as FlowRouteImport } from './routes/flow'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WikiIndexRouteImport } from './routes/wiki/index'
+import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -34,18 +36,32 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WikiIndexRoute = WikiIndexRouteImport.update({
+  id: '/wiki/',
+  path: '/wiki/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WikiCharacterIdRoute = WikiCharacterIdRouteImport.update({
+  id: '/wiki/character/$id',
+  path: '/wiki/character/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/flow': typeof FlowRoute
   '/login': typeof LoginRoute
+  '/wiki': typeof WikiIndexRoute
+  '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/flow': typeof FlowRoute
   '/login': typeof LoginRoute
+  '/wiki': typeof WikiIndexRoute
+  '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +69,28 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/flow': typeof FlowRoute
   '/login': typeof LoginRoute
+  '/wiki/': typeof WikiIndexRoute
+  '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/flow' | '/login'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/flow'
+    | '/login'
+    | '/wiki'
+    | '/wiki/character/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/flow' | '/login'
-  id: '__root__' | '/' | '/dashboard' | '/flow' | '/login'
+  to: '/' | '/dashboard' | '/flow' | '/login' | '/wiki' | '/wiki/character/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/flow'
+    | '/login'
+    | '/wiki/'
+    | '/wiki/character/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +98,8 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   FlowRoute: typeof FlowRoute
   LoginRoute: typeof LoginRoute
+  WikiIndexRoute: typeof WikiIndexRoute
+  WikiCharacterIdRoute: typeof WikiCharacterIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +132,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/wiki/': {
+      id: '/wiki/'
+      path: '/wiki'
+      fullPath: '/wiki'
+      preLoaderRoute: typeof WikiIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wiki/character/$id': {
+      id: '/wiki/character/$id'
+      path: '/wiki/character/$id'
+      fullPath: '/wiki/character/$id'
+      preLoaderRoute: typeof WikiCharacterIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +154,8 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   FlowRoute: FlowRoute,
   LoginRoute: LoginRoute,
+  WikiIndexRoute: WikiIndexRoute,
+  WikiCharacterIdRoute: WikiCharacterIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
