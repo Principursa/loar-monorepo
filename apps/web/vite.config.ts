@@ -7,8 +7,8 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [
     tailwindcss(),
-    tanstackRouter({}),
     react(),
+    tanstackRouter({}),
   ],
   resolve: {
     alias: {

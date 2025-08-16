@@ -28,15 +28,20 @@ export default function UserMenu() {
     );
   }
 
+  // Safely access user data with fallbacks
+  const user = session?.user || {};
+  const displayName = user?.name || user?.email || 'User';
+  const userEmail = user?.email || 'No email available';
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline">{session.user.name}</Button>
+        <Button variant="outline">{displayName}</Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="bg-card">
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
+        <DropdownMenuItem>{userEmail}</DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Button
             variant="destructive"

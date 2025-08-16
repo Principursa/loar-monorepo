@@ -67,9 +67,9 @@ function RouteComponent() {
 
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-6">LOAR Dashboard</h1>
       
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 mb-8">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -134,6 +134,21 @@ function RouteComponent() {
           </CardContent>
         </Card>
       </div>
+      
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Narrative Flow Editor</CardTitle>
+          <CardDescription>
+            Create and manage your narrative universe
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4">Access the narrative flow editor to create and connect characters, plot points, and media elements.</p>
+          <Button>
+            Open Narrative Editor
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

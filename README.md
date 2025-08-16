@@ -19,6 +19,8 @@ Before you begin, ensure you have the following installed:
 - **Bun** (recommended) - [Install here](https://bun.sh/)
 - **PostgreSQL** - [Install here](https://www.postgresql.org/download/)
 - **Foundry** (for smart contracts) - [Install here](https://book.getfoundry.sh/getting-started/installation)
+- **Ethereum wallet** (MetaMask recommended)
+- **NFT holdings** (for full governance participation)
 
 ## 📦 Installation
 
@@ -28,13 +30,16 @@ Before you begin, ensure you have the following installed:
    cd Loar-Fullstack
    ```
 
+<<<<<<< HEAD
 2. **Install dependencies:**
    ```bash
-   # Using Bun (recommended)
+   # Install dependencies for the entire monorepo
    bun install
    
-   # Or using npm
-   npm install
+   # If you encounter missing dependencies, install them specifically for the web app
+   cd apps/web
+   bun install
+   bun add reactflow  # Required for the narrative flow editor
    ```
 
 3. **Set up Dynamic Wallet Authentication:**
@@ -47,27 +52,53 @@ Before you begin, ensure you have the following installed:
      VITE_SERVER_URL=http://localhost:3000
      ```
 
-4. **Set up the database:**
+4. **Configure your environment:**
+   - Update `apps/server/.env` with your PostgreSQL and OpenSea API details
+   - Copy `apps/web/.env.example` to `apps/web/.env` and update as needed
+
+5. **Set up the database:**
    ```bash
+   # From the root directory
+   bun db:push
+   # Or if you prefer to run migrations
    cd apps/server
-   # Update database connection in drizzle.config.ts
    bun run db:generate
    bun run db:migrate
    ```
 
 ## 🚀 Running the Application
 
-1. **Start the server:**
+1. **Launch the platform:**
    ```bash
-   cd apps/server
-   bun run dev
+   # Run the full stack:
+   bun dev
+   
+   # Or run just the frontend:
+   bun dev:web
+   
+   # Or run just the backend:
+   bun dev:server
    ```
 
-2. **Start the web app:**
+2. **Access the application:**
+   - Web App: [http://localhost:3001](http://localhost:3001) or [http://localhost:3002](http://localhost:3002) (port may vary if 3001 is already in use)
+   - API endpoints: [http://localhost:3000](http://localhost:3000)
+
+### Troubleshooting
+
+If you encounter dependency issues:
+
+1. **Missing packages**: Some dependencies might not be installed automatically. If you see errors about missing packages, install them individually:
    ```bash
    cd apps/web
-   bun run dev
+   bun add reactflow @tailwindcss/postcss autoprefixer
    ```
+
+2. **Port conflicts**: If port 3001 is already in use, the application will automatically use port 3002 or another available port.
+
+3. **Database connection issues**: Ensure PostgreSQL is running and your connection details in `apps/server/.env` are correct.
+
+4. **Workspace warnings**: You may see warnings about missing workspace directories like "packages/" or "contracts/". These can be safely ignored if you're only working on the web and server applications.
 
 3. **Deploy smart contracts (optional):**
    ```bash
@@ -151,6 +182,15 @@ cd apps/contracts
 forge build
 forge deploy
 ```
+
+## 🔑 Key Technologies
+
+- **TypeScript** - Type-safe development
+- **React & TanStack** - Dynamic frontend
+- **Hono & tRPC** - Performant API layer
+- **Ethereum & OpenSea** - Blockchain integration
+- **Walrus Protocol** - Decentralized content storage
+- **Dynamic** - Wallet Connection
 
 ## 🤝 Contributing
 
