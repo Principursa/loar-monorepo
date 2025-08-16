@@ -132,6 +132,17 @@ function UniversesPage() {
                           <p className="text-sm text-muted-foreground mb-3">
                             {node.description}
                           </p>
+
+                          <div className="mb-3">
+                            <video 
+                              className="w-full h-32 object-cover rounded-lg border" 
+                              controls
+                              preload="metadata"
+                            >
+                              <source src={node.videoUrl} type="video/mp4" />
+                              Your browser does not support the video tag.
+                            </video>
+                          </div>
                           
                           {node.characters.length > 0 && (
                             <div className="mb-3">
@@ -147,8 +158,10 @@ function UniversesPage() {
                           )}
 
                           <div className="flex items-center justify-between">
-                            <Button size="sm" variant="outline">
-                              Watch Video
+                            <Button size="sm" variant="outline" asChild>
+                              <a href={node.videoUrl} target="_blank" rel="noopener noreferrer">
+                                Watch Full Video
+                              </a>
                             </Button>
                             {node.connections.length > 0 && (
                               <Badge variant="outline" className="text-xs">

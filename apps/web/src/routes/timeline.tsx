@@ -100,6 +100,17 @@ function TimelinePage() {
                   <p className="text-sm text-muted-foreground">
                     {node.description}
                   </p>
+
+                  <div>
+                    <video 
+                      className="w-full h-48 object-cover rounded-lg border" 
+                      controls
+                      preload="metadata"
+                    >
+                      <source src={node.videoUrl} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
                   
                   {node.characters.length > 0 && (
                     <div>
@@ -115,9 +126,11 @@ function TimelinePage() {
                   )}
 
                   <div className="flex items-center justify-between pt-2">
-                    <Button size="sm" className="flex items-center gap-2">
-                      <Play className="w-4 h-4" />
-                      Watch Event
+                    <Button size="sm" className="flex items-center gap-2" asChild>
+                      <a href={node.videoUrl} target="_blank" rel="noopener noreferrer">
+                        <Play className="w-4 h-4" />
+                        Watch Full Video
+                      </a>
                     </Button>
                     
                     {node.connections.length > 0 && (
