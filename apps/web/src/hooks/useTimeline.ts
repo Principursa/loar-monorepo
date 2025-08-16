@@ -21,7 +21,15 @@ export function useGetTimeline() {
 
 }
 export function useGetLeaves() {
+  const chainId = useChainId()
 
+  return useReadContract({
+    abi: timelineAbi,
+    address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
+    functionName: "getLeaves",
+    args: [],
+
+  })
 }
 
 export function useGetMedia(id: number) {
