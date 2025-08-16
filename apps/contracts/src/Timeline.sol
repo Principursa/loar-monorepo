@@ -2,8 +2,9 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
+import {Ownable} from "@openzeppelin/access/ownable.sol";
 
-contract Timeline {
+contract Timeline is Ownable{
   struct VideoNode {
     string link;
     uint id;
@@ -12,6 +13,7 @@ contract Timeline {
     uint[] next;
     bool canon;
   }
+  constructor(address initialOwner) Ownable(initialOwner) {}
 
   mapping(uint => VideoNode) public nodes;
   uint public latestNodeId;
@@ -120,7 +122,7 @@ contract Timeline {
 
     // ---- Canon ----
 
-    function setCanon(uint id) public { //governance will handle this
+    function setCanon(uint id) public onlyOwner{ //governance will handle this
         require(nodes[id].id != 0, "Node does not exist");
 
         // Clear old canon (at most one canon at a time)
