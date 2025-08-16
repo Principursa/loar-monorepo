@@ -26,8 +26,6 @@ const router = createRouter({
   defaultPendingComponent: () => <Loader />,
   context: { trpc, queryClient },
   Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {
-    console.log("DynamicContextProvider rendering with environmentId:", import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID);
-    
     return (
       <DynamicContextProvider
         settings={{
