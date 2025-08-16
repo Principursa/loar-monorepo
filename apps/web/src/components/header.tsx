@@ -8,6 +8,8 @@ export default function Header() {
     { to: "/", label: "Home" },
     { to: "/dashboard", label: "Dashboard" },
     { to: "/flow", label: "Narrative Flow" },
+    { to: "/wiki", label: "Characters" },
+    { to: "/universes", label: "Universes" },
   ];
 
   return (

@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UniversesRouteImport } from './routes/universes'
+import { Route as TimelineRouteImport } from './routes/timeline'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FlowRouteImport } from './routes/flow'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -16,6 +18,16 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as WikiIndexRouteImport } from './routes/wiki/index'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 
+const UniversesRoute = UniversesRouteImport.update({
+  id: '/universes',
+  path: '/universes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TimelineRoute = TimelineRouteImport.update({
+  id: '/timeline',
+  path: '/timeline',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -52,6 +64,8 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/flow': typeof FlowRoute
   '/login': typeof LoginRoute
+  '/timeline': typeof TimelineRoute
+  '/universes': typeof UniversesRoute
   '/wiki': typeof WikiIndexRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
@@ -60,6 +74,8 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/flow': typeof FlowRoute
   '/login': typeof LoginRoute
+  '/timeline': typeof TimelineRoute
+  '/universes': typeof UniversesRoute
   '/wiki': typeof WikiIndexRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
@@ -69,6 +85,8 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/flow': typeof FlowRoute
   '/login': typeof LoginRoute
+  '/timeline': typeof TimelineRoute
+  '/universes': typeof UniversesRoute
   '/wiki/': typeof WikiIndexRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
 }
@@ -79,16 +97,28 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/flow'
     | '/login'
+    | '/timeline'
+    | '/universes'
     | '/wiki'
     | '/wiki/character/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/flow' | '/login' | '/wiki' | '/wiki/character/$id'
+  to:
+    | '/'
+    | '/dashboard'
+    | '/flow'
+    | '/login'
+    | '/timeline'
+    | '/universes'
+    | '/wiki'
+    | '/wiki/character/$id'
   id:
     | '__root__'
     | '/'
     | '/dashboard'
     | '/flow'
     | '/login'
+    | '/timeline'
+    | '/universes'
     | '/wiki/'
     | '/wiki/character/$id'
   fileRoutesById: FileRoutesById
@@ -98,12 +128,28 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   FlowRoute: typeof FlowRoute
   LoginRoute: typeof LoginRoute
+  TimelineRoute: typeof TimelineRoute
+  UniversesRoute: typeof UniversesRoute
   WikiIndexRoute: typeof WikiIndexRoute
   WikiCharacterIdRoute: typeof WikiCharacterIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/universes': {
+      id: '/universes'
+      path: '/universes'
+      fullPath: '/universes'
+      preLoaderRoute: typeof UniversesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/timeline': {
+      id: '/timeline'
+      path: '/timeline'
+      fullPath: '/timeline'
+      preLoaderRoute: typeof TimelineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -154,6 +200,8 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   FlowRoute: FlowRoute,
   LoginRoute: LoginRoute,
+  TimelineRoute: TimelineRoute,
+  UniversesRoute: UniversesRoute,
   WikiIndexRoute: WikiIndexRoute,
   WikiCharacterIdRoute: WikiCharacterIdRoute,
 }
