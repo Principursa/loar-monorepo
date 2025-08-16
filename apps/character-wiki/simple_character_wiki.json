@@ -2,13 +2,13 @@
   "metadata": {
     "version": "4.0",
     "created_at": "2025-08-16T03:01:07.881Z",
-    "total_characters": 2,
-    "last_updated": "2025-08-16T03:01:45.377Z"
+    "total_characters": 14,
+    "last_updated": "2025-08-16T17:28:35.862Z"
   },
   "characters": [
     {
       "id": "bored_ape_yacht_club_1234",
-      "character_name": "Captain Bubblenap",
+      "character_name": "Captain Somnus Blue",
       "collection": "Bored Ape Yacht Club",
       "token_id": "1234",
       "traits": {
@@ -20,14 +20,14 @@
         "Hat": "Fisherman's Hat"
       },
       "rarity_rank": 0,
-      "rarity_percentage": 30.49,
+      "rarity_percentage": 0,
       "image_url": "https://i2.seadn.io/base/0x7e72abdf47bd21bf0ed6ea8cb8dad60579f3fb50/34234bf162d45933d645055a11c1b6/a834234bf162d45933d645055a11c1b6.png",
-      "description": "Captain Bubblenap is the world’s most laid-back adventurer, always blowing bubbles as he dozes off mid-quest. His cool blue fur and battered leather jacket hint at wild stories he’ll never finish telling, while his sleepy eyes and trusty fisherman’s hat prove that nap time is the real treasure. If you can keep him awake long enough, he'll lead you to the Yacht Club’s best-kept secrets.",
-      "created_at": "2025-08-16T03:01:26.286Z"
+      "description": "Captain Somnus Blue is the laid-back legend of the marina, always found leaning on the yacht rail with his trusty fisherman's hat and a bubblegum bubble halfway popped. His sleepy eyes hide a sharp wit beneath the blue fur, and his leather jacket bears the patches of countless chill adventures. Unflappable and sly, he's the ape everyone wants at the poker table—or on the open sea.",
+      "created_at": "2025-08-16T15:55:31.958Z"
     },
     {
       "id": "doodles_999",
-      "character_name": "Sunny Slice",
+      "character_name": "Sunny Glare",
       "collection": "Doodles",
       "token_id": "999",
       "traits": {
@@ -39,10 +39,214 @@
         "Piercing": "Pearl"
       },
       "rarity_rank": 0,
-      "rarity_percentage": 0,
+      "rarity_percentage": 29.58,
       "image_url": "https://i2.seadn.io/ethereum/0x8a90cab2b38dba80c64b7734e58ee1db38b8992e/48af7f10ae12f8c7cfd676cf8dcb67b4.png",
-      "description": "Sunny Slice is the eternally chill trendsetter of the Doodles tribe, sporting bold yellow bowlcut hair and glossy sunglasses that always keep their cool secrets hidden. Clad in a vibrant Combo 2 Puffer jacket and flaunting a single pearl piercing, they're effortlessly confident and love sparking laughter wherever the purple skies lead them. Always ready with quick wit and a sly smile, Sunny Slice is a magnetic storyteller with a passion for adventure and new friendships.",
-      "created_at": "2025-08-16T03:01:45.377Z"
+      "description": "Sunny Glare is always ready to brighten up any scene, sporting iconic sunglasses and a daring yellow bowlcut that stands out in any crowd. Wrapped in a vibrant combo puffer and rocking a sophisticated pearl piercing, Sunny exudes effortless cool with a playful twist. Beneath the stylish exterior lies a laid-back optimist who loves adventure—and never misses a beat in the ever-colorful Doodles world.",
+      "created_at": "2025-08-16T15:55:51.184Z"
+    },
+    {
+      "id": "cryptopunks_1000",
+      "character_name": "Vera Ash",
+      "collection": "CryptoPunks",
+      "token_id": "1000",
+      "traits": {
+        "Type": "Female",
+        "Accessory": "Cigarette",
+        "Accessories total": "3 attributes"
+      },
+      "rarity_rank": 0,
+      "rarity_percentage": 51.31,
+      "image_url": "https://i2.seadn.io/ethereum/0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb/f8c7574bf861c8e5e7d387d618d72e/e4f8c7574bf861c8e5e7d387d618d72e.png",
+      "description": "Vera Ash strides through the pixel metropolis with a knowing smirk and a cigarette perched confidently between her lips. Her sharp gaze hints at a rebellious spirit and quick wit, making her the go-to fixer in the city’s underground riddles. Cool under pressure, Vera's smoky allure conceals a heart unafraid to fight for what she believes in.",
+      "created_at": "2025-08-16T17:25:04.724Z"
+    },
+    {
+      "id": "cryptopunks_2500",
+      "character_name": "Beardo Blaze",
+      "collection": "CryptoPunks",
+      "token_id": "2500",
+      "traits": {
+        "Type": "Male",
+        "Accessory": "Front Beard",
+        "Attributes": "3 attributes"
+      },
+      "rarity_rank": 0,
+      "rarity_percentage": 0,
+      "image_url": "https://i2.seadn.io/ethereum/0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb/cf1d3a39ca9861a1512bffa969cd93/b2cf1d3a39ca9861a1512bffa969cd93.png",
+      "description": "Beardo Blaze is the unflappable strategist of the CryptoPunks tribe, known for his signature fiery front beard and piercing gaze. He always keeps a cool head under pressure, using quick wit and razor-sharp intuition to outsmart rivals in the digital underworld. Loyal to his crew but fiercely independent, Beardo’s silent confidence makes him a natural leader in times of chaos.",
+      "created_at": "2025-08-16T17:25:19.888Z"
+    },
+    {
+      "id": "cryptopunks_5000",
+      "character_name": "Pixel Sage Orrin",
+      "collection": "CryptoPunks",
+      "token_id": "5000",
+      "traits": {},
+      "rarity_rank": 0,
+      "rarity_percentage": 51.31,
+      "image_url": "https://i2.seadn.io/ethereum/0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb/661db7fe337c87875e93466e62c991/46661db7fe337c87875e93466e62c991.png",
+      "description": "Pixel Sage Orrin is the cryptic elder of the CryptoPunks tribe, his eyes gleaming with the wisdom of thousands of blockchain transactions. Clad in digital regalia, he exudes an aura of quiet curiosity and playful insight, always ready with a pixelated riddle or a byte-sized piece of advice. Orrin's enigmatic presence makes him both a trusted advisor and a mischievous trickster among CryptoPunks.",
+      "created_at": "2025-08-16T17:25:35.350Z"
+    },
+    {
+      "id": "pudgy_penguins_100",
+      "character_name": "Waddles the Wise",
+      "collection": "Pudgy Penguins",
+      "token_id": "100",
+      "traits": {},
+      "rarity_rank": 0,
+      "rarity_percentage": 14.32,
+      "image_url": "https://i2.seadn.io/ethereum/0xbd3531da5cf5857e7cfaa92426877b022e612cf8/90094b29f279013a7e87719b96288103.png",
+      "description": "Waddles the Wise is a legendary Pudgy Penguin, instantly recognizable by his sparkling monocle and twinkling blue scarf. With a knack for solving mysteries and a heart full of warmth, he brings wisdom and laughter to his icy tribe. His clever gaze and gentle waddle make him the trusted advisor every penguin looks up to.",
+      "created_at": "2025-08-16T17:25:53.378Z"
+    },
+    {
+      "id": "pudgy_penguins_500",
+      "character_name": "Percival Puddlefoot",
+      "collection": "Pudgy Penguins",
+      "token_id": "500",
+      "traits": {
+        "Background": "Purple",
+        "Skin": "Baby Pink",
+        "Body": "Overalls",
+        "Face": "Circle Glasses",
+        "Head": "Flat Cap Black"
+      },
+      "rarity_rank": 0,
+      "rarity_percentage": 0,
+      "image_url": "https://i2.seadn.io/ethereum/0xbd3531da5cf5857e7cfaa92426877b022e612cf8/fb6f2f39c15e64dbc41f83a917109ca8.png",
+      "description": "Percival is the ingenious tinkerer of the Pudgy Penguins tribe, instantly recognized by his cheerful baby pink hue, round spectacles, and snappy black flat cap. With a toolbox always clipped to his classic overalls, he's known for inventing clever contraptions to help his friends out of any chilly jam. Percival's curious spirit and gentle humor make him the heart of every penguin escapade in their purple-hued world.",
+      "created_at": "2025-08-16T17:26:08.239Z"
+    },
+    {
+      "id": "pudgy_penguins_1000",
+      "character_name": "Chef Turbo Waddle",
+      "collection": "Pudgy Penguins",
+      "token_id": "1000",
+      "traits": {
+        "Background": "Pink",
+        "Skin": "Light Gray",
+        "Body": "Apron",
+        "Face": "Normal",
+        "Head": "Biker Helmet"
+      },
+      "rarity_rank": 0,
+      "rarity_percentage": 30.99,
+      "image_url": "https://i2.seadn.io/ethereum/0xbd3531da5cf5857e7cfaa92426877b022e612cf8/96be7f7caf4d36031db0a6757a1b110b.png",
+      "description": "Chef Turbo Waddle is Pudgyville's fastest gourmet, zooming between kitchens with a spatula in one flipper and a recipe book in the other. With a light gray belly and signature biker helmet atop his head, he's always ready to whip up a feast or a food fight. His upbeat attitude and daring recipes make him a beloved, legendary presence on the pink-tinted streets.",
+      "created_at": "2025-08-16T17:26:26.870Z"
+    },
+    {
+      "id": "doodles_250",
+      "character_name": "NeoChroma",
+      "collection": "Doodles",
+      "token_id": "250",
+      "traits": {
+        "face": "neutral note",
+        "hair": "beige bucket cap",
+        "body": "pink and white jacket",
+        "background": "holographic",
+        "head": "pale",
+        "piercing": "airpod"
+      },
+      "rarity_rank": 0,
+      "rarity_percentage": 0,
+      "image_url": "https://i2.seadn.io/ethereum/0x8a90cab2b38dba80c64b7734e58ee1db38b8992e/f5311e0d39cafd90bedab9f1a18b74c9.png",
+      "description": "NeoChroma is the tribe's low-key music mastermind, always soaking in inspirational beats through a single Airpod. With a beige bucket cap askew and a sharp pink and white jacket, their cool, neutral gaze belies a mind bursting with holographic ideas. They’re calm, collected, and always ready to set the vibe, whether it’s a chill evening or a neon-lit adventure.",
+      "created_at": "2025-08-16T17:26:47.345Z"
+    },
+    {
+      "id": "doodles_750",
+      "character_name": "Sunny Snapback",
+      "collection": "Doodles",
+      "token_id": "750",
+      "traits": {
+        "face": "content",
+        "hair": "yellow backwards cap",
+        "body": "combo 2 puffer",
+        "background": "holographic",
+        "head": "tan"
+      },
+      "rarity_rank": 0,
+      "rarity_percentage": 0,
+      "image_url": "https://i2.seadn.io/ethereum/0x8a90cab2b38dba80c64b7734e58ee1db38b8992e/29941aeaadad4453a414e706998b6f12.png",
+      "description": "Sunny Snapback exudes effortless cool with a bright yellow backwards cap and a cozy two-tone puffer jacket, gleaming against a holographic backdrop. Always content and optimistic, their approachable grin and laid-back vibe make them the go-to friend for adventures or chill hangouts. Their tan complexion and bold style are a beacon of warmth in the Doodles universe, lighting up every story with positivity and charm.",
+      "created_at": "2025-08-16T17:27:16.013Z"
+    },
+    {
+      "id": "doodles_1500",
+      "character_name": "Poppy Lovelight",
+      "collection": "Doodles",
+      "token_id": "1500",
+      "traits": {
+        "Face": "in love",
+        "Hair": "pink",
+        "Body": "pink and white jacket",
+        "Background": "pink",
+        "Head": "purple"
+      },
+      "rarity_rank": 0,
+      "rarity_percentage": 0,
+      "image_url": "https://i2.seadn.io/ethereum/0x8a90cab2b38dba80c64b7734e58ee1db38b8992e/b72bec2d7899b9fae599e7d7097c3588.png",
+      "description": "Poppy Lovelight radiates joy with heart eyes and a permanent, dreamy smile. Donning a sleek pink and white jacket over a vibrant purple head, they spread affection and optimism wherever they go. Poppy has an infectious energy that turns every encounter into a celebration of friendship and fun.",
+      "created_at": "2025-08-16T17:27:37.720Z"
+    },
+    {
+      "id": "moonbirds_100",
+      "character_name": "Sunny Halo",
+      "collection": "Moonbirds",
+      "token_id": "100",
+      "traits": {
+        "Background": "Yellow",
+        "Beak": "Small",
+        "Body": "Tabby",
+        "Feathers": "Brown",
+        "Eyewear": "Sunglasses",
+        "Headwear": "Halo"
+      },
+      "rarity_rank": 0,
+      "rarity_percentage": 0,
+      "image_url": "https://i2.seadn.io/ethereum/0x23581767a106ae21c074b2276d25e5c3e136a68b/0e26ff71e6c20d3b67f9eaa3283fbb/fa0e26ff71e6c20d3b67f9eaa3283fbb.png",
+      "description": "Radiating cool confidence with brown tabby feathers and a gleaming halo, Sunny Halo is the Moonbirds tribe's most laid-back yet inspiring leader. Always sporting sleek sunglasses, they're known for their warm charisma and ability to turn any problem into a bright opportunity. Sunny's golden presence lights the way for their flock through even the darkest night skies.",
+      "created_at": "2025-08-16T17:28:00.248Z"
+    },
+    {
+      "id": "moonbirds_500",
+      "character_name": "Captain Chillbeak",
+      "collection": "Moonbirds",
+      "token_id": "500",
+      "traits": {
+        "Background": "Green",
+        "Beak": "Long",
+        "Body": "Stark",
+        "Feathers": "Blue",
+        "Eyes": "Relaxed",
+        "Headwear": "Pirate's Hat"
+      },
+      "rarity_rank": 0,
+      "rarity_percentage": 39.87,
+      "image_url": "https://i2.seadn.io/ethereum/0x23581767a106ae21c074b2276d25e5c3e136a68b/cb894603273706751a3dff09da911c/dfcb894603273706751a3dff09da911c.png",
+      "description": "Captain Chillbeak roams the lunar skies with a laid-back swagger, his piercing blue feathers a sign of adventures weathered and tales untold. Always wearing his signature pirate's hat, he greets friend and foe alike with a knowing wink and a long-beaked grin. Despite his cool exterior and green-hued world, he's got a soft spot for good stories and even better company.",
+      "created_at": "2025-08-16T17:28:16.534Z"
+    },
+    {
+      "id": "moonbirds_1000",
+      "character_name": "Ruby Sentinel",
+      "collection": "Moonbirds",
+      "token_id": "1000",
+      "traits": {
+        "Background": "Pink",
+        "Beak": "Short",
+        "Body": "Guardian",
+        "Feathers": "Red",
+        "Eyes": "Open",
+        "Headwear": "Bandana"
+      },
+      "rarity_rank": 0,
+      "rarity_percentage": 0,
+      "image_url": "https://i2.seadn.io/ethereum/0x23581767a106ae21c074b2276d25e5c3e136a68b/bae1234d87f46677c28322d33fb773/98bae1234d87f46677c28322d33fb773.png",
+      "description": "Ruby Sentinel stands proud with vibrant red feathers and a sturdy guardian's stance, forever vigilant beneath a jaunty bandana. Her sharp, open eyes miss nothing, making her the Moonbirds' most reliable watchkeeper. Gritty, brave, and always ready to defend her flock, Ruby's presence is a beacon of strength amidst the rosy glow of her world.",
+      "created_at": "2025-08-16T17:28:35.837Z"
     }
   ]
 }
