@@ -19,6 +19,8 @@ import { FlowWalletConnectors } from "@dynamic-labs/flow";
 import { SolanaWalletConnectors } from "@dynamic-labs/solana";
 import { StarknetWalletConnectors } from "@dynamic-labs/starknet";
 import { SuiWalletConnectors } from "@dynamic-labs/sui";
+import { WagmiProvider } from "wagmi";
+import {config} from "../config"
 
 const router = createRouter({
   routeTree,
@@ -42,9 +44,11 @@ const router = createRouter({
           ],
         }}
       >
+      <WagmiProvider config={config}>
         <QueryClientProvider client={queryClient}>
           {children}
         </QueryClientProvider>
+        </WagmiProvider>
         <DynamicWidget />
       </DynamicContextProvider>
     );
