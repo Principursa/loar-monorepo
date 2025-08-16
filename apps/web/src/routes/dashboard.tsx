@@ -30,7 +30,7 @@ function RouteComponent() {
   return (
     <div>
       <h1>Dashboard</h1>
-      <p>Welcome {session?.user.name}</p>
+      <p>Welcome {session?.user?.name || 'User'}</p>
       <p>privateData: {privateData.data?.message}</p>
     </div>
   );

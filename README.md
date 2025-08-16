@@ -21,26 +21,58 @@ In the expanding multiverse of collaborative content creation, determining what'
 
 - Ethereum wallet (MetaMask recommended)
 - NFT holdings (for full governance participation)
-- Node.js environment
+- Bun runtime environment (v1.1.0 or later)
+- PostgreSQL database (for the server component)
+- Node.js v18+ (if not using Bun)
 
 ### Installation
 
 ```bash
-# Install dependencies
+# Install dependencies for the entire monorepo
 bun install
+
+# If you encounter missing dependencies, install them specifically for the web app
+cd apps/web
+bun install
+bun add reactflow  # Required for the narrative flow editor
 
 # Configure your environment
 # Update apps/server/.env with your PostgreSQL and OpenSea API details
+# Copy apps/web/.env.example to apps/web/.env and update as needed
 
-# Initialize the database
+# Initialize the database (from the root directory)
+cd ../.. 
 bun db:push
 
 # Launch the platform
+# You can run the full stack:
 bun dev
+
+# Or run just the frontend:
+bun dev:web
+
+# Or run just the backend:
+bun dev:server
 ```
 
-Open [http://localhost:3001](http://localhost:3001) to access the LOAR platform.
+Open [http://localhost:3001](http://localhost:3001) or [http://localhost:3002](http://localhost:3002) to access the LOAR platform (port may vary if 3001 is already in use).
 API endpoints available at [http://localhost:3000](http://localhost:3000).
+
+### Troubleshooting
+
+If you encounter dependency issues:
+
+1. **Missing packages**: Some dependencies might not be installed automatically. If you see errors about missing packages, install them individually:
+   ```bash
+   cd apps/web
+   bun add reactflow @tailwindcss/postcss autoprefixer
+   ```
+
+2. **Port conflicts**: If port 3001 is already in use, the application will automatically use port 3002 or another available port.
+
+3. **Database connection issues**: Ensure PostgreSQL is running and your connection details in `apps/server/.env` are correct.
+
+4. **Workspace warnings**: You may see warnings about missing workspace directories like "packages/" or "contracts/". These can be safely ignored if you're only working on the web and server applications.
 
 
 
