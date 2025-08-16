@@ -42,6 +42,7 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
+    "@wagmi/cli": "^2.4.0",
     "turbo": "^2.5.4"
   },
   "packageManager": "bun@1.1.8"
