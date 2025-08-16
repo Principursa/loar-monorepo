@@ -1,7 +1,7 @@
-import {useReadContract, useWriteContract} from 'wagmi'
+import { useReadContract, useWriteContract } from 'wagmi'
 import { timelineAbi } from '@/generated'
-import {useChainId} from 'wagmi'
-import { TIMELINE_ADDRESSES, SupportedChainId} from '@/configs/addresses-test'
+import { useChainId } from 'wagmi'
+import { TIMELINE_ADDRESSES, SupportedChainId } from '@/configs/addresses-test'
 
 
 //----------READ FUNCTIONS---------
@@ -29,11 +29,26 @@ export function useGetMedia() {
 export function useGetCanonChain() {
 
 }
+export function useGetFullGraph() {
+
+}
 
 
 //-------WRITE FUNCTIONS--------
 
-export function useCreateNode() {
+export function useCreateNode(link: string, plot: string, previous: number) {
+  const chainId = useChainId()
+  const contract = useWriteContract()
+
+  const writeAsync = (link: string, plot: string, previous: number) =>
+    contract.writeContractAsync({
+      abi: timelineAbi,
+      address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
+      functionName: 'createNode',
+      args: [link, plot, previous]
+    })
+
+  return { writeAsync }
 
 }
 export function useSetMedia() {
