@@ -50,6 +50,15 @@
 		"db:down": {
 			"cache": false,
 			"persistent": true
-		}
+		},
+    "sc:test": {
+      "dependsOn": ["build"]
+    },
+    "sc:test:cov": {
+      "dependsOn": ["build"]
+    },
+    "sc:test:integration" : { 
+      "dependsOn": ["build"]
+    }
 	}
 }
