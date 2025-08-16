@@ -26,6 +26,8 @@
     "sc:test:integration": "turbo run sc:test:integration"
   },
   "dependencies": {
+    "@dynamic-labs/ethereum": "^4.26.0",
+    "@dynamic-labs/sdk-react-core": "^4.26.0",
     "@langchain/openai": "^0.6.7",
     "@modelcontextprotocol/sdk": "^1.17.3",
     "@openai/agents": "^0.0.17",
@@ -34,7 +36,7 @@
     "install": "^0.13.0",
     "mcp-use": "^0.1.15",
     "openai": "^5.12.2",
-    "viem": "2.x",
+    "viem": "^2.33.3",
     "wagmi": "^2.16.3",
     "web": "./apps/web",
     "zod": "^4.0.17"
