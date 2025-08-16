@@ -25,7 +25,11 @@
     "sc:test:cov": "turbo run sc:test:cov",
     "sc:test:integration": "turbo run sc:test:integration"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@dynamic-labs/ethereum": "^4.26.0",
+    "@dynamic-labs/sdk-react-core": "^4.26.0",
+    "viem": "^2.33.3"
+  },
   "devDependencies": {
     "turbo": "^2.5.4"
   },

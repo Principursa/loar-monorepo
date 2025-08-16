@@ -1,4 +1,4 @@
-import { useDynamicContext } from "@dynamic-labs/sdk-react";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

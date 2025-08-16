@@ -1,24 +1,30 @@
-import { useDynamicContext } from "@dynamic-labs/sdk-react";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { Button } from "./ui/button";
 import { Wallet, LogOut } from "lucide-react";
 
 export const DynamicWalletButton = () => {
-  const { handleConnect, handleDisconnect, user, isConnecting } = useDynamicContext();
+  const { user, setShowDynamicUserProfile } = useDynamicContext();
+
+  // Debug logging
+  console.log("DynamicWalletButton render:", { user });
 
   if (user) {
     return (
       <div className="flex items-center gap-2">
         <span className="text-sm text-muted-foreground">
-          {user.wallets?.[0]?.address?.slice(0, 6)}...{user.wallets?.[0]?.address?.slice(-4)}
+          {user.username || "Connected"}
         </span>
         <Button
           variant="outline"
           size="sm"
-          onClick={handleDisconnect}
+          onClick={() => {
+            console.log("Show profile clicked");
+            setShowDynamicUserProfile?.(true);
+          }}
           className="flex items-center gap-2"
         >
           <LogOut className="h-4 w-4" />
-          Disconnect
+          Profile
         </Button>
       </div>
     );
@@ -26,12 +32,14 @@ export const DynamicWalletButton = () => {
 
   return (
     <Button
-      onClick={handleConnect}
-      disabled={isConnecting}
+      onClick={() => {
+        console.log("Connect clicked - opening Dynamic widget");
+        // The DynamicWidget should handle the connection
+      }}
       className="flex items-center gap-2"
     >
       <Wallet className="h-4 w-4" />
-      {isConnecting ? "Connecting..." : "Connect Wallet"}
+      Connect Wallet
     </Button>
   );
 };

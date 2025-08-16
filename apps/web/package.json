@@ -11,8 +11,16 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@dynamic-labs/algorand": "^4.26.0",
+    "@dynamic-labs/bitcoin": "^4.26.0",
+    "@dynamic-labs/cosmos": "^4.26.0",
     "@dynamic-labs/ethereum": "^4.26.0",
+    "@dynamic-labs/flow": "^4.26.0",
     "@dynamic-labs/sdk-react": "^0.18.30",
+    "@dynamic-labs/sdk-react-core": "^4.26.0",
+    "@dynamic-labs/solana": "^4.26.0",
+    "@dynamic-labs/starknet": "^4.26.0",
+    "@dynamic-labs/sui": "^4.26.0",
     "@hookform/resolvers": "^5.1.1",
     "@tailwindcss/vite": "^4.0.15",
     "@tanstack/react-form": "^1.12.3",
