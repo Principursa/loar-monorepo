@@ -33,8 +33,8 @@ export const DynamicWalletButton = () => {
   return (
     <Button
       onClick={() => {
-        console.log("Connect clicked - opening Dynamic widget");
-        // The DynamicWidget should handle the connection
+        console.log("Connect clicked - Dynamic widget should be visible on the page");
+        alert("Look for the Dynamic wallet widget on the page! It should appear as a floating button.");
       }}
       className="flex items-center gap-2"
     >

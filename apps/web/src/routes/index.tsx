@@ -30,6 +30,8 @@ function HomeComponent() {
   const healthCheck = useQuery(trpc.healthCheck.queryOptions());
   const { user, handleConnect } = useDynamicContext();
 
+  console.log("HomeComponent render:", { user, hasHandleConnect: !!handleConnect });
+
   return (
     <div className="container mx-auto max-w-6xl px-4 py-8">
       <div className="text-center mb-8">
