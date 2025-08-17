@@ -4,7 +4,6 @@ import { useChainId } from 'wagmi'
 import { TIMELINE_ADDRESSES, SupportedChainId } from '@/configs/addresses-test'
 import { TimelineEventNode } from '@/components/flow/TimelineNodes'
 
-
 //----------READ FUNCTIONS---------
 export function useGetNode(id: number) {
   const chainId = useChainId()
@@ -15,8 +14,8 @@ export function useGetNode(id: number) {
     functionName: "getNode",
     args: [id]
   })
-
 }
+
 export function useGetTimeline(id: number) {
   const chainId = useChainId()
 
@@ -26,8 +25,8 @@ export function useGetTimeline(id: number) {
     functionName: "getTimeline",
     args: [id]
   })
-
 }
+
 export function useGetLeaves() {
   const chainId = useChainId()
 
@@ -36,7 +35,6 @@ export function useGetLeaves() {
     address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
     functionName: "getLeaves",
     args: [],
-
   })
 }
 
@@ -49,8 +47,8 @@ export function useGetMedia(id: number) {
     functionName: "getMedia",
     args: [id]
   })
-
 }
+
 export function useGetCanonChain() {
   const chainId = useChainId()
 
@@ -59,8 +57,8 @@ export function useGetCanonChain() {
     address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
     functionName: "getCanonChain"
   })
-
 }
+
 export function useGetFullGraph() {
   const chainId = useChainId()
 
@@ -70,12 +68,9 @@ export function useGetFullGraph() {
     functionName: "getFullGraph",
     args: []
   })
-
 }
 
-
 //-------WRITE FUNCTIONS--------
-
 export function useCreateNode(link: string, plot: string, previous: number) {
   const chainId = useChainId()
   const contract = useWriteContract()
@@ -89,8 +84,8 @@ export function useCreateNode(link: string, plot: string, previous: number) {
     })
 
   return { writeAsync }
-
 }
+
 export function useSetMedia(id: number, link: string) {
   const chainId = useChainId()
   const contract = useWriteContract()
@@ -99,8 +94,24 @@ export function useSetMedia(id: number, link: string) {
     contract.writeContractAsync({
       abi: timelineAbi,
       address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
-      functionName: 'useSetMedia',
+      functionName: 'setMedia',
       args: [id, link]
     })
 
+  return { writeAsync }
+}
+
+export function useSetCanon(id: number) {
+  const chainId = useChainId()
+  const contract = useWriteContract()
+
+  const writeAsync = (id: number) =>
+    contract.writeContractAsync({
+      abi: timelineAbi,
+      address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
+      functionName: "setCanon",
+      args: [id]
+    })
+
+  return { writeAsync }
 }
