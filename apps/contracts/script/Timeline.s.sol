@@ -27,7 +27,7 @@ contract TimelineScript is Script {
         console.log("Deploying");
         vm.startBroadcast(deployerPrivateKey);
 
-        timeline = new Timeline(deployerAddress);//In backend this will be deployed w governance
+        timeline = new Timeline(deployerAddress); //In backend this will be deployed w governance
 
         vm.stopBroadcast();
     }
