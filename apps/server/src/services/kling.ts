@@ -90,6 +90,8 @@ export class KlingService {
   }
 
   async createMultiImageVideo(options: KlingMultiImageOptions): Promise<KlingTaskResponse> {
+    console.log('🎬 Starting Kling Multi-Image to Video Generation\n');
+    
     if (!options.image_list || options.image_list.length === 0) {
       throw new Error('At least one image is required');
     }
@@ -98,20 +100,15 @@ export class KlingService {
       throw new Error('Maximum 4 images allowed');
     }
 
-    // Download images and convert to base64
-    console.log('🖼️ Processing images for Kling AI...');
-    const processedImageList = await Promise.all(
-      options.image_list.map(async (imageInput) => {
-        // If it's already base64, use as is
-        if (!imageInput.image.startsWith('http')) {
-          return { image: imageInput.image };
-        }
-        
-        // Download and convert URL to base64
-        const base64 = await this.downloadImageAsBase64(imageInput.image);
-        return { image: base64 };
-      })
-    );
+    console.log('🖼️ Using NFT character images:');
+    options.image_list.forEach((imageInput, index) => {
+      console.log(`  ${index + 1}. ${imageInput.image}`);
+    });
+    console.log();
+
+    // Use images directly for Kling AI (no need to convert to base64)
+    console.log('🖼️ Using images directly for Kling AI...');
+    const processedImageList = options.image_list;
 
     const payload = {
       model_name: options.model_name || 'kling-v1-6',
@@ -122,8 +119,10 @@ export class KlingService {
       duration: options.duration || '5', // Use shortest duration by default
       aspect_ratio: options.aspect_ratio || '16:9',
       callback_url: options.callback_url,
-      external_task_id: options.external_task_id
+      external_task_id: options.external_task_id || `nft_flow_${Date.now()}`
     };
+
+    console.log('🚀 Creating multi-image video with payload:', JSON.stringify(payload, null, 2));
 
     try {
       const response = await fetch(`${this.baseUrl}/videos/multi-image2video`, {
@@ -135,15 +134,22 @@ export class KlingService {
         body: JSON.stringify(payload)
       });
 
+      const result = await response.json() as KlingTaskResponse;
+
       if (!response.ok) {
+        console.error('❌ API Response Error:', response.status, response.statusText);
+        console.error('❌ Error Details:', result);
         throw new Error(`Kling API error: ${response.status} ${response.statusText}`);
       }
 
-      const result = await response.json() as KlingTaskResponse;
-      
       if (result.code !== 0) {
         throw new Error(`Kling API error: ${result.message}`);
       }
+
+      console.log(`✅ Generation started successfully!`);
+      console.log(`📝 Task ID: ${result.data.task_id}`);
+      console.log(`📊 Status: ${result.data.task_status}`);
+      console.log(`⏰ Created at: ${new Date(result.data.created_at).toISOString()}\n`);
 
       return result;
     } catch (error) {
@@ -154,6 +160,8 @@ export class KlingService {
 
   async getTaskStatus(taskId: string): Promise<KlingTaskResponse> {
     try {
+      console.log(`🔄 Checking Kling status for task: ${taskId}...`);
+      
       const response = await fetch(`${this.baseUrl}/videos/multi-image2video/${taskId}`, {
         method: 'GET',
         headers: {
@@ -162,14 +170,36 @@ export class KlingService {
         }
       });
 
+      const result = await response.json() as KlingTaskResponse;
+
       if (!response.ok) {
+        console.error('❌ API Response Error:', response.status, response.statusText);
+        console.error('❌ Error Details:', result);
         throw new Error(`Kling API error: ${response.status} ${response.statusText}`);
       }
 
-      const result = await response.json() as KlingTaskResponse;
-      
       if (result.code !== 0) {
         throw new Error(`Kling API error: ${result.message}`);
+      }
+
+      console.log(`📊 Status: ${result.data.task_status}`);
+      if (result.data.task_status_msg) {
+        console.log(`💬 Message: ${result.data.task_status_msg}`);
+      }
+
+      if (result.data.task_status === 'succeed') {
+        console.log('🎉 Generation completed successfully!\n');
+        if (result.data.task_result?.videos?.length) {
+          const video = result.data.task_result.videos[0];
+          console.log(`🎥 Video Details:`);
+          console.log(`   ID: ${video.id}`);
+          console.log(`   Duration: ${video.duration}`);
+          console.log(`   URL: ${video.url}`);
+        }
+      } else if (result.data.task_status === 'failed') {
+        console.log(`❌ Generation failed: ${result.data.task_status_msg}`);
+      } else {
+        console.log(`⏳ Status: ${result.data.task_status}... waiting...\n`);
       }
 
       return result;

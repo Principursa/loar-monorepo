@@ -10,21 +10,6 @@ export const Route = createFileRoute("/")({
   component: HomeComponent,
 });
 
-const TITLE_TEXT = `
- ██████╗ ███████╗████████╗████████╗███████╗██████╗
- ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
- ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
- ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
- ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
- ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
-
- ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
- ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
-    ██║       ███████╗   ██║   ███████║██║     █████╔╝
-    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
-    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
-    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
- `;
 
 function HomeComponent() {
   const healthCheck = useQuery(trpc.healthCheck.queryOptions());
@@ -35,10 +20,26 @@ function HomeComponent() {
   return (
     <div className="container mx-auto max-w-6xl px-4 py-8">
       <div className="text-center mb-8">
-        <pre className="overflow-x-auto font-mono text-sm mb-6">{TITLE_TEXT}</pre>
-        <h1 className="text-4xl font-bold mb-4">Welcome to Loar Fullstack</h1>
+        <div className="flex justify-center mb-6">
+          <img
+            src="/logo.png"
+            alt="LOAR Logo"
+            className="h-72 w-auto object-contain"
+            onError={(e) => {
+              // Fallback to text if logo doesn't load
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              const fallback = target.nextElementSibling as HTMLElement;
+              if (fallback) fallback.style.display = 'block';
+            }}
+          />
+          <div className="hidden">
+            <h1 className="text-6xl font-bold text-primary">LOAR</h1>
+          </div>
+        </div>
+        <h1 className="text-4xl font-bold mb-4">Welcome to LOAR</h1>
         <p className="text-xl text-muted-foreground mb-8">
-          A modern fullstack application with Dynamic wallet authentication
+          Decentralized narrative control through NFT ownership and community governance
         </p>
       </div>
 
