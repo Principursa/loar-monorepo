@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { useAccount, useDeployContract, useWaitForTransactionReceipt, useBalance, useChainId } from "wagmi";
+import { useAccount, useDeployContract, useWaitForTransactionReceipt, useBalance, useChainId, useSignMessage } from "wagmi";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,7 @@ function CinematicUniverseCreate() {
   const { user } = useDynamicContext();
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
+  const { signMessage } = useSignMessage();
   const [tokenName, setTokenName] = useState("");
   const [tokenSymbol, setTokenSymbol] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -112,14 +113,39 @@ function CinematicUniverseCreate() {
 
   // Create cinematic universe when all contracts are deployed
   const createCinematicUniverse = useMutation({
-    mutationFn: (variables: {
+    mutationFn: async (variables: {
       address: string;
       creator: string; 
       tokenAddress: string;
       governanceAddress: string;
       imageUrl: string;
       description: string;
-    }) => trpcClient.cinematicUniverses.createcu.mutate(variables),
+    }) => {
+      console.log("Creating universe with variables:", variables);
+      
+      // Create message for wallet signature
+      const message = `Create Cinematic Universe\nCreator: ${variables.creator}\nTimeline: ${variables.address}\nTimestamp: ${Date.now()}`;
+      
+      // Sign the message with wallet
+      const signature = await new Promise<string>((resolve, reject) => {
+        signMessage(
+          { message },
+          {
+            onSuccess: (sig) => resolve(sig),
+            onError: (error) => reject(error)
+          }
+        );
+      });
+      
+      console.log("Signed message:", { message, signature });
+      
+      // Call tRPC with signature
+      return trpcClient.cinematicUniverses.createcu.mutate({
+        ...variables,
+        signature,
+        message
+      });
+    },
     onSuccess: (data) => {
       console.log("Cinematic Universe created:", data);
       setDeploymentStep("Cinematic Universe created successfully!");
