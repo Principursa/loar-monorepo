@@ -1,6 +1,8 @@
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Video } from 'lucide-react';
+import { trpcClient } from '@/utils/trpc';
+import { useMutation, useQuery } from '@tanstack/react-query';
 
 // Character Node - For representing characters in the narrative
 export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
@@ -59,6 +61,24 @@ export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
 // Plot Point Node - For representing key narrative events
 export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
   const [description, setDescription] = useState(data.description || '');
+  const [videoPrompt, setVideoPrompt] = useState('');
+  const [showPromptDialog, setShowPromptDialog] = useState(false);
+  const [generatedVideoId, setGeneratedVideoId] = useState<string | null>(null);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(data.plotVideoUrl || null);
+  
+  // Video generation mutation
+  const generateVideoMutation = useMutation({
+    mutationFn: (input: { prompt: string; model?: 'ray-flash-2' | 'ray-2' | 'ray-1-6'; resolution?: '540p' | '720p' | '1080p' | '4k'; duration?: '5s' | '10s' }) =>
+      trpcClient.video.generate.mutate(input),
+  });
+  
+  // Video status query - only enabled when we have a video ID
+  const { data: videoStatus } = useQuery({
+    queryKey: ['plotVideoStatus', generatedVideoId],
+    queryFn: () => trpcClient.video.status.query({ id: generatedVideoId! }),
+    enabled: !!generatedVideoId && !generatedVideoUrl,
+    refetchInterval: 3000, // Poll every 3 seconds
+  });
   
   // Update the node data when description changes
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -67,10 +87,54 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
     data.description = newDescription; // Update the node data directly
   };
   
-  // Prevent node drag when interacting with the textarea
-  const onTextareaClick = (e: React.MouseEvent) => {
+  // Prevent node drag when interacting with elements
+  const onInteractionClick = (e: React.MouseEvent) => {
     e.stopPropagation();
   };
+  
+  // Handle video generation completion
+  const checkVideoCompletion = useCallback(() => {
+    if (videoStatus?.status === 'completed' && videoStatus.videoUrl) {
+      setGeneratedVideoUrl(videoStatus.videoUrl);
+      data.plotVideoUrl = videoStatus.videoUrl;
+      setGeneratedVideoId(null); // Stop polling
+    } else if (videoStatus?.status === 'failed') {
+      alert(`Video generation failed: ${videoStatus.failureReason || 'Unknown error'}`);
+      setGeneratedVideoId(null); // Stop polling
+    }
+  }, [videoStatus, data]);
+  
+  // Check for video completion when status changes
+  useEffect(() => {
+    checkVideoCompletion();
+  }, [checkVideoCompletion]);
+  
+  // Open prompt dialog
+  const openPromptDialog = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowPromptDialog(true);
+    setVideoPrompt(description || 'A cinematic scene representing this plot point');
+  }, [description]);
+  
+  // Generate video with prompt
+  const handleGenerateVideo = useCallback(async () => {
+    if (!videoPrompt.trim()) return;
+    
+    try {
+      const result = await generateVideoMutation.mutateAsync({
+        prompt: videoPrompt,
+        model: 'ray-flash-2',
+        resolution: '720p',
+        duration: '5s'
+      }) as { id: string; status: string };
+      
+      setGeneratedVideoId(result.id);
+      setShowPromptDialog(false);
+    } catch (error) {
+      console.error('Error generating video:', error);
+      alert('Failed to generate video. Please try again.');
+    }
+  }, [videoPrompt, generateVideoMutation]);
   
   return (
     <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-green-500 dark:bg-slate-800">
@@ -95,12 +159,77 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
           className="w-full p-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-slate-700"
           value={description}
           onChange={handleDescriptionChange}
-          onClick={onTextareaClick}
-          onMouseDown={onTextareaClick}
+          onClick={onInteractionClick}
+          onMouseDown={onInteractionClick}
           placeholder="Enter plot point description..."
           rows={2}
         />
       </div>
+      
+      {/* Display generated video if available */}
+      {generatedVideoUrl && (
+        <div className="mt-2 text-xs text-muted-foreground">
+          <strong>Plot Video:</strong>
+          <video 
+            controls 
+            className="w-full mt-1 rounded"
+            src={generatedVideoUrl}
+            style={{ maxHeight: '120px' }}
+          >
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      )}
+      
+      {/* Generate Video Button */}
+      <button
+        onClick={openPromptDialog}
+        onMouseDown={onInteractionClick}
+        disabled={generateVideoMutation.isPending}
+        className={`mt-2 w-full py-1 px-2 text-xs rounded ${generateVideoMutation.isPending ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white flex items-center justify-center`}
+      >
+        {generateVideoMutation.isPending ? (
+          <>
+            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+            Generating...
+          </>
+        ) : (
+          <><Video className="w-3 h-3 mr-1" />Generate Video</>
+        )}
+      </button>
+      
+      {/* Video Prompt Dialog */}
+      {showPromptDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowPromptDialog(false)}>
+          <div className="bg-white p-4 rounded-lg shadow-lg max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-semibold mb-3">Generate Plot Point Video</h3>
+            <textarea
+              value={videoPrompt}
+              onChange={(e) => setVideoPrompt(e.target.value)}
+              placeholder="Describe the video for this plot point..."
+              className="w-full p-2 border rounded mb-3 text-sm"
+              rows={3}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleGenerateVideo}
+                disabled={!videoPrompt.trim() || generateVideoMutation.isPending}
+                className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700 disabled:bg-gray-400"
+              >
+                {generateVideoMutation.isPending ? 'Generating...' : 'Generate'}
+              </button>
+              <button
+                onClick={() => setShowPromptDialog(false)}
+                className="px-3 py-2 border rounded text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <Handle
         type="target"
         position={Position.Top}
@@ -118,7 +247,31 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
 // Media Node - For representing media content (videos, images, etc.)
 export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
   const [description, setDescription] = useState(data.description || '');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [videoPrompt, setVideoPrompt] = useState('');
+  const [showPromptDialog, setShowPromptDialog] = useState(false);
+  const [generatedVideoId, setGeneratedVideoId] = useState<string | null>(null);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(data.mediaUrl || null);
+  const [walrusUrl, setWalrusUrl] = useState<string | null>(data.walrusUrl || null);
+  
+  // Video generation mutation
+  const generateVideoMutation = useMutation({
+    mutationFn: (input: { prompt: string; model?: 'ray-flash-2' | 'ray-2' | 'ray-1-6'; resolution?: '540p' | '720p' | '1080p' | '4k'; duration?: '5s' | '10s' }) =>
+      trpcClient.video.generate.mutate(input),
+  });
+  
+  // Walrus upload mutation
+  const uploadToWalrusMutation = useMutation({
+    mutationFn: (input: { url: string }) =>
+      trpcClient.walrus.uploadFromUrl.mutate(input),
+  });
+  
+  // Video status query - only enabled when we have a video ID
+  const { data: videoStatus, refetch: refetchVideoStatus } = useQuery({
+    queryKey: ['videoStatus', generatedVideoId],
+    queryFn: () => trpcClient.video.status.query({ id: generatedVideoId! }),
+    enabled: !!generatedVideoId && !generatedVideoUrl,
+    refetchInterval: 3000, // Poll every 3 seconds
+  });
   
   // Update the node data when description changes
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -127,36 +280,73 @@ export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
     data.description = newDescription; // Update the node data directly
   };
   
-  // Prevent node drag when interacting with the textarea or button
+  // Prevent node drag when interacting with elements
   const onInteractionClick = (e: React.MouseEvent) => {
     e.stopPropagation();
   };
   
-  // Generate content and update the mediaUrl
-  const handleGenerateContent = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent node drag when clicking the button
+  // Handle video generation completion
+  const checkVideoCompletion = useCallback(() => {
+    if (videoStatus?.status === 'completed' && videoStatus.videoUrl) {
+      setGeneratedVideoUrl(videoStatus.videoUrl);
+      data.mediaUrl = videoStatus.videoUrl;
+      setGeneratedVideoId(null); // Stop polling
+    } else if (videoStatus?.status === 'failed') {
+      alert(`Video generation failed: ${videoStatus.failureReason || 'Unknown error'}`);
+      setGeneratedVideoId(null); // Stop polling
+    }
+  }, [videoStatus, data]);
+  
+  // Check for video completion when status changes
+  useEffect(() => {
+    checkVideoCompletion();
+  }, [checkVideoCompletion]);
+  
+  // Open prompt dialog
+  const openPromptDialog = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowPromptDialog(true);
+    setVideoPrompt(description || 'A cinematic scene in a cyberpunk city');
+  }, [description]);
+  
+  // Generate video with prompt
+  const handleGenerateVideo = useCallback(async () => {
+    if (!videoPrompt.trim()) return;
     
     try {
-      setIsGenerating(true);
+      const result = await generateVideoMutation.mutateAsync({
+        prompt: videoPrompt,
+        model: 'ray-flash-2',
+        resolution: '720p',
+        duration: '5s'
+      }) as { id: string; status: string };
       
-      // Mock API call to generate content and get Walrus link
-      // In a real implementation, this would call your backend API
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
-      
-      // Simulate getting a Walrus link back
-      const walrusLink = `https://walrus.com/video/${Math.random().toString(36).substring(2, 10)}`;
-      
-      // Update the node data
-      data.mediaUrl = walrusLink;
-      
-      alert(`Content generated! Walrus link: ${walrusLink}`);
+      setGeneratedVideoId(result.id);
+      setShowPromptDialog(false);
     } catch (error) {
-      console.error('Error generating content:', error);
-      alert('Failed to generate content. Please try again.');
-    } finally {
-      setIsGenerating(false);
+      console.error('Error generating video:', error);
+      alert('Failed to generate video. Please try again.');
     }
-  }, [data]);
+  }, [videoPrompt, generateVideoMutation]);
+  
+  // Upload to Walrus
+  const handleUploadToWalrus = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!generatedVideoUrl) return;
+    
+    try {
+      const walrusResult = await uploadToWalrusMutation.mutateAsync({
+        url: generatedVideoUrl
+      }) as { blobId: string; url: string };
+      
+      setWalrusUrl(walrusResult.url);
+      data.walrusUrl = walrusResult.url;
+      data.walrusBlobId = walrusResult.blobId;
+    } catch (error) {
+      console.error('Error uploading to Walrus:', error);
+      alert('Failed to upload to Walrus. Please try again.');
+    }
+  }, [generatedVideoUrl, uploadToWalrusMutation, data]);
   
   return (
     <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-purple-500 dark:bg-slate-800">
@@ -195,20 +385,52 @@ export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
       
       {/* Generate Content Button */}
       <button
-        onClick={handleGenerateContent}
+        onClick={openPromptDialog}
         onMouseDown={onInteractionClick}
-        disabled={isGenerating}
-        className={`mt-2 w-full py-1 px-2 text-sm rounded ${isGenerating ? 'bg-gray-400' : 'bg-purple-600 hover:bg-purple-700'} text-white flex items-center justify-center`}
+        disabled={generateVideoMutation.isPending}
+        className={`mt-2 w-full py-1 px-2 text-sm rounded ${generateVideoMutation.isPending ? 'bg-gray-400' : 'bg-purple-600 hover:bg-purple-700'} text-white flex items-center justify-center`}
       >
-        {isGenerating ? (
+        {generateVideoMutation.isPending ? (
           <>
             <Loader2 className="w-3 h-3 mr-1 animate-spin" />
             Generating...
           </>
         ) : (
-          'Generate Content'
+          'Generate Video'
         )}
       </button>
+      
+      {/* Video Prompt Dialog */}
+      {showPromptDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowPromptDialog(false)}>
+          <div className="bg-white p-4 rounded-lg shadow-lg max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-semibold mb-3">Generate Video</h3>
+            <textarea
+              value={videoPrompt}
+              onChange={(e) => setVideoPrompt(e.target.value)}
+              placeholder="Describe the video you want to generate..."
+              className="w-full p-2 border rounded mb-3 text-sm"
+              rows={3}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleGenerateVideo}
+                disabled={!videoPrompt.trim() || generateVideoMutation.isPending}
+                className="flex-1 bg-purple-600 text-white px-3 py-2 rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+              >
+                {generateVideoMutation.isPending ? 'Generating...' : 'Generate'}
+              </button>
+              <button
+                onClick={() => setShowPromptDialog(false)}
+                className="px-3 py-2 border rounded text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <Handle
         type="target"
