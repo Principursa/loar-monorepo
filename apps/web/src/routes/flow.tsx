@@ -3,9 +3,12 @@ import { useMemo, useEffect } from 'react';
 import FlowEditor from '@/components/flow/FlowEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useGetFullGraph } from '@/hooks/useTimeline';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
+import { useReadContract, useChainId } from 'wagmi';
+import { timelineAbi } from '@/generated';
+import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
+import { type Address } from 'viem';
 
 export const Route = createFileRoute('/flow')({
   component: FlowPage,
@@ -14,6 +17,7 @@ export const Route = createFileRoute('/flow')({
 function FlowPage() {
   // Get search parameters from URL
   const searchParams = useSearch({ from: '/flow' }) as any;
+  const chainId = useChainId();
   
   // Extract timeline data from URL parameters
   const timelineData = useMemo(() => {
@@ -29,14 +33,26 @@ function FlowPage() {
   // Extract universe ID from search params even if no timeline data
   const universeIdFromParams = searchParams?.universeId;
 
-  // Get full graph data if timeline data is loaded
-  const { data: fullGraphData } = useGetFullGraph();
-  
   // Fetch universe data if we have a universe ID (from timeline data OR direct search params)
   const { data: universeData } = useQuery({
     queryKey: ['universeData', universeIdFromParams],
     queryFn: () => trpcClient.cinematicUniverses.get.query({ id: universeIdFromParams! }),
     enabled: !!universeIdFromParams && universeIdFromParams !== 'blockchain-universe' && universeIdFromParams !== 'unknown',
+  });
+
+  // Determine which contract address to use for getting timeline data
+  const contractAddress = universeData?.data?.address 
+    ? (universeData.data.address as Address)
+    : (TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address);
+
+  // Get full graph data from the appropriate timeline contract
+  const { data: fullGraphData } = useReadContract({
+    abi: timelineAbi,
+    address: contractAddress,
+    functionName: 'getFullGraph',
+    query: {
+      enabled: !!contractAddress
+    }
   });
   
   // Parse timeline nodes for display

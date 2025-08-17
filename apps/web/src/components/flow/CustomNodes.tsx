@@ -67,9 +67,19 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
   const [videoPrompt, setVideoPrompt] = useState('');
   const [showPromptDialog, setShowPromptDialog] = useState(false);
   const [generatedVideoId, setGeneratedVideoId] = useState<string | null>(null);
-  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(data.plotVideoUrl || null);
+  
+  // Check if this node has existing blockchain video data
+  const existingBlockchainVideo = data.videoUrl; // From timeline blockchain data
+  const hasExistingVideo = !!existingBlockchainVideo;
+  
+  // Use existing blockchain video or generated video
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(
+    data.plotVideoUrl || (hasExistingVideo ? existingBlockchainVideo : null)
+  );
   const [walrusUrl, setWalrusUrl] = useState<string | null>(data.plotWalrusUrl || null);
-  const [blockchainNodeCreated, setBlockchainNodeCreated] = useState<boolean>(data.blockchainNodeCreated || false);
+  const [blockchainNodeCreated, setBlockchainNodeCreated] = useState<boolean>(
+    data.blockchainNodeCreated || hasExistingVideo // If it has blockchain video, it's already on blockchain
+  );
   
   // Video generation mutation
   const generateVideoMutation = useMutation({
@@ -243,19 +253,27 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
         />
       </div>
       
-      {/* Display generated video or loading animation */}
+      {/* Display video: either from blockchain, generated, or loading animation */}
       {(generatedVideoUrl || generatedVideoId) && (
         <div className="mt-2 text-xs text-muted-foreground">
-          <strong>Plot Video:</strong>
+          <strong>{hasExistingVideo ? 'Blockchain Video:' : 'Plot Video:'}</strong>
           {generatedVideoUrl ? (
-            <video 
-              controls 
-              className="w-full mt-1 rounded"
-              src={generatedVideoUrl}
-              style={{ maxHeight: '120px' }}
-            >
-              Your browser does not support the video tag.
-            </video>
+            <div>
+              <video 
+                controls 
+                className="w-full mt-1 rounded"
+                src={generatedVideoUrl}
+                style={{ maxHeight: '120px' }}
+              >
+                Your browser does not support the video tag.
+              </video>
+              {hasExistingVideo && (
+                <div className="text-xs text-blue-600 mt-1 flex items-center">
+                  <span className="mr-1">⛓️</span>
+                  <span>Stored on blockchain timeline</span>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="w-full mt-1 rounded bg-gradient-to-r from-green-100 to-green-200 dark:from-green-800 dark:to-green-700 flex items-center justify-center" style={{ height: '120px' }}>
               <div className="text-center">
@@ -274,23 +292,34 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
       
       {/* Action Buttons */}
       <div className="mt-2 space-y-1">
-        <button
-          onClick={openPromptDialog}
-          onMouseDown={onInteractionClick}
-          disabled={generateVideoMutation.isPending}
-          className={`w-full py-1 px-2 text-xs rounded ${generateVideoMutation.isPending ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white flex items-center justify-center`}
-        >
-          {generateVideoMutation.isPending ? (
-            <>
-              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <><Video className="w-3 h-3 mr-1" />Generate Video</>
-          )}
-        </button>
+        {/* Only show Generate Video button if there's no existing blockchain video */}
+        {!hasExistingVideo && (
+          <button
+            onClick={openPromptDialog}
+            onMouseDown={onInteractionClick}
+            disabled={generateVideoMutation.isPending}
+            className={`w-full py-1 px-2 text-xs rounded ${generateVideoMutation.isPending ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white flex items-center justify-center`}
+          >
+            {generateVideoMutation.isPending ? (
+              <>
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <><Video className="w-3 h-3 mr-1" />Generate Video</>
+            )}
+          </button>
+        )}
         
-        {generatedVideoUrl && !walrusUrl && (
+        {/* Show info badge for existing blockchain videos */}
+        {hasExistingVideo && (
+          <div className="w-full py-1 px-2 text-xs rounded bg-blue-100 text-blue-800 text-center border border-blue-200">
+            ⛓️ Video from Blockchain
+          </div>
+        )}
+        
+        {/* Upload to Walrus - only for newly generated videos, not existing blockchain videos */}
+        {generatedVideoUrl && !walrusUrl && !hasExistingVideo && (
           <button
             onClick={handleUploadToWalrus}
             onMouseDown={onInteractionClick}
@@ -308,7 +337,8 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
           </button>
         )}
         
-        {walrusUrl && !blockchainNodeCreated && (
+        {/* Add Node - only for newly created content, not existing blockchain nodes */}
+        {walrusUrl && !blockchainNodeCreated && !hasExistingVideo && (
           <button
             onClick={handleAddNode}
             onMouseDown={onInteractionClick}
@@ -324,6 +354,13 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
               <>⛓️ Add Node</>
             )}
           </button>
+        )}
+        
+        {/* Show different message for existing blockchain nodes */}
+        {hasExistingVideo && (
+          <div className="w-full py-1 px-2 text-xs rounded bg-green-100 text-green-800 text-center border border-green-200">
+            ✅ Already on Blockchain
+          </div>
         )}
       </div>
       
@@ -407,7 +444,7 @@ export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
   });
   
   // Video status query - only enabled when we have a video ID
-  const { data: videoStatus, refetch: refetchVideoStatus } = useQuery({
+  const { data: videoStatus } = useQuery({
     queryKey: ['videoStatus', generatedVideoId],
     queryFn: () => trpcClient.video.status.query({ id: generatedVideoId! }),
     enabled: !!generatedVideoId && !generatedVideoUrl,
