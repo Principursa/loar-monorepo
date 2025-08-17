@@ -10,29 +10,29 @@ export default defineConfig({
     react(),
     tanstackRouter({}),
   ],
-    build: {
+  build: {
     minify: 'esbuild',
+    sourcemap: false,
     chunkSizeWarningLimit: 10000,
-    sourcemap:false,
     rollupOptions: {
-	output: {
-		manualChunks: {
-	core: ['src/core', 'node_modules/starknetkit'],
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/starknetkit')) return 'starknetkit';
+          // no local src/core chunks
         },
       },
-
-
-    }
+    },
   },
   optimizeDeps: {
-    exclude: ['@dynamic-labs/sdk-react-core']
+    exclude: ['@dynamic-labs/sdk-react-core'],
   },
   ssr: {
-    noExternal: ['@dynamic-labs/sdk-react-core']
+    noExternal: ['@dynamic-labs/sdk-react-core'],
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      '@': path.resolve(__dirname, './src'),
     },
   },
 });
+
