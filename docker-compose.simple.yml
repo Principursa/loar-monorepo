@@ -7,7 +7,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.simple.conf:/etc/nginx/nginx.conf:ro
       - ./apps/web/dist:/usr/share/nginx/html:ro
     depends_on:
       - app-server
