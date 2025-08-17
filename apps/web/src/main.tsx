@@ -8,7 +8,6 @@ import { queryClient, trpc } from "./utils/trpc";
 
 import {
   DynamicContextProvider,
-  DynamicWidget,
 } from "@dynamic-labs/sdk-react-core";
 
 import { AlgorandWalletConnectors } from "@dynamic-labs/algorand";
@@ -44,8 +43,6 @@ const router = createRouter({
           {children}
         </QueryClientProvider>
         </WagmiProvider>
-        {/* Add DynamicWidget to ensure wallet connection works */}
-        <DynamicWidget variant="modal" />
       </DynamicContextProvider>
     );
   },
