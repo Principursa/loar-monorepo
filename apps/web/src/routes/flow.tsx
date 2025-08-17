@@ -100,7 +100,7 @@ function FlowPage() {
       setIsPosting(true);
       setPostStatus('loading');
       
-      // Get node data from the editor
+      // Get node data from the editor - this will include any edits made to descriptions
       const nodeData = editorRef.current.getNodeData();
       
       if (nodeData.length === 0) {
@@ -110,23 +110,35 @@ function FlowPage() {
         return;
       }
       
-      // Find the most relevant node to post (could be selected node, latest node, etc.)
-      // For this example, we'll use the first node of type 'plotPoint' or the first node if no plot points
-      const plotNode = nodeData.find((node: FlowNode) => node.type === 'plotPoint') || nodeData[0];
+      // Find the most relevant node to post
+      // First look for a media node with a mediaUrl (generated content)
+      let selectedNode = nodeData.find((node: FlowNode) => 
+        node.type === 'media' && node.data.mediaUrl);
+      
+      // If no media node with URL found, look for a plot point
+      if (!selectedNode) {
+        selectedNode = nodeData.find((node: FlowNode) => node.type === 'plotPoint');
+      }
+      
+      // If still no node found, use the first node
+      if (!selectedNode) {
+        selectedNode = nodeData[0];
+      }
       
       // Extract data for blockchain submission
-      const link = plotNode.data.mediaUrl || ''; // URL to media content if available
-      const plot = plotNode.data.description || plotNode.data.label || 'Narrative content'; // Plot description
+      // The description will now be dynamically updated from the editable fields
+      const link = selectedNode.data.mediaUrl || ''; // URL to media content if available
+      const plot = selectedNode.data.description || selectedNode.data.label || 'Narrative content'; // Plot description
       const previous = 0; // Previous node ID in the blockchain (0 for root node)
       
       console.log('Submitting to blockchain:', { link, plot, previous });
       
-      // Call the blockchain contract
+      // Call the blockchain contract with the dynamic content
       const tx = await writeAsync(link, plot, previous);
       console.log('Transaction submitted:', tx);
       
       setPostStatus('success');
-      alert(`Successfully posted narrative content to the blockchain!\nTransaction: ${tx}`);
+      alert(`Successfully posted narrative content to the blockchain!\nTransaction: ${tx}\n\nContent: ${plot}\nMedia URL: ${link || 'None'}`);
     } catch (error) {
       console.error('Error posting to blockchain:', error);
       setPostStatus('error');
