@@ -1,8 +1,8 @@
-import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { createFileRoute, Link, useParams, useNavigate } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, GitBranch } from "lucide-react";
+import { ArrowRight, GitBranch, Edit } from "lucide-react";
 import ReactFlow, {
   Controls,
   Background,
@@ -24,6 +24,7 @@ interface UniverseParams {
 
 function UniverseViewPage() {
   const { id } = useParams({ from: "/universe/$id" });
+  const navigate = useNavigate();
   
   // Define our single blockchain universe
   const universe = {
@@ -155,6 +156,21 @@ function UniverseViewPage() {
     timelineEvent: TimelineEventNode,
   }), []);
 
+  // Handle loading timeline to flow editor
+  const handleLoadToFlowEditor = () => {
+    // Encode the timeline data as URL parameters
+    const timelineParams = {
+      nodeIds: nodeIds.join(','),
+      universeId: universe.id,
+      totalNodes: nodeIds.length.toString()
+    };
+    
+    navigate({ 
+      to: '/flow', 
+      search: timelineParams 
+    });
+  };
+
   return (
     <div className="container mx-auto p-6">
       {/* Blockchain Timeline Actions */}
@@ -185,9 +201,20 @@ function UniverseViewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Timeline Graph Visualization */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center gap-2 mb-4">
-            <GitBranch className="w-5 h-5" />
-            <h2 className="text-2xl font-semibold">Timeline Branches</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <GitBranch className="w-5 h-5" />
+              <h2 className="text-2xl font-semibold">Timeline Branches</h2>
+            </div>
+            <Button 
+              onClick={handleLoadToFlowEditor}
+              disabled={nodeIds.length === 0 || isLoadingAny}
+              className="flex items-center gap-2"
+              variant="outline"
+            >
+              <Edit className="w-4 h-4" />
+              Load to Flow Editor
+            </Button>
           </div>
           
           <Card className="overflow-hidden bg-background">
