@@ -1,6 +1,6 @@
 # Loar Fullstack
 
-A modern fullstack application with Dynamic wallet authentication, built with React 19, Vite, TanStack Router, and tRPC.
+Loar is a narrative control suite for management of canonical cinematic universes. Users can generate video content based on their OpenSea NFTs, tokenize their universes, and it's built on Walrus' censorship resistant video hosting
 
 ## 🚀 Features
 
