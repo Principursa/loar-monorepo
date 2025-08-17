@@ -10,6 +10,38 @@ import { type Address } from 'viem';
 // Character Node - For representing characters in the narrative
 export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
   const [description, setDescription] = useState(data.description || '');
+  const [selectedCharacterId, setSelectedCharacterId] = useState(data.selectedCharacterId || '');
+  const [showCharacterSelector, setShowCharacterSelector] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const charactersPerPage = 5;
+
+  // Fetch available characters from database
+  const { data: charactersData, isLoading: isLoadingCharacters } = useQuery({
+    queryKey: ['characters'],
+    queryFn: () => trpcClient.wiki.characters.query(),
+  });
+
+  // Handle character selection
+  const handleCharacterSelect = (characterId: string) => {
+    const selectedCharacter = charactersData?.characters.find(char => char.id === characterId);
+    if (selectedCharacter) {
+      setSelectedCharacterId(characterId);
+      setShowCharacterSelector(false);
+      
+      // Update node data with selected character info
+      data.selectedCharacterId = characterId;
+      data.characterName = selectedCharacter.character_name;
+      data.nftId = `${selectedCharacter.collection} #${selectedCharacter.token_id}`;
+      data.characterImage = selectedCharacter.image_url;
+      data.characterTraits = selectedCharacter.traits;
+      
+      // Update description if empty
+      if (!description) {
+        setDescription(selectedCharacter.description);
+        data.description = selectedCharacter.description;
+      }
+    }
+  };
   
   // Update the node data when description changes
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -18,21 +50,76 @@ export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
     data.description = newDescription; // Update the node data directly
   };
   
-  // Prevent node drag when interacting with the textarea
-  const onTextareaClick = (e: React.MouseEvent) => {
+  // Prevent node drag when interacting with elements
+  const onInteractionClick = (e: React.MouseEvent) => {
     e.stopPropagation();
   };
+
+  // Get the selected character data
+  const selectedCharacter = selectedCharacterId 
+    ? charactersData?.characters.find(char => char.id === selectedCharacterId)
+    : null;
+
+  // Pagination logic
+  const totalCharacters = charactersData?.characters?.length || 0;
+  const totalPages = Math.ceil(totalCharacters / charactersPerPage);
+  const startIndex = currentPage * charactersPerPage;
+  const endIndex = startIndex + charactersPerPage;
+  const currentCharacters = charactersData?.characters?.slice(startIndex, endIndex) || [];
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages - 1) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  // Close selector when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showCharacterSelector) {
+        setShowCharacterSelector(false);
+      }
+    };
+
+    if (showCharacterSelector) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showCharacterSelector]);
   
   return (
     <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-blue-500 dark:bg-slate-800">
       <div className="flex items-center">
         <div className="rounded-full w-10 h-10 flex justify-center items-center bg-blue-100 dark:bg-blue-900">
-          {data.emoji || '👤'}
+          {selectedCharacter ? (
+            <img 
+              src={selectedCharacter.image_url} 
+              alt={selectedCharacter.character_name}
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          ) : (
+            <span>{data.emoji || '👤'}</span>
+          )}
         </div>
         <div className="ml-2">
-          <div className="text-lg font-bold">{data.label}</div>
-          {data.nftId && (
-            <div className="text-xs text-muted-foreground">NFT: {data.nftId}</div>
+          <div className="text-lg font-bold">
+            {selectedCharacter ? selectedCharacter.character_name : data.label}
+          </div>
+          {selectedCharacter && (
+            <div className="text-xs text-muted-foreground">
+              {selectedCharacter.collection} #{selectedCharacter.token_id}
+            </div>
+          )}
+          {selectedCharacter && selectedCharacter.rarity_rank > 0 && (
+            <div className="text-xs text-blue-600">
+              Rank #{selectedCharacter.rarity_rank}
+            </div>
           )}
         </div>
       </div>
@@ -41,11 +128,93 @@ export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
           className="w-full p-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
           value={description}
           onChange={handleDescriptionChange}
-          onClick={onTextareaClick}
-          onMouseDown={onTextareaClick}
+          onClick={onInteractionClick}
+          onMouseDown={onInteractionClick}
           placeholder="Enter character description..."
           rows={2}
         />
+      </div>
+
+      {/* Character Selector */}
+      <div className="mt-2">
+        <button
+          onClick={(e) => {
+            onInteractionClick(e);
+            setShowCharacterSelector(!showCharacterSelector);
+          }}
+          disabled={isLoadingCharacters}
+          className="w-full py-1 px-2 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center"
+        >
+          {isLoadingCharacters ? 'Loading...' : selectedCharacter ? 'Change Character' : 'Select NFT Character'}
+        </button>
+
+        {/* Character Dropdown with Pagination */}
+        {showCharacterSelector && charactersData?.characters && (
+          <div className="mt-1 bg-white dark:bg-slate-700 border rounded shadow-lg z-50 relative">
+            {/* Header with pagination info */}
+            <div className="flex items-center justify-between p-2 border-b bg-gray-50 dark:bg-slate-600">
+              <div className="text-xs text-muted-foreground">
+                {totalCharacters} characters
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Page {currentPage + 1} of {totalPages}
+              </div>
+            </div>
+
+            {/* Character List */}
+            <div className="max-h-64">
+              {currentCharacters.map((character: any) => (
+                <div
+                  key={character.id}
+                  onClick={() => handleCharacterSelect(character.id)}
+                  className="p-2 hover:bg-blue-50 dark:hover:bg-slate-600 cursor-pointer border-b last:border-b-0 flex items-center gap-2 min-h-[3rem]"
+                >
+                  <img 
+                    src={character.image_url} 
+                    alt={character.character_name}
+                    className="w-8 h-8 rounded object-cover flex-shrink-0"
+                  />
+                  <div className="text-xs flex-1 min-w-0">
+                    <div className="font-medium truncate">{character.character_name}</div>
+                    <div className="text-muted-foreground truncate">{character.collection} #{character.token_id}</div>
+                    {character.rarity_rank > 0 && (
+                      <div className="text-blue-600">Rank #{character.rarity_rank}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Navigation Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-2 border-t bg-gray-50 dark:bg-slate-600">
+                <button
+                  onClick={(e) => {
+                    onInteractionClick(e);
+                    goToPrevPage();
+                  }}
+                  disabled={currentPage === 0}
+                  className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white"
+                >
+                  ← Prev
+                </button>
+                <div className="text-xs text-muted-foreground">
+                  {startIndex + 1}-{Math.min(endIndex, totalCharacters)} of {totalCharacters}
+                </div>
+                <button
+                  onClick={(e) => {
+                    onInteractionClick(e);
+                    goToNextPage();
+                  }}
+                  disabled={currentPage >= totalPages - 1}
+                  className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white"
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <Handle
         type="target"
@@ -172,20 +341,45 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
   const openPromptDialog = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setShowPromptDialog(true);
-    setVideoPrompt(description || 'A cinematic scene representing this plot point');
-  }, [description]);
+    
+    // Set appropriate prompt based on connection type
+    if (data.isImageToVideo && data.characterName) {
+      setVideoPrompt(`${data.characterName} ${description || 'in a cinematic scene'}`);
+    } else {
+      setVideoPrompt(description || 'A cinematic scene representing this plot point');
+    }
+  }, [description, data.isImageToVideo, data.characterName]);
   
-  // Generate video with prompt
+  // Generate video with prompt (text-to-video or image-to-video)
   const handleGenerateVideo = useCallback(async () => {
     if (!videoPrompt.trim()) return;
     
     try {
-      const result = await generateVideoMutation.mutateAsync({
+      // Check if this is image-to-video generation (connected to character)
+      const isImageToVideo = Boolean(data.isImageToVideo && data.characterImageUrl);
+      
+      console.log('Generating video - Debug data:', {
+        'data.isImageToVideo': data.isImageToVideo,
+        'data.characterImageUrl': data.characterImageUrl,
+        'local isImageToVideo': isImageToVideo,
+        characterName: data.characterName,
         prompt: videoPrompt,
-        model: 'ray-flash-2',
-        resolution: '720p',
-        duration: '5s'
-      }) as { id: string; status: string };
+        'typeof data.isImageToVideo': typeof data.isImageToVideo
+      });
+      
+      const generationInput = {
+        prompt: videoPrompt,
+        model: 'ray-flash-2' as const, // Use ray-flash-2 for fast/low quality generation
+        // Only include resolution/duration for text-to-video
+        ...(isImageToVideo ? {} : {
+          resolution: '540p' as const, // Lower resolution for faster generation
+          duration: '5s' as const
+        }),
+        // Add image URL for image-to-video generation
+        ...(isImageToVideo && { imageUrl: data.characterImageUrl })
+      };
+      
+      const result = await generateVideoMutation.mutateAsync(generationInput) as { id: string; status: string };
       
       setGeneratedVideoId(result.id);
       setShowPromptDialog(false);
@@ -193,7 +387,7 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
       console.error('Error generating video:', error);
       alert('Failed to generate video. Please try again.');
     }
-  }, [videoPrompt, generateVideoMutation]);
+  }, [videoPrompt, generateVideoMutation, data.isImageToVideo, data.characterImageUrl, data.characterName]);
   
   // Handle manual blockchain node creation
   const handleAddNode = useCallback(async (e: React.MouseEvent) => {
@@ -249,6 +443,11 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
           {data.previousNode && data.previousNode > 0 && (
             <div className="text-xs text-blue-600">
               🔗 Connected to Node {data.previousNode}
+            </div>
+          )}
+          {data.isImageToVideo && data.characterName && (
+            <div className="text-xs text-purple-600">
+              🎭 Character: {data.characterName}
             </div>
           )}
         </div>
@@ -318,7 +517,7 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
                 Generating...
               </>
             ) : (
-              <><Video className="w-3 h-3 mr-1" />Generate Video</>
+              <><Video className="w-3 h-3 mr-1" />{data.isImageToVideo ? 'Generate Character Video' : 'Generate Video'}</>
             )}
           </button>
         )}

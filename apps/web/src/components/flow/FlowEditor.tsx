@@ -165,33 +165,65 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
       // Add the edge
       setEdges((eds) => addEdge(params, eds));
       
-      // Update target node with previousNode information
+      // Update target node based on connection type
       if (params.source && params.target) {
-        setNodes((nds) => nds.map((node) => {
-          if (node.id === params.target) {
-            // Extract node ID from source node
-            let previousNodeId = 0;
-            
-            // Handle timeline nodes (format: "timeline-X")
-            if (params.source && params.source.startsWith('timeline-')) {
-              previousNodeId = parseInt(params.source.replace('timeline-', ''));
-            }
-            // Handle other node types - for now, we'll use 0 as default
-            // You could extend this to handle other node ID formats
-            
-            // Update the node's data with previousNode info
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                previousNode: previousNodeId,
-                // Add visual indicator that this node is connected
-                isConnectedToBlockchain: previousNodeId > 0
+        setNodes((nds) => {
+          // Find source and target nodes
+          const sourceNode = nds.find(n => n.id === params.source);
+          const targetNode = nds.find(n => n.id === params.target);
+          
+          if (!sourceNode || !targetNode) return nds;
+          
+          return nds.map((node) => {
+            if (node.id === params.target) {
+              let updatedData = { ...node.data };
+              
+              // Handle different connection types
+              if (sourceNode.type === 'character' && targetNode.type === 'plotPoint') {
+                // Character -> PlotPoint: Setup image-to-video generation
+                console.log('Character-to-Plot connection detected:', {
+                  characterData: sourceNode.data,
+                  plotData: targetNode.data,
+                  characterImage: sourceNode.data.characterImage
+                });
+                
+                updatedData = {
+                  ...updatedData,
+                  // Add character image for image-to-video generation
+                  characterImageUrl: sourceNode.data.characterImage,
+                  characterName: sourceNode.data.characterName,
+                  characterId: sourceNode.data.selectedCharacterId,
+                  // Mark as image-to-video instead of text-to-video
+                  isImageToVideo: true,
+                  connectionType: 'character-to-plot'
+                };
+                
+                console.log('Updated plot data after connection:', updatedData);
+              } else if (sourceNode.type === 'plotPoint' && targetNode.type === 'plotPoint') {
+                // PlotPoint -> PlotPoint: Setup blockchain timeline connection
+                let previousNodeId = 0;
+                
+                // Handle timeline nodes (format: "timeline-X")
+                if (params.source && params.source.startsWith('timeline-')) {
+                  previousNodeId = parseInt(params.source.replace('timeline-', ''));
+                }
+                
+                updatedData = {
+                  ...updatedData,
+                  previousNode: previousNodeId,
+                  isConnectedToBlockchain: previousNodeId > 0,
+                  connectionType: 'plot-to-plot'
+                };
               }
-            };
-          }
-          return node;
-        }));
+              
+              return {
+                ...node,
+                data: updatedData
+              };
+            }
+            return node;
+          });
+        });
       }
     },
     [setEdges, setNodes]
