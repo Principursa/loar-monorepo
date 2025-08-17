@@ -16,7 +16,12 @@ import 'reactflow/dist/style.css';
 import { useMemo } from 'react';
 import { TimelineEventNode } from '@/components/flow/TimelineNodes';
 import { TimelineActions } from '@/components/TimelineActions';
-import { useGetNode, useGetLeaves, useGetFullGraph } from '@/hooks/useTimeline';
+import { trpcClient } from '@/utils/trpc';
+import { useQuery } from '@tanstack/react-query';
+import { useReadContract, useChainId } from 'wagmi';
+import { timelineAbi } from '@/generated';
+import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
+import { type Address } from 'viem';
 
 interface UniverseParams {
   id: string;
@@ -25,18 +30,72 @@ interface UniverseParams {
 function UniverseViewPage() {
   const { id } = useParams({ from: "/universe/$id" });
   const navigate = useNavigate();
-  
-  // Define our single blockchain universe
-  const universe = {
-    id: 'blockchain-universe',
-    name: 'Cyberpunk City',
-    description: 'A decentralized narrative universe powered by blockchain technology',
-    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=800&h=400&fit=crop'
+  const chainId = useChainId();
+
+  // Universe-specific timeline hooks
+  const useUniverseLeaves = (contractAddress?: string) => {
+    return useReadContract({
+      abi: timelineAbi,
+      address: contractAddress 
+        ? (contractAddress as Address)
+        : (TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address),
+      functionName: 'getLeaves',
+      query: {
+        enabled: (!!contractAddress && contractAddress !== 'unknown') || id === 'blockchain-universe'
+      }
+    });
   };
 
-  // Get timeline leaves (endpoints) and full graph
-  const { data: leavesData, isLoading: isLoadingLeaves } = useGetLeaves();
-  const { data: fullGraphData, isLoading: isLoadingFullGraph } = useGetFullGraph();
+  const useUniverseFullGraph = (contractAddress?: string) => {
+    return useReadContract({
+      abi: timelineAbi,
+      address: contractAddress 
+        ? (contractAddress as Address)
+        : (TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address),
+      functionName: 'getFullGraph',
+      query: {
+        enabled: (!!contractAddress && contractAddress !== 'unknown') || id === 'blockchain-universe'
+      }
+    });
+  };
+  
+  // Fetch cinematic universe data if it's not the default blockchain universe
+  const { data: cinematicUniverse, isLoading: isLoadingUniverse } = useQuery({
+    queryKey: ['cinematicUniverse', id],
+    queryFn: () => trpcClient.cinematicUniverses.get.query({ id }),
+    enabled: id !== 'blockchain-universe',
+  });
+  
+  // Define universe data - either from database or default
+  const universe = useMemo(() => {
+    if (id === 'blockchain-universe') {
+      return {
+        id: 'blockchain-universe',
+        name: 'Cyberpunk City',
+        description: 'A decentralized narrative universe powered by blockchain technology',
+        imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=800&h=400&fit=crop',
+        address: null, // Uses default timeline contract
+        isDefault: true
+      };
+    } else if (cinematicUniverse?.data) {
+      return {
+        id: cinematicUniverse.data.id,
+        name: `Universe ${cinematicUniverse.data.id.slice(0, 8)}...`,
+        description: cinematicUniverse.data.description,
+        imageUrl: cinematicUniverse.data.image_url,
+        address: cinematicUniverse.data.address,
+        creator: cinematicUniverse.data.creator,
+        tokenAddress: cinematicUniverse.data.tokenAddress,
+        governanceAddress: cinematicUniverse.data.governanceAddress,
+        isDefault: false
+      };
+    }
+    return null;
+  }, [id, cinematicUniverse]);
+
+  // Get timeline data using universe-specific contract address
+  const { data: leavesData, isLoading: isLoadingLeaves } = useUniverseLeaves(universe?.address || undefined);
+  const { data: fullGraphData, isLoading: isLoadingFullGraph } = useUniverseFullGraph(universe?.address || undefined);
   
   // Parse full graph data structure
   const graphData = useMemo(() => {
@@ -57,7 +116,7 @@ function UniverseViewPage() {
   // Extract node IDs for iteration
   const nodeIds = graphData.nodeIds.map(id => typeof id === 'bigint' ? Number(id) : parseInt(String(id)));
 
-  const isLoadingAny = isLoadingLeaves || isLoadingFullGraph;
+  const isLoadingAny = isLoadingLeaves || isLoadingFullGraph || isLoadingUniverse;
 
   // Build timelines by using getNode for each node in the chain
   const timelines = useMemo(() => {
@@ -122,7 +181,7 @@ function UniverseViewPage() {
           timelineName: isCanon ? 'Canon Timeline' : `Timeline ${leafIndex + 1}`,
           eventId: `node-${nodeId}`,
           timelineId: `timeline-${nodeId}`,
-          universeId: universe.id,
+          universeId: universe?.id || 'unknown',
           isRoot: String(previousNode) === '0' || !previousNode
         }
       });
@@ -150,7 +209,7 @@ function UniverseViewPage() {
     });
     
     return { nodes, edges };
-  }, [graphData, leavesData, universe.id]);
+  }, [graphData, leavesData, universe?.id]);
 
   const nodeTypes = useMemo(() => ({
     timelineEvent: TimelineEventNode,
@@ -161,7 +220,7 @@ function UniverseViewPage() {
     // Encode the timeline data as URL parameters
     const timelineParams = {
       nodeIds: nodeIds.join(','),
-      universeId: universe.id,
+      universeId: universe?.id || 'unknown',
       totalNodes: nodeIds.length.toString()
     };
     
@@ -171,10 +230,39 @@ function UniverseViewPage() {
     });
   };
 
+  // Show loading state
+  if (isLoadingUniverse || (id !== 'blockchain-universe' && !universe)) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading universe data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show not found state
+  if (id !== 'blockchain-universe' && !universe) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center py-12">
+          <h1 className="text-2xl font-bold mb-4">Universe Not Found</h1>
+          <p className="text-muted-foreground mb-6">The universe with ID "{id}" could not be found.</p>
+          <Button asChild>
+            <Link to="/universes">← Back to Universes</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6">
-      {/* Blockchain Timeline Actions */}
-      <TimelineActions />
+      {/* Show Timeline Actions only for default universe */}
+      {universe?.isDefault && <TimelineActions />}
       
       {/* Header */}
       <div className="mb-8">
@@ -185,14 +273,23 @@ function UniverseViewPage() {
         </div>
         <div className="relative mb-6">
           <img 
-            src={universe.imageUrl} 
-            alt={universe.name}
+            src={universe?.imageUrl} 
+            alt={universe?.name}
             className="w-full h-48 object-cover rounded-lg"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=800&h=400&fit=crop';
+            }}
           />
           <div className="absolute inset-0 bg-black/40 rounded-lg flex items-end">
             <div className="p-6 text-white">
-              <h1 className="text-4xl font-bold mb-2">{universe.name}</h1>
-              <p className="text-lg opacity-90">{universe.description}</p>
+              <h1 className="text-4xl font-bold mb-2">{universe?.name}</h1>
+              <p className="text-lg opacity-90">{universe?.description}</p>
+              {!universe?.isDefault && (
+                <div className="mt-2 space-y-1 text-sm opacity-75">
+                  <p>Creator: {universe?.creator?.slice(0, 6)}...{universe?.creator?.slice(-4)}</p>
+                  <p>Timeline: {universe?.address?.slice(0, 6)}...{universe?.address?.slice(-4)}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -208,7 +305,7 @@ function UniverseViewPage() {
             </div>
             <Button 
               onClick={handleLoadToFlowEditor}
-              disabled={nodeIds.length === 0 || isLoadingAny}
+              disabled={isLoadingAny}
               className="flex items-center gap-2"
               variant="outline"
             >
@@ -223,7 +320,42 @@ function UniverseViewPage() {
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
                     <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Loading blockchain timeline data...</p>
+                    <p className="text-muted-foreground">Loading timeline data...</p>
+                  </div>
+                </div>
+              ) : flowNodes.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center space-y-4">
+                    <div className="text-6xl opacity-20">🌌</div>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-2">Empty Universe</h3>
+                      <p className="text-muted-foreground mb-4">
+                        {universe?.isDefault 
+                          ? "No timeline events have been created yet."
+                          : "This universe doesn't have any timeline data yet."
+                        }
+                      </p>
+                      <div className="space-y-2">
+                        <Button 
+                          onClick={handleLoadToFlowEditor}
+                          className="mr-2"
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Create Timeline in Flow Editor
+                        </Button>
+                        <Button variant="outline" asChild>
+                          <Link to="/universes">
+                            Return to Universes
+                          </Link>
+                        </Button>
+                        {!universe?.isDefault && (
+                          <div className="text-xs text-muted-foreground mt-3">
+                            <p>This universe uses timeline contract:</p>
+                            <code className="bg-muted px-2 py-1 rounded text-xs">{universe?.address}</code>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -291,10 +423,10 @@ function UniverseViewPage() {
               </div>
               
               <div>
-                <h4 className="text-sm font-medium mb-2">Data Source</h4>
+                <h4 className="text-sm font-medium mb-2">Universe Type</h4>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-blue-50">
-                    Smart Contract
+                  <Badge variant="outline" className={universe?.isDefault ? "bg-blue-50" : "bg-purple-50"}>
+                    {universe?.isDefault ? 'Default Universe' : 'Created Universe'}
                   </Badge>
                   <Badge variant="outline" className="bg-green-50">
                     Live Data
@@ -302,12 +434,38 @@ function UniverseViewPage() {
                 </div>
               </div>
 
+              {!universe?.isDefault && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Contract Addresses</h4>
+                  <div className="space-y-2 text-xs text-muted-foreground">
+                    <div>
+                      <span className="font-medium">Timeline:</span>
+                      <div className="font-mono bg-muted px-2 py-1 rounded mt-1">
+                        {universe?.address?.slice(0, 20)}...
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Token:</span>
+                      <div className="font-mono bg-muted px-2 py-1 rounded mt-1">
+                        {universe?.tokenAddress?.slice(0, 20)}...
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Governance:</span>
+                      <div className="font-mono bg-muted px-2 py-1 rounded mt-1">
+                        {universe?.governanceAddress?.slice(0, 20)}...
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
-                <h4 className="text-sm font-medium mb-2">Contract Status</h4>
+                <h4 className="text-sm font-medium mb-2">Status</h4>
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isLoadingAny ? 'bg-yellow-500' : 'bg-green-500'}`} />
+                  <div className={`w-2 h-2 rounded-full ${isLoadingAny ? 'bg-yellow-500' : nodeIds.length > 0 ? 'bg-green-500' : 'bg-gray-400'}`} />
                   <span className="text-sm">
-                    {isLoadingAny ? 'Loading...' : 'Connected'}
+                    {isLoadingAny ? 'Loading...' : nodeIds.length > 0 ? 'Active Timeline' : 'Empty Universe'}
                   </span>
                 </div>
               </div>
@@ -345,7 +503,7 @@ function UniverseViewPage() {
                   asChild
                 >
                   <Link to="/event/$universeId/$timelineId/$eventId" params={{ 
-                    universeId: universe.id, 
+                    universeId: universe?.id || 'unknown', 
                     timelineId: 'blockchain-timeline', 
                     eventId: `node-${nodeIds[0]}`
                   }}>

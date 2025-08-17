@@ -1,9 +1,14 @@
 import { createFileRoute, useSearch } from '@tanstack/react-router';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import FlowEditor from '@/components/flow/FlowEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useGetFullGraph } from '@/hooks/useTimeline';
+import { trpcClient } from '@/utils/trpc';
+import { useQuery } from '@tanstack/react-query';
+import { useReadContract, useChainId } from 'wagmi';
+import { timelineAbi } from '@/generated';
+import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
+import { type Address } from 'viem';
 
 export const Route = createFileRoute('/flow')({
   component: FlowPage,
@@ -12,6 +17,7 @@ export const Route = createFileRoute('/flow')({
 function FlowPage() {
   // Get search parameters from URL
   const searchParams = useSearch({ from: '/flow' }) as any;
+  const chainId = useChainId();
   
   // Extract timeline data from URL parameters
   const timelineData = useMemo(() => {
@@ -24,8 +30,30 @@ function FlowPage() {
     };
   }, [searchParams]);
 
-  // Get full graph data if timeline data is loaded
-  const { data: fullGraphData } = useGetFullGraph();
+  // Extract universe ID from search params even if no timeline data
+  const universeIdFromParams = searchParams?.universeId;
+
+  // Fetch universe data if we have a universe ID (from timeline data OR direct search params)
+  const { data: universeData } = useQuery({
+    queryKey: ['universeData', universeIdFromParams],
+    queryFn: () => trpcClient.cinematicUniverses.get.query({ id: universeIdFromParams! }),
+    enabled: !!universeIdFromParams && universeIdFromParams !== 'blockchain-universe' && universeIdFromParams !== 'unknown',
+  });
+
+  // Determine which contract address to use for getting timeline data
+  const contractAddress = universeData?.data?.address 
+    ? (universeData.data.address as Address)
+    : (TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address);
+
+  // Get full graph data from the appropriate timeline contract
+  const { data: fullGraphData } = useReadContract({
+    abi: timelineAbi,
+    address: contractAddress,
+    functionName: 'getFullGraph',
+    query: {
+      enabled: !!contractAddress
+    }
+  });
   
   // Parse timeline nodes for display
   const timelineNodes = useMemo(() => {
@@ -58,6 +86,22 @@ function FlowPage() {
       };
     }).filter(Boolean);
   }, [timelineData, fullGraphData]);
+
+  // Debug universe data
+  useEffect(() => {
+    console.log('Flow page debug - detailed:', {
+      searchParams,
+      timelineData,
+      universeIdFromParams,
+      universeData: universeData?.data,
+      universeAddress: universeData?.data?.address,
+      contractAddress,
+      fullGraphData,
+      timelineNodesCount: timelineNodes?.length || 0,
+      isQueryEnabled: !!universeIdFromParams && universeIdFromParams !== 'blockchain-universe' && universeIdFromParams !== 'unknown',
+      isLoadingUniverse: universeData === undefined
+    });
+  }, [searchParams, timelineData, universeData, universeIdFromParams, contractAddress, fullGraphData, timelineNodes]);
 
   return (
     <div className="container mx-auto py-8">
@@ -110,7 +154,11 @@ function FlowPage() {
       )}
       
       <div className="border rounded-lg overflow-hidden">
-        <FlowEditor timelineData={timelineNodes as any} />
+        <FlowEditor 
+          timelineData={timelineNodes as any}
+          universeAddress={universeData?.data?.address}
+          universeId={universeIdFromParams}
+        />
       </div>
     </div>
   );

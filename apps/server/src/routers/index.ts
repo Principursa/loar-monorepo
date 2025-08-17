@@ -11,6 +11,7 @@ import { z } from "zod";
 
 import { videoService } from "../services/video";
 import { walrusService } from "../services/walrus";
+import { klingService } from "../services/kling";
 
 import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverses.index";
 
@@ -97,7 +98,8 @@ export const appRouter = router({
         prompt: z.string().min(1, "Prompt is required"),
         model: z.enum(['ray-flash-2', 'ray-2', 'ray-1-6']).optional(),
         resolution: z.enum(['540p', '720p', '1080p', '4k']).optional(),
-        duration: z.enum(['5s', '10s']).optional()
+        duration: z.enum(['5s', '10s']).optional(),
+        imageUrl: z.string().url().optional() // For image-to-video generation
       }))
       .mutation(async ({ input }) => {
         return await videoService.generateVideo(input);
@@ -112,11 +114,48 @@ export const appRouter = router({
         prompt: z.string().min(1, "Prompt is required"),
         model: z.enum(['ray-flash-2', 'ray-2', 'ray-1-6']).optional(),
         resolution: z.enum(['540p', '720p', '1080p', '4k']).optional(),
-        duration: z.enum(['5s', '10s']).optional()
+        duration: z.enum(['5s', '10s']).optional(),
+        imageUrl: z.string().url().optional() // For image-to-video generation
       }))
       .mutation(async ({ input }) => {
         const generation = await videoService.generateVideo(input);
         return await videoService.waitForCompletion(generation.id);
+      }),
+    multiImageGenerate: publicProcedure
+      .input(z.object({
+        image_list: z.array(z.object({
+          image: z.string().min(1, "Image is required")
+        })).min(1, "At least one image is required").max(4, "Maximum 4 images allowed"),
+        prompt: z.string().optional(),
+        negative_prompt: z.string().optional(),
+        mode: z.enum(['std', 'pro']).optional(),
+        duration: z.enum(['5', '10']).optional(),
+        aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional(),
+        external_task_id: z.string().optional()
+      }))
+      .mutation(async ({ input }) => {
+        return await klingService.createMultiImageVideo(input);
+      }),
+    multiImageStatus: publicProcedure
+      .input(z.object({ task_id: z.string() }))
+      .query(async ({ input }) => {
+        return await klingService.getTaskStatus(input.task_id);
+      }),
+    multiImageGenerateAndWait: publicProcedure
+      .input(z.object({
+        image_list: z.array(z.object({
+          image: z.string().min(1, "Image is required")
+        })).min(1, "At least one image is required").max(4, "Maximum 4 images allowed"),
+        prompt: z.string().optional(),
+        negative_prompt: z.string().optional(),
+        mode: z.enum(['std', 'pro']).optional(),
+        duration: z.enum(['5', '10']).optional(),
+        aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional(),
+        external_task_id: z.string().optional()
+      }))
+      .mutation(async ({ input }) => {
+        const generation = await klingService.createMultiImageVideo(input);
+        return await klingService.waitForCompletion(generation.data.task_id);
       }),
   }),
   walrus: router({

@@ -78,4 +78,4 @@ async function testWalrusService() {
 // Run the test
 testWalrusService().catch(console.error);
 
-https://aggregator.walrus-testnet.walrus.space/v1/blobs/6v8WTb4tXmhcEBAb3CD4Afhpp_W42cXnNkzJJXcJ_Vo
+// https://aggregator.walrus-testnet.walrus.space/v1/blobs/6v8WTb4tXmhcEBAb3CD4Afhpp_W42cXnNkzJJXcJ_Vo

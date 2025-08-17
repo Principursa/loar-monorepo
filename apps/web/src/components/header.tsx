@@ -10,6 +10,7 @@ export default function Header() {
     { to: "/flow", label: "Narrative Flow" },
     { to: "/wiki", label: "Characters" },
     { to: "/universes", label: "Universes" },
+    { to: "/cinematicuniversecreate", label: "Create Universe" },
   ];
 
   return (

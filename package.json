@@ -35,6 +35,7 @@
     "@types/node": "^24.3.0",
     "dotenv": "^17.2.1",
     "install": "^0.13.0",
+    "jsonwebtoken": "^9.0.2",
     "mcp-use": "^0.1.15",
     "openai": "^5.12.2",
     "server": "./apps/server",
@@ -44,6 +45,7 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@wagmi/cli": "^2.4.0",
     "turbo": "^2.5.4"
   },

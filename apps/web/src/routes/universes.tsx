@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useCreateNode, useGetNode, useGetTimeline, useGetLeaves, useGetMedia, useGetCanonChain, useGetFullGraph, useSetMedia, useSetCanon } from "@/hooks/useTimeline";
 import { trpc, trpcClient } from "@/utils/trpc";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 function UniversesPage() {
   // Define our single blockchain universe
@@ -41,17 +42,32 @@ function UniversesPage() {
   const [walrusVideoUrl, setWalrusVideoUrl] = useState<string | null>(null);
   const [isUploadingToWalrus, setIsUploadingToWalrus] = useState(false);
   const [walrusUploadUrl, setWalrusUploadUrl] = useState('');
+  
+  // Expanded universe states
+  const [expandedUniverses, setExpandedUniverses] = useState<Record<string, boolean>>({});
+  
+  const toggleUniverseExpansion = (universeId: string) => {
+    setExpandedUniverses(prev => ({
+      ...prev,
+      [universeId]: !prev[universeId]
+    }));
+  };
 
   const { writeAsync: createNode } = useCreateNode(nodeLink, nodePlot, previousNode);
   const { writeAsync: setMediaAsync } = useSetMedia(updateMediaNodeId, updateMediaLink);
   const { writeAsync: setCanonAsync } = useSetCanon(canonNodeId);
   const { data: nodeData, isLoading: isLoadingNode, refetch: refetchNode } = useGetNode(queryNodeId);
-  const { data: timelineData, isLoading: isLoadingTimeline, refetch: refetchTimeline } = useGetTimeline();
+  const { data: timelineData, isLoading: isLoadingTimeline, refetch: refetchTimeline } = useGetTimeline(0);
   const { data: leavesData, isLoading: isLoadingLeaves, refetch: refetchLeaves } = useGetLeaves();
   const { data: mediaData, isLoading: isLoadingMedia, refetch: refetchMedia } = useGetMedia(mediaNodeId);
   const { data: canonChainData, isLoading: isLoadingCanonChain, refetch: refetchCanonChain } = useGetCanonChain();
   const { data: fullGraphData, isLoading: isLoadingFullGraph, refetch: refetchFullGraph } = useGetFullGraph();
 
+  // Fetch all created cinematic universes
+  const { data: cinematicUniverses, isLoading: isLoadingUniverses, refetch: refetchUniverses } = useQuery({
+    queryKey: ['cinematicUniverses'],
+    queryFn: () => trpcClient.cinematicUniverses.getAll.query(),
+  });
 
   // Video generation hooks
   const generateVideoMutation = useMutation({
@@ -545,16 +561,166 @@ function UniversesPage() {
       </div>
       
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-4">Blockchain Universe</h1>
+        <h1 className="text-4xl font-bold mb-4">Cinematic Universes</h1>
         <p className="text-lg text-muted-foreground">
-          Explore the decentralized narrative universe with blockchain-powered timelines
+          Explore decentralized narrative universes with blockchain-powered timelines
         </p>
       </div>
 
+      {/* Created Cinematic Universes */}
+      {cinematicUniverses?.data && cinematicUniverses.data.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-semibold">Created Universes ({cinematicUniverses.total})</h2>
+            <Button onClick={() => refetchUniverses()} disabled={isLoadingUniverses}>
+              {isLoadingUniverses ? 'Loading...' : 'Refresh'}
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {cinematicUniverses.data.map((universe: any) => (
+              <Card key={universe.id} className="transition-all hover:shadow-lg">
+                <div className="relative">
+                  <img 
+                    src={universe.image_url} 
+                    alt={`Universe ${universe.id}`}
+                    className="w-full h-48 object-cover rounded-t-lg"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=800&h=400&fit=crop';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-black/20 rounded-t-lg" />
+                  <div className="absolute bottom-4 left-4 text-white">
+                    <h3 className="font-bold text-xl">Universe #{universe.id}</h3>
+                  </div>
+                </div>
+                <CardContent className="p-4">
+                  <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
+                    {universe.description}
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-purple-50 text-xs">
+                        Timeline Contract
+                      </Badge>
+                      <Badge variant="outline" className="bg-green-50 text-xs">
+                        Active
+                      </Badge>
+                    </div>
+                    
+                    <div className="text-xs text-muted-foreground">
+                      <p><strong>Creator:</strong> {universe.creator.slice(0, 6)}...{universe.creator.slice(-4)}</p>
+                      <p><strong>Timeline:</strong> {universe.address.slice(0, 6)}...{universe.address.slice(-4)}</p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Button size="sm" className="flex-1" asChild>
+                          <Link to="/flow" search={{ 
+                            universeId: universe.id,
+                            timelineAddress: universe.address,
+                            description: universe.description 
+                          }}>
+                            Flow Editor
+                          </Link>
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1" asChild>
+                          <Link to="/universe/$id" params={{ id: universe.id }}>
+                            Timeline Graph
+                          </Link>
+                        </Button>
+                      </div>
+                      
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="w-full text-xs"
+                        onClick={() => toggleUniverseExpansion(universe.id)}
+                      >
+                        {expandedUniverses[universe.id] ? (
+                          <>
+                            <ChevronUp className="w-3 h-3 mr-1" />
+                            Hide Timeline Actions
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-3 h-3 mr-1" />
+                            Show Timeline Actions
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+                
+                {/* Expanded Timeline Actions */}
+                {expandedUniverses[universe.id] && (
+                  <CardContent className="pt-0 border-t bg-muted/20">
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-sm text-muted-foreground">Timeline Actions for {universe.id.slice(0, 8)}...</h4>
+                      
+                      {/* Video Generation Section */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2 p-3 bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-lg">
+                          <h5 className="font-medium text-pink-700 text-sm">🎬 Video Generation</h5>
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              placeholder="Video prompt for this universe..."
+                              value={videoPrompt}
+                              onChange={(e) => setVideoPrompt(e.target.value)}
+                              className="w-full px-2 py-1 text-sm border border-pink-300 rounded focus:outline-none focus:ring-1 focus:ring-pink-500"
+                            />
+                            <button
+                              onClick={handleGenerateVideo}
+                              disabled={!videoPrompt.trim() || generateVideoMutation.isPending}
+                              className="w-full px-3 py-1 text-sm bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded hover:from-pink-600 hover:to-purple-600 disabled:bg-gray-400"
+                            >
+                              {generateVideoMutation.isPending ? 'Generating...' : 'Generate Video'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Walrus Upload Section */}
+                        <div className="space-y-2 p-3 bg-gradient-to-r from-blue-50 to-teal-50 border border-blue-200 rounded-lg">
+                          <h5 className="font-medium text-blue-700 text-sm">🐙 Upload to Walrus</h5>
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              placeholder="Video URL to upload..."
+                              value={walrusUploadUrl}
+                              onChange={(e) => setWalrusUploadUrl(e.target.value)}
+                              className="w-full px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <button
+                              onClick={handleUploadToWalrus}
+                              disabled={!walrusUploadUrl.trim() || isUploadingToWalrus}
+                              className="w-full px-3 py-1 text-sm bg-gradient-to-r from-blue-500 to-teal-500 text-white rounded hover:from-blue-600 hover:to-teal-600 disabled:bg-gray-400"
+                            >
+                              {isUploadingToWalrus ? 'Uploading...' : 'Upload to Walrus'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Timeline Info */}
+                      <div className="text-xs text-muted-foreground bg-white/50 p-2 rounded border">
+                        <p><strong>Timeline Contract:</strong> {universe.address}</p>
+                        <p><strong>Token:</strong> {universe.tokenAddress}</p>
+                        <p><strong>Governance:</strong> {universe.governanceAddress}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Single Blockchain Universe Card */}
+        {/* Default Blockchain Universe Card */}
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold">Universe</h2>
+          <h2 className="text-2xl font-semibold">Default Universe</h2>
           <Card className="transition-all hover:shadow-lg">
             <div className="relative">
               <img 
