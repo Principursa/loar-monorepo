@@ -3,19 +3,18 @@ FROM oven/bun:1.1.8-alpine AS base
 WORKDIR /app
 
 # Copy package files
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 COPY apps/web/package.json ./apps/web/
-COPY packages/ ./packages/
+COPY turbo.json ./
 
 # Install dependencies
 RUN bun install --frozen-lockfile
 
 # Copy source code
 COPY apps/web/ ./apps/web/
-COPY turbo.json ./
 
 # Build the application
-RUN bun run build
+RUN cd apps/web && bun run build
 
 # Production stage
 FROM nginx:alpine AS production
@@ -26,9 +25,8 @@ COPY --from=base /app/apps/web/dist /usr/share/nginx/html
 # Copy custom nginx config
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nginx -u 1001
+# Install curl for health checks
+RUN apk add --no-cache curl
 
 EXPOSE 3001
 
