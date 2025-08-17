@@ -16,6 +16,13 @@ const governanceERC20Bytecode = governanceERC20Artifact.bytecode.object
 const universeGovernanceBytecode = universeGovernorArtifact.bytecode.object
 const timelineBytecode = timelineArtifact.bytecode.object
 
+// Log contract sizes
+console.log("Contract bytecode sizes:");
+console.log("GovernanceERC20:", Math.floor(governanceERC20Bytecode.length / 2), "bytes");
+console.log("UniverseGovernor:", Math.floor(universeGovernanceBytecode.length / 2), "bytes"); 
+console.log("Timeline:", Math.floor(timelineBytecode.length / 2), "bytes");
+console.log("Size limit: 24576 bytes");
+
 export const Route = createFileRoute("/cinematicUniverseCreate")({
   component: CinematicUniverseCreate,
 });
@@ -89,14 +96,16 @@ function CinematicUniverseCreate() {
     setDeploymentStep("Deploying GovernanceERC20 token...");
 
     try {
-      console.log("Deploying token with:", { tokenName, tokenSymbol, address });
+      console.log("Deploying token with:", { tokenName, tokenSymbol, address, chainId });
+      console.log("Balance:", balance?.formatted, balance?.symbol);
       console.log("Bytecode length:", governanceERC20Bytecode.length);
       
       // Step 1: Deploy GovernanceERC20 token
       deployToken({
         abi: governanceErc20Abi,
-        bytecode: `0x${governanceERC20Bytecode}` as `0x${string}`,
+        bytecode: governanceERC20Bytecode as `0x${string}`,
         args: [tokenName, tokenSymbol],
+        gas: 3000000n, // Add explicit gas limit
       });
     } catch (error) {
       console.error("Token deployment failed:", error);
@@ -117,7 +126,8 @@ function CinematicUniverseCreate() {
       deployGovernor({
         abi: universeGovernorAbi,
         args: [tokenAddress],
-        bytecode: `0x${universeGovernanceBytecode}` as `0x${string}`,
+        bytecode: universeGovernanceBytecode as `0x${string}`,
+        gas: 5000000n, // Increase gas limit for large contract
       });
     }
   }, [tokenDeployed, tokenReceipt]);
@@ -134,7 +144,7 @@ function CinematicUniverseCreate() {
       deployTimeline({
         abi: timelineAbi,
         args: [governorAddress],
-        bytecode: `0x${timelineBytecode}` as `0x${string}`,
+        bytecode: timelineBytecode as `0x${string}`,
       });
     }
   }, [governorDeployed, governorReceipt]);
