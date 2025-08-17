@@ -65,11 +65,18 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
   const [showPromptDialog, setShowPromptDialog] = useState(false);
   const [generatedVideoId, setGeneratedVideoId] = useState<string | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(data.plotVideoUrl || null);
+  const [walrusUrl, setWalrusUrl] = useState<string | null>(data.plotWalrusUrl || null);
   
   // Video generation mutation
   const generateVideoMutation = useMutation({
     mutationFn: (input: { prompt: string; model?: 'ray-flash-2' | 'ray-2' | 'ray-1-6'; resolution?: '540p' | '720p' | '1080p' | '4k'; duration?: '5s' | '10s' }) =>
       trpcClient.video.generate.mutate(input),
+  });
+  
+  // Walrus upload mutation
+  const uploadToWalrusMutation = useMutation({
+    mutationFn: (input: { url: string }) =>
+      trpcClient.walrus.uploadFromUrl.mutate(input),
   });
   
   // Video status query - only enabled when we have a video ID
@@ -136,6 +143,25 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
     }
   }, [videoPrompt, generateVideoMutation]);
   
+  // Upload to Walrus
+  const handleUploadToWalrus = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!generatedVideoUrl) return;
+    
+    try {
+      const walrusResult = await uploadToWalrusMutation.mutateAsync({
+        url: generatedVideoUrl
+      }) as { blobId: string; url: string };
+      
+      setWalrusUrl(walrusResult.url);
+      data.plotWalrusUrl = walrusResult.url;
+      data.plotWalrusBlobId = walrusResult.blobId;
+    } catch (error) {
+      console.error('Error uploading to Walrus:', error);
+      alert('Failed to upload to Walrus. Please try again.');
+    }
+  }, [generatedVideoUrl, uploadToWalrusMutation, data]);
+  
   return (
     <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-green-500 dark:bg-slate-800">
       <div className="flex">
@@ -195,22 +221,54 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
         </div>
       )}
       
-      {/* Generate Video Button */}
-      <button
-        onClick={openPromptDialog}
-        onMouseDown={onInteractionClick}
-        disabled={generateVideoMutation.isPending}
-        className={`mt-2 w-full py-1 px-2 text-xs rounded ${generateVideoMutation.isPending ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white flex items-center justify-center`}
-      >
-        {generateVideoMutation.isPending ? (
-          <>
-            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-            Generating...
-          </>
-        ) : (
-          <><Video className="w-3 h-3 mr-1" />Generate Video</>
+      {/* Action Buttons */}
+      <div className="mt-2 space-y-1">
+        <button
+          onClick={openPromptDialog}
+          onMouseDown={onInteractionClick}
+          disabled={generateVideoMutation.isPending}
+          className={`w-full py-1 px-2 text-xs rounded ${generateVideoMutation.isPending ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white flex items-center justify-center`}
+        >
+          {generateVideoMutation.isPending ? (
+            <>
+              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <><Video className="w-3 h-3 mr-1" />Generate Video</>
+          )}
+        </button>
+        
+        {generatedVideoUrl && !walrusUrl && (
+          <button
+            onClick={handleUploadToWalrus}
+            onMouseDown={onInteractionClick}
+            disabled={uploadToWalrusMutation.isPending}
+            className={`w-full py-1 px-2 text-xs rounded ${uploadToWalrusMutation.isPending ? 'bg-gray-400' : 'bg-teal-600 hover:bg-teal-700'} text-white flex items-center justify-center`}
+          >
+            {uploadToWalrusMutation.isPending ? (
+              <>
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>🐙 Upload to Walrus</>
+            )}
+          </button>
         )}
-      </button>
+      </div>
+      
+      {/* Display Walrus URL if available */}
+      {walrusUrl && (
+        <div className="mt-2 text-xs text-muted-foreground">
+          <strong>🐙 Walrus:</strong>
+          <div className="bg-teal-50 dark:bg-teal-900 p-1 rounded mt-1 break-all">
+            <a href={walrusUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">
+              {walrusUrl.length > 50 ? `${walrusUrl.substring(0, 47)}...` : walrusUrl}
+            </a>
+          </div>
+        </div>
+      )}
       
       {/* Video Prompt Dialog */}
       {showPromptDialog && (
@@ -265,7 +323,7 @@ export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
   const [showPromptDialog, setShowPromptDialog] = useState(false);
   const [generatedVideoId, setGeneratedVideoId] = useState<string | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(data.mediaUrl || null);
-  const [walrusUrl, setWalrusUrl] = useState<string | null>(data.walrusUrl || null);
+  const [walrusUrl, setWalrusUrl] = useState<string | null>(data.mediaWalrusUrl || null);
   
   // Video generation mutation
   const generateVideoMutation = useMutation({
@@ -354,8 +412,8 @@ export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
       }) as { blobId: string; url: string };
       
       setWalrusUrl(walrusResult.url);
-      data.walrusUrl = walrusResult.url;
-      data.walrusBlobId = walrusResult.blobId;
+      data.mediaWalrusUrl = walrusResult.url;
+      data.mediaWalrusBlobId = walrusResult.blobId;
     } catch (error) {
       console.error('Error uploading to Walrus:', error);
       alert('Failed to upload to Walrus. Please try again.');
@@ -419,22 +477,54 @@ export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
         </div>
       )}
       
-      {/* Generate Content Button */}
-      <button
-        onClick={openPromptDialog}
-        onMouseDown={onInteractionClick}
-        disabled={generateVideoMutation.isPending}
-        className={`mt-2 w-full py-1 px-2 text-sm rounded ${generateVideoMutation.isPending ? 'bg-gray-400' : 'bg-purple-600 hover:bg-purple-700'} text-white flex items-center justify-center`}
-      >
-        {generateVideoMutation.isPending ? (
-          <>
-            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-            Generating...
-          </>
-        ) : (
-          'Generate Video'
+      {/* Action Buttons */}
+      <div className="mt-2 space-y-1">
+        <button
+          onClick={openPromptDialog}
+          onMouseDown={onInteractionClick}
+          disabled={generateVideoMutation.isPending}
+          className={`w-full py-1 px-2 text-sm rounded ${generateVideoMutation.isPending ? 'bg-gray-400' : 'bg-purple-600 hover:bg-purple-700'} text-white flex items-center justify-center`}
+        >
+          {generateVideoMutation.isPending ? (
+            <>
+              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            'Generate Video'
+          )}
+        </button>
+        
+        {generatedVideoUrl && !walrusUrl && (
+          <button
+            onClick={handleUploadToWalrus}
+            onMouseDown={onInteractionClick}
+            disabled={uploadToWalrusMutation.isPending}
+            className={`w-full py-1 px-2 text-sm rounded ${uploadToWalrusMutation.isPending ? 'bg-gray-400' : 'bg-teal-600 hover:bg-teal-700'} text-white flex items-center justify-center`}
+          >
+            {uploadToWalrusMutation.isPending ? (
+              <>
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>🐙 Upload to Walrus</>
+            )}
+          </button>
         )}
-      </button>
+      </div>
+      
+      {/* Display Walrus URL if available */}
+      {walrusUrl && (
+        <div className="mt-2 text-xs text-muted-foreground">
+          <strong>🐙 Walrus:</strong>
+          <div className="bg-teal-50 dark:bg-teal-900 p-1 rounded mt-1 break-all">
+            <a href={walrusUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">
+              {walrusUrl.length > 50 ? `${walrusUrl.substring(0, 47)}...` : walrusUrl}
+            </a>
+          </div>
+        </div>
+      )}
       
       {/* Video Prompt Dialog */}
       {showPromptDialog && (
