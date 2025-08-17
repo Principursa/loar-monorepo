@@ -1,142 +1,262 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { trpc } from "@/utils/trpc";
-import { useQuery } from "@tanstack/react-query";
 import { useDynamicContext, useUserWallets } from "@dynamic-labs/sdk-react-core";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Wallet, ArrowRight, Shield, Zap, Globe } from "lucide-react";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Play, Sparkles, Video, Shield, Coins, ShoppingBag } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: HomeComponent,
 });
 
-
 function HomeComponent() {
-  const healthCheck = useQuery(trpc.healthCheck.queryOptions());
   const { user, handleConnect } = useDynamicContext();
   const userWallets = useUserWallets();
 
-  console.log("HomeComponent render:", { user, hasHandleConnect: !!handleConnect });
-
   return (
-    <div className="container mx-auto max-w-6xl px-4 py-8">
-      <div className="text-center mb-8">
-        <div className="flex justify-center mb-6">
-          <img
-            src="/logo.png"
-            alt="LOAR Logo"
-            className="h-72 w-auto object-contain"
-            onError={(e) => {
-              // Fallback to text if logo doesn't load
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              const fallback = target.nextElementSibling as HTMLElement;
-              if (fallback) fallback.style.display = 'block';
-            }}
-          />
-          <div className="hidden">
-            <h1 className="text-6xl font-bold text-primary">LOAR</h1>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="LOAR Logo" className="h-10 w-10 object-contain" />
+            <span className="text-2xl font-bold text-foreground">LOAR</span>
           </div>
-        </div>
-        <h1 className="text-4xl font-bold mb-4">Welcome to LOAR</h1>
-        <p className="text-xl text-muted-foreground mb-8">
-          Decentralized narrative control through NFT ownership and community governance
-        </p>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Wallet Authentication
-            </CardTitle>
-            <CardDescription>
-              Connect with MetaMask, WalletConnect, and more
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          <nav className="hidden md:flex items-center gap-6">
+            <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
+              Features
+            </a>
             {user ? (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Connected: {userWallets[0]?.address?.slice(0, 6)}...{userWallets[0]?.address?.slice(-4)}
-                </p>
-                <Button asChild className="w-full">
-                  <a href="/dashboard">
-                    Go to Dashboard
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </a>
-                </Button>
-              </div>
+              <Button asChild size="sm">
+                <a href="/dashboard">Dashboard</a>
+              </Button>
             ) : (
-              <Button onClick={handleConnect} className="w-full">
-                <Wallet className="mr-2 h-4 w-4" />
-                Connect Wallet
+              <>
+                <Button variant="outline" size="sm" onClick={handleConnect}>
+                  Sign In
+                </Button>
+                <Button size="sm" onClick={handleConnect}>
+                  Get Started
+                </Button>
+              </>
+            )}
+          </nav>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <section className="py-20 px-4 text-center bg-gradient-to-br from-primary/10 via-background to-accent/5">
+        <div className="container mx-auto max-w-4xl">
+          <Badge variant="secondary" className="mb-6">
+            <Sparkles className="w-4 h-4 mr-2" />
+            AI-Powered Video Generation
+          </Badge>
+          <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            Create Stunning Videos in Minutes
+          </h1>
+          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
+            Transform your ideas into professional videos with LOAR's advanced AI technology. No editing experience
+            required – just describe your vision and watch it come to life.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+            {user ? (
+              <Button size="lg" className="text-lg px-8 py-6" asChild>
+                <a href="/flow">
+                  <Play className="w-5 h-5 mr-2" />
+                  Start Creating
+                </a>
+              </Button>
+            ) : (
+              <Button size="lg" className="text-lg px-8 py-6" onClick={handleConnect}>
+                <Play className="w-5 h-5 mr-2" />
+                Start Creating
               </Button>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Secure & Reliable
-            </CardTitle>
-            <CardDescription>
-              Built with modern security practices
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Dynamic provides enterprise-grade wallet infrastructure with MPC technology and smart account support.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5" />
-              Lightning Fast
-            </CardTitle>
-            <CardDescription>
-              Optimized for performance
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Built with Vite, React 19, and TanStack Router for the best developer and user experience.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5" />
-            API Status
-          </CardTitle>
-          <CardDescription>
-            Backend connection status
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2">
-            <div
-              className={`h-3 w-3 rounded-full ${healthCheck.data ? "bg-green-500" : "bg-red-500"}`}
-            />
-            <span className="text-sm text-muted-foreground">
-              {healthCheck.isLoading
-                ? "Checking connection..."
-                : healthCheck.data
-                  ? "Backend connected and ready"
-                  : "Backend disconnected"}
-            </span>
+            <Button variant="outline" size="lg" className="text-lg px-8 py-6 bg-transparent">
+              <Video className="w-5 h-5 mr-2" />
+              Watch Demo
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Demo Video Placeholder */}
+          <div className="relative max-w-4xl mx-auto">
+            <div className="aspect-video bg-card rounded-xl border-2 border-border shadow-2xl overflow-hidden">
+              <video 
+                className="w-full h-full object-cover" 
+                controls 
+                autoPlay 
+                muted 
+                loop 
+                poster="/loar-video-generation-preview.png"
+              >
+                <source
+                  src="https://aggregator.walrus-testnet.walrus.space/v1/blobs/SfYobs0IsGUYorA898m0k2mQxK4wud5HotOyysKGrs0"
+                  type="video/mp4"
+                />
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Video Example Section */}
+      <section className="py-20 px-4 bg-card/30">
+        <div className="container mx-auto max-w-6xl">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold mb-4">See LOAR in Action</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Watch real videos created with LOAR's AI technology.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="relative">
+              <div className="aspect-video bg-card rounded-xl border-2 border-border shadow-xl overflow-hidden">
+                <video 
+                  className="w-full h-full object-cover" 
+                  controls 
+                  autoPlay 
+                  muted 
+                  loop 
+                  poster="/ai-generated-video-example-1.png"
+                >
+                  <source
+                    src="https://aggregator.walrus-testnet.walrus.space/v1/blobs/SfYobs0IsGUYorA898m0k2mQxK4wud5HotOyysKGrs0"
+                    type="video/mp4"
+                  />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+              <div className="mt-4 text-center">
+                <h3 className="font-semibold mb-2">AI Story Video</h3>
+                <p className="text-sm text-muted-foreground">Generated from text prompt</p>
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="aspect-video bg-card rounded-xl border-2 border-border shadow-xl overflow-hidden">
+                <video 
+                  className="w-full h-full object-cover" 
+                  controls 
+                  autoPlay 
+                  muted 
+                  loop 
+                  poster="/ai-generated-video-example-2.png"
+                >
+                  <source
+                    src="https://aggregator.walrus-testnet.walrus.space/v1/blobs/a-yeySpQFv6J0IwVNZZ3iCY2mN-vyIyb0A66oFuEiKc"
+                    type="video/mp4"
+                  />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+              <div className="mt-4 text-center">
+                <h3 className="font-semibold mb-2">Product Demo</h3>
+                <p className="text-sm text-muted-foreground">Marketing video creation</p>
+              </div>
+            </div>
+
+            <div className="relative md:col-span-2 lg:col-span-1">
+              <div className="aspect-video bg-card rounded-xl border-2 border-border shadow-xl overflow-hidden">
+                <video 
+                  className="w-full h-full object-cover" 
+                  controls 
+                  autoPlay 
+                  muted 
+                  loop 
+                  poster="/ai-generated-video-example-3.png"
+                >
+                  <source
+                    src="https://aggregator.walrus-testnet.walrus.space/v1/blobs/Ns8IUy5XjhVJwUQ2Xptiv5ZWX4uIyqovVlWpEJDCX7M"
+                    type="video/mp4"
+                  />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+              <div className="mt-4 text-center">
+                <h3 className="font-semibold mb-2">Creative Content</h3>
+                <p className="text-sm text-muted-foreground">Social media ready</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Workflow Section */}
+      <section className="py-20 px-4">
+        <div className="container mx-auto max-w-6xl">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold mb-4">Blockchain Video Timeline Workflow</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Create branching narratives with blockchain-verified video content across multiple timeline nodes.
+            </p>
+          </div>
+
+          <div className="relative max-w-5xl mx-auto">
+            <div className="aspect-[4/3] bg-card rounded-xl border-2 border-border shadow-xl overflow-hidden">
+              <img
+                src="/workflow-diagram.png"
+                alt="LOAR Blockchain Video Timeline Workflow showing 4 connected timeline nodes with video content and blockchain verification"
+                className="w-full h-full object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="py-20 px-4">
+        <div className="container mx-auto max-w-6xl">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold mb-4">Powerful Features for Every Creator</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Everything you need to create professional videos, powered by cutting-edge AI technology and Web3
+              innovation.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            <Card className="border-2 hover:border-primary/50 transition-colors">
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                  <Shield className="w-6 h-6 text-primary" />
+                </div>
+                <CardTitle>Censorship Resistant</CardTitle>
+                <CardDescription>
+                  Your videos are stored on Walrus decentralized storage, ensuring permanent access and resistance to
+                  censorship.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="border-2 hover:border-primary/50 transition-colors">
+              <CardHeader>
+                <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center mb-4">
+                  <Coins className="w-6 h-6 text-accent" />
+                </div>
+                <CardTitle>Community Governance</CardTitle>
+                <CardDescription>
+                  Participate in platform decisions through token incentives and earn rewards for contributing to the
+                  ecosystem.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="border-2 hover:border-primary/50 transition-colors">
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                  <ShoppingBag className="w-6 h-6 text-primary" />
+                </div>
+                <CardTitle>Content Ownership</CardTitle>
+                <CardDescription>
+                  Own your videos as NFTs on OpenSea, enabling true digital ownership and monetization opportunities.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
