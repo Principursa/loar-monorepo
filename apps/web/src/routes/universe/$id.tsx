@@ -2,7 +2,6 @@ import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { universes } from "@/data/universes";
 import { ArrowRight, GitBranch } from "lucide-react";
 import ReactFlow, {
   Controls,
@@ -17,6 +16,7 @@ import 'reactflow/dist/style.css';
 import { useMemo } from 'react';
 import { TimelineEventNode } from '@/components/flow/TimelineNodes';
 import { TimelineActions } from '@/components/TimelineActions';
+import { useGetNode, useGetLeaves } from '@/hooks/useTimeline';
 
 interface UniverseParams {
   id: string;
@@ -24,27 +24,85 @@ interface UniverseParams {
 
 function UniverseViewPage() {
   const { id } = useParams({ from: "/universe/$id" });
-  const universe = universes.find(u => u.id === id);
+  
+  // Define our single blockchain universe
+  const universe = {
+    id: 'blockchain-universe',
+    name: 'Cyberpunk City',
+    description: 'A decentralized narrative universe powered by blockchain technology',
+    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=800&h=400&fit=crop'
+  };
 
-  if (!universe) {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <h2 className="text-2xl font-bold mb-4">Universe Not Found</h2>
-            <p className="text-muted-foreground mb-4">
-              The requested universe could not be found.
-            </p>
-            <Button asChild>
-              <Link to="/universes">Back to Universes</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Get timeline leaves (endpoints)
+  const { data: leavesData, isLoading: isLoadingLeaves } = useGetLeaves();
+  
+  // Fetch individual nodes (IDs 0-4) for building timelines
+  const { data: node0, isLoading: isLoading0 } = useGetNode(0);
+  const { data: node1, isLoading: isLoading1 } = useGetNode(1);
+  const { data: node2, isLoading: isLoading2 } = useGetNode(2);
+  const { data: node3, isLoading: isLoading3 } = useGetNode(3);
+  const { data: node4, isLoading: isLoading4 } = useGetNode(4);
+  
+  const nodeDataMap = new Map([
+    [0, node0],
+    [1, node1], 
+    [2, node2],
+    [3, node3],
+    [4, node4]
+  ]);
+  
+  const isLoadingAny = isLoadingLeaves || isLoading0 || isLoading1 || isLoading2 || isLoading3 || isLoading4;
 
-  // Generate React Flow nodes and edges with git-like layout
+  // Build timelines from leaves and trace back via previous relationships
+  const timelines = useMemo(() => {
+    if (!leavesData || !Array.isArray(leavesData)) return [];
+    
+    const timelinesList: Array<{id: string, events: Array<{id: number, data: any}>}> = [];
+    
+    leavesData.forEach((leafId, timelineIndex) => {
+      const leafNodeId = typeof leafId === 'bigint' ? Number(leafId) : leafId;
+      const timeline = { id: `timeline-${leafNodeId}`, events: [] as Array<{id: number, data: any}> };
+      
+      // Trace back from leaf to root
+      let currentNodeId = leafNodeId;
+      const visited = new Set();
+      
+      while (currentNodeId !== null && currentNodeId !== undefined && !visited.has(currentNodeId)) {
+        visited.add(currentNodeId);
+        const nodeData = nodeDataMap.get(currentNodeId);
+        
+        if (nodeData && Array.isArray(nodeData)) {
+          timeline.events.unshift({ id: currentNodeId, data: nodeData });
+          
+          // Get previous node ID (index 3 in the response)
+          const previous = nodeData[3];
+          const prevNodeId = typeof previous === 'bigint' ? Number(previous) : previous;
+          
+          // Stop if previous is 0 (root) or invalid
+          if (!prevNodeId || prevNodeId === 0) {
+            // Add node 0 as root if it exists
+            if (currentNodeId !== 0) {
+              const rootData = nodeDataMap.get(0);
+              if (rootData) {
+                timeline.events.unshift({ id: 0, data: rootData });
+              }
+            }
+            break;
+          }
+          
+          currentNodeId = prevNodeId;
+        } else {
+          break;
+        }
+      }
+      
+      timelinesList.push(timeline);
+    });
+    
+    return timelinesList;
+  }, [leavesData, nodeDataMap]);
+
+  // Generate React Flow nodes and edges from timelines
   const { nodes: flowNodes, edges: flowEdges } = useMemo(() => {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
@@ -55,147 +113,69 @@ function UniverseViewPage() {
     // Colors for different timelines
     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
     
-    // Track the x position for each timeline branch
-    const branchPositions: Record<string, number> = {};
-    let currentY = 0;
+    // Track node positions to avoid duplicates
+    const nodePositions = new Map();
     
-    // Add the common starting node
-    const commonStart = universe.timelines[0]?.nodes[0];
-    if (!commonStart) return { nodes: [], edges: [] };
-    
-    // Create root node
-    nodes.push({
-      id: 'root',
-      type: 'timelineEvent',
-      position: { x: startX, y: currentY },
-      data: {
-        label: commonStart.title,
-        description: commonStart.description,
-        videoUrl: commonStart.videoUrl,
-        characters: commonStart.characters,
-        isRoot: true,
-        eventId: commonStart.id,
-        timelineId: universe.timelines[0].id,
-        universeId: universe.id
-      }
-    });
-    
-    currentY += verticalSpacing;
-    
-    // Create a map to track where each timeline branches
-    const timelineBranchPoints: Record<string, { nodeId: string; y: number }> = {};
-    
-    // First, lay out all nodes vertically as if they were a single timeline
-    const allEvents: Array<{ node: any; timeline: any; timelineIndex: number }> = [];
-    
-    universe.timelines.forEach((timeline, timelineIndex) => {
-      timeline.nodes.slice(1).forEach((node) => {
-        allEvents.push({ node, timeline, timelineIndex });
-      });
-    });
-    
-    // Sort events to create a logical flow
-    allEvents.sort((a, b) => {
-      // Group by timeline first, then by position in timeline
-      if (a.timelineIndex !== b.timelineIndex) {
-        return a.timelineIndex - b.timelineIndex;
-      }
-      return 0;
-    });
-    
-    // Create the git-like branch structure
-    universe.timelines.forEach((timeline, timelineIndex) => {
+    timelines.forEach((timeline, timelineIndex) => {
       const color = colors[timelineIndex % colors.length];
-      const branchX = startX + (timelineIndex * horizontalSpacing);
-      branchPositions[timeline.id] = branchX;
       
-      let previousNodeId = 'root';
-      let branchY = currentY + verticalSpacing;
-      
-      // Add a timeline label node
-      const labelNodeId = `label-${timeline.id}`;
-      nodes.push({
-        id: labelNodeId,
-        type: 'default',
-        position: {
-          x: branchX - 50,
-          y: branchY - 40
-        },
-        data: {
-          label: timeline.name
-        },
-        style: {
-          background: color,
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          fontSize: '12px',
-          padding: '4px 8px',
-          width: 'auto'
-        },
-        selectable: false,
-        draggable: false
-      });
-      
-      timeline.nodes.slice(1).forEach((node, nodeIndex) => {
-        const nodeId = `${timeline.id}-${node.id}`;
+      timeline.events.forEach((event, eventIndex) => {
+        const nodeId = event.id;
+        const nodeData = event.data;
         
-        // Calculate Y position with consistent spacing
-        const nodeY = branchY + (nodeIndex * verticalSpacing);
+        // Extract data from node response [id, url, desc, prev_node_id, array, bool]
+        const nodeIdFromData = nodeData[0];
+        const url = nodeData[1] || '';
+        const description = nodeData[2] || '';
         
-        nodes.push({
-          id: nodeId,
-          type: 'timelineEvent',
-          position: {
-            x: branchX,
-            y: nodeY
-          },
-          data: {
-            label: node.title,
-            description: node.description,
-            videoUrl: node.videoUrl,
-            characters: node.characters,
-            timelineColor: color,
-            timelineName: timeline.name,
-            eventId: node.id,
-            timelineId: timeline.id,
-            universeId: universe.id
-          }
-        });
+        // Position nodes
+        const x = startX + (timelineIndex * horizontalSpacing);
+        const y = eventIndex * verticalSpacing;
         
-        // Create edge from previous node
-        if (nodeIndex === 0) {
-          // First node of branch connects to root
-          edges.push({
-            id: `root-${nodeId}`,
-            source: 'root',
-            target: nodeId,
-            type: 'smoothstep',
-            style: { stroke: color, strokeWidth: 3 },
-            animated: false,
-            markerEnd: undefined,
-            sourceHandle: null,
-            targetHandle: null
+        // Check if node already exists
+        const existingNodeId = `blockchain-node-${nodeId}`;
+        if (!nodePositions.has(nodeId)) {
+          nodePositions.set(nodeId, { x, y });
+          
+          nodes.push({
+            id: existingNodeId,
+            type: 'timelineEvent',
+            position: { x, y },
+            data: {
+              label: `${nodeIdFromData || nodeId}`,
+              description: description || `Timeline event ${nodeId}`,
+              videoUrl: url || 'https://aggregator.walrus-testnet.walrus.space/v1/blobs/lBt_Ua5p8I56LFOYgG_z8YiLf3IBVvBNRBlO_94giMI',
+              characters: [],
+              timelineColor: color,
+              timelineName: `Timeline ${timelineIndex + 1}`,
+              eventId: `node-${nodeId}`,
+              timelineId: timeline.id,
+              universeId: universe.id,
+              isRoot: nodeId === 0
+            }
           });
-        } else {
-          // Subsequent nodes connect to previous in same branch
+        }
+        
+        // Create edges between consecutive events in timeline
+        if (eventIndex > 0) {
+          const prevEvent = timeline.events[eventIndex - 1];
+          const prevNodeId = prevEvent.id;
+          
           edges.push({
-            id: `${previousNodeId}-${nodeId}`,
-            source: previousNodeId,
-            target: nodeId,
+            id: `edge-${prevNodeId}-${nodeId}`,
+            source: `blockchain-node-${prevNodeId}`,
+            target: `blockchain-node-${nodeId}`,
             type: 'straight',
             style: { stroke: color, strokeWidth: 3 },
             animated: false,
             markerEnd: undefined
           });
         }
-        
-        previousNodeId = nodeId;
       });
     });
     
     return { nodes, edges };
-  }, [universe]);
+  }, [timelines, universe.id]);
 
   const nodeTypes = useMemo(() => ({
     timelineEvent: TimelineEventNode,
@@ -238,52 +218,58 @@ function UniverseViewPage() {
           
           <Card className="overflow-hidden bg-background">
             <div style={{ width: '100%', height: '700px' }}>
-              <ReactFlow
-                nodes={flowNodes}
-                edges={flowEdges}
-                nodeTypes={nodeTypes}
-                connectionMode={ConnectionMode.Loose}
-                fitView
-                fitViewOptions={{ padding: 0.1, includeHiddenNodes: false }}
-                minZoom={0.2}
-                maxZoom={2}
-                defaultViewport={{ x: 0, y: 0, zoom: 0.6 }}
-                proOptions={{ hideAttribution: true }}
-              >
-                <Controls />
-                <Background 
-                  variant={BackgroundVariant.Lines} 
-                  gap={20} 
-                  size={1}
-                  color="#e5e5e5"
-                  className="opacity-50"
-                />
-              </ReactFlow>
+              {isLoadingAny ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading blockchain timeline data...</p>
+                  </div>
+                </div>
+              ) : (
+                <ReactFlow
+                  nodes={flowNodes}
+                  edges={flowEdges}
+                  nodeTypes={nodeTypes}
+                  connectionMode={ConnectionMode.Loose}
+                  fitView
+                  fitViewOptions={{ padding: 0.1, includeHiddenNodes: false }}
+                  minZoom={0.2}
+                  maxZoom={2}
+                  defaultViewport={{ x: 0, y: 0, zoom: 0.6 }}
+                  proOptions={{ hideAttribution: true }}
+                >
+                  <Controls />
+                  <Background 
+                    variant={BackgroundVariant.Lines} 
+                    gap={20} 
+                    size={1}
+                    color="#e5e5e5"
+                    className="opacity-50"
+                  />
+                </ReactFlow>
+              )}
             </div>
           </Card>
           
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Timeline Legend</CardTitle>
+              <CardTitle className="text-lg">Timeline Data Source</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-4">
-                {universe.timelines.map((timeline, index) => {
-                  const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-                  const color = colors[index % colors.length];
-                  return (
-                    <div key={timeline.id} className="flex items-center gap-2">
-                      <div 
-                        className="w-4 h-4 rounded-full" 
-                        style={{ backgroundColor: color }}
-                      />
-                      <span className="text-sm font-medium">{timeline.name}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {timeline.nodes.length} events
-                      </Badge>
-                    </div>
-                  );
-                })}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-primary rounded-full" />
+                  <span className="text-sm font-medium">Blockchain Timelines</span>
+                  <Badge variant="secondary" className="text-xs">
+                    Live from Smart Contract
+                  </Badge>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {timelines.length} timeline{timelines.length !== 1 ? 's' : ''} traced from {leavesData && Array.isArray(leavesData) ? leavesData.length : 0} leaves
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Timelines built by tracing back from leaves via previous node relationships
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -297,31 +283,37 @@ function UniverseViewPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <h4 className="text-sm font-medium mb-2">Total Timelines</h4>
-                <p className="text-2xl font-bold">{universe.timelines.length}</p>
+                <h4 className="text-sm font-medium mb-2">Active Timelines</h4>
+                <p className="text-2xl font-bold">
+                  {timelines.length}
+                </p>
               </div>
               
               <div>
-                <h4 className="text-sm font-medium mb-2">Total Events</h4>
-                <p className="text-2xl font-bold">
-                  {universe.timelines.reduce((total, timeline) => total + timeline.nodes.length, 0)}
-                </p>
+                <h4 className="text-sm font-medium mb-2">Data Source</h4>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-blue-50">
+                    Smart Contract
+                  </Badge>
+                  <Badge variant="outline" className="bg-green-50">
+                    Live Data
+                  </Badge>
+                </div>
               </div>
 
               <div>
-                <h4 className="text-sm font-medium mb-2">Unique Characters</h4>
-                <p className="text-2xl font-bold">
-                  {new Set(
-                    universe.timelines.flatMap(timeline => 
-                      timeline.nodes.flatMap(node => node.characters)
-                    )
-                  ).size}
-                </p>
+                <h4 className="text-sm font-medium mb-2">Contract Status</h4>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isLoadingAny ? 'bg-yellow-500' : 'bg-green-500'}`} />
+                  <span className="text-sm">
+                    {isLoadingAny ? 'Loading...' : 'Connected'}
+                  </span>
+                </div>
               </div>
 
               <div className="pt-4">
                 <Button className="w-full" asChild>
-                  <Link to="/universes">Explore Other Universes</Link>
+                  <Link to="/universes">Back to Universe Hub</Link>
                 </Button>
               </div>
             </CardContent>
@@ -332,20 +324,35 @@ function UniverseViewPage() {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {universe.timelines.map((timeline) => (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full justify-start" 
+                asChild
+              >
+                <Link to="/universes">
+                  <ArrowRight className="w-3 h-3 mr-2" />
+                  Manage Timeline
+                </Link>
+              </Button>
+              
+              {timelines.length > 0 && timelines[0].events.length > 0 && (
                 <Button 
-                  key={timeline.id} 
                   variant="outline" 
                   size="sm" 
                   className="w-full justify-start" 
                   asChild
                 >
-                  <Link to="/timeline" search={{ universe: universe.id, timeline: timeline.id }}>
+                  <Link to="/event/$universeId/$timelineId/$eventId" params={{ 
+                    universeId: universe.id, 
+                    timelineId: timelines[0].id, 
+                    eventId: `node-${timelines[0].events[0].id}`
+                  }}>
                     <ArrowRight className="w-3 h-3 mr-2" />
-                    {timeline.name}
+                    View First Event
                   </Link>
                 </Button>
-              ))}
+              )}
             </CardContent>
           </Card>
         </div>
