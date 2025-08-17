@@ -8,7 +8,9 @@ const createCinematicUniverseSchema = z.object({
   tokenAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid token address"),
   governanceAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid governance address"),
   imageUrl: z.string().url("Invalid image URL"),
-  description: z.string().min(1, "Description is required").max(1000, "Description too long")
+  description: z.string().min(1, "Description is required").max(1000, "Description too long"),
+  signature: z.string().min(1, "Signature is required"), // Wallet signature for verification
+  message: z.string().min(1, "Message is required") // Message that was signed
 });
 
 const getCinematicUniverseSchema = z.object({
@@ -20,16 +22,41 @@ const getByCreatorSchema = z.object({
 });
 
 export const cinematicUniversesRouter = router({
-  // Create a new cinematic universe
-  createcu: protectedProcedure
+  // Create a new cinematic universe (wallet-based auth)
+  createcu: publicProcedure
     .input(createCinematicUniverseSchema)
-    .mutation(async ({ input, ctx }) => {
-      // Verify the authenticated user's address matches the creator address
-      if (ctx.session.user.id !== input.creator) {
-        throw new Error("Creator address must match authenticated user");
-      }
+    .mutation(async ({ input }) => {
+      // Verify wallet signature
+      const { verifyMessage } = await import("viem");
       
-      return await createCinematicUniverse(input);
+      try {
+        const isValid = await verifyMessage({
+          address: input.creator as `0x${string}`,
+          message: input.message,
+          signature: input.signature as `0x${string}`,
+        });
+        
+        if (!isValid) {
+          throw new Error("Invalid wallet signature");
+        }
+        
+        // Verify the message contains the creator address to prevent replay attacks
+        if (!input.message.toLowerCase().includes(input.creator.toLowerCase())) {
+          throw new Error("Message must contain creator address");
+        }
+        
+        return await createCinematicUniverse({
+          address: input.address,
+          creator: input.creator,
+          tokenAddress: input.tokenAddress,
+          governanceAddress: input.governanceAddress,
+          imageUrl: input.imageUrl,
+          description: input.description
+        });
+      } catch (error) {
+        console.error("Wallet signature verification failed:", error);
+        throw new Error("Authentication failed: Invalid wallet signature");
+      }
     }),
 
   // Get a specific cinematic universe by ID
