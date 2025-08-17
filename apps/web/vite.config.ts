@@ -10,6 +10,12 @@ export default defineConfig({
     react(),
     tanstackRouter({}),
   ],
+  optimizeDeps: {
+    include: ['@dynamic-labs/sdk-react-core']
+  },
+  ssr: {
+    noExternal: ['@dynamic-labs/sdk-react-core']
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
