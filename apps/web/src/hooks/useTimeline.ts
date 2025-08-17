@@ -1,9 +1,8 @@
 import { useReadContract, useWriteContract } from 'wagmi'
 import { timelineAbi } from '@/generated'
 import { useChainId } from 'wagmi'
-import { TIMELINE_ADDRESSES } from '@/configs/addresses-test'
+import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test'
 import { TimelineEventNode } from '@/components/flow/TimelineNodes'
-import type { SupportedChainId } from '@/configs/addresses-test'
 //----------READ FUNCTIONS---------
 export function useGetNode(id: number) {
   const chainId = useChainId()
@@ -12,7 +11,7 @@ export function useGetNode(id: number) {
     abi: timelineAbi,
     address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
     functionName: "getNode",
-    args: [id]
+    args: [BigInt(id)]
   })
 }
 
@@ -23,7 +22,7 @@ export function useGetTimeline(id: number) {
     abi: timelineAbi,
     address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
     functionName: "getTimeline",
-    args: [id]
+    args: [BigInt(id)]
   })
 }
 
@@ -45,7 +44,7 @@ export function useGetMedia(id: number) {
     abi: timelineAbi,
     address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
     functionName: "getMedia",
-    args: [id]
+    args: [BigInt(id)]
   })
 }
 
@@ -80,7 +79,7 @@ export function useCreateNode(link: string, plot: string, previous: number) {
       abi: timelineAbi,
       address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
       functionName: 'createNode',
-      args: [link, plot, previous]
+      args: [link, plot, BigInt(previous)]
     })
 
   return { writeAsync }
@@ -95,7 +94,7 @@ export function useSetMedia(id: number, link: string) {
       abi: timelineAbi,
       address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
       functionName: 'setMedia',
-      args: [id, link]
+      args: [BigInt(id), link]
     })
 
   return { writeAsync }
@@ -110,7 +109,7 @@ export function useSetCanon(id: number) {
       abi: timelineAbi,
       address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
       functionName: "setCanon",
-      args: [id]
+      args: [BigInt(id)]
     })
 
   return { writeAsync }
