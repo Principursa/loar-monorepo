@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCreateNode, useGetNode, useGetTimeline, useGetLeaves, useGetMedia, useGetCanonChain, useGetFullGraph, useSetMedia, useSetCanon } from "@/hooks/useTimeline";
+import { trpc, trpcClient } from "@/utils/trpc";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 function UniversesPage() {
   // Define our single blockchain universe
@@ -29,6 +31,11 @@ function UniversesPage() {
   const [isSettingMedia, setIsSettingMedia] = useState(false);
   const [isSettingCanon, setIsSettingCanon] = useState(false);
 
+  // Video generation states
+  const [videoPrompt, setVideoPrompt] = useState('');
+  const [generatedVideoId, setGeneratedVideoId] = useState<string | null>(null);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+
   const { writeAsync: createNode } = useCreateNode(nodeLink, nodePlot, previousNode);
   const { writeAsync: setMediaAsync } = useSetMedia(updateMediaNodeId, updateMediaLink);
   const { writeAsync: setCanonAsync } = useSetCanon(canonNodeId);
@@ -38,6 +45,18 @@ function UniversesPage() {
   const { data: mediaData, isLoading: isLoadingMedia, refetch: refetchMedia } = useGetMedia(mediaNodeId);
   const { data: canonChainData, isLoading: isLoadingCanonChain, refetch: refetchCanonChain } = useGetCanonChain();
   const { data: fullGraphData, isLoading: isLoadingFullGraph, refetch: refetchFullGraph } = useGetFullGraph();
+
+
+  // Video generation hooks
+  const generateVideoMutation = useMutation({
+    mutationFn: (input: { prompt: string; model?: string; resolution?: string; duration?: string }) =>
+      trpcClient.video.generate.mutate(input),
+  });
+  
+  const { data: videoStatus, refetch: refetchVideoStatus } = useQuery({
+    ...trpc.video.status.queryOptions({ id: generatedVideoId! }),
+    enabled: !!generatedVideoId,
+  });
   
   // Fetch individual nodes (IDs 0-4) for timeline building
   const { data: node0 } = useGetNode(0);
@@ -109,6 +128,40 @@ function UniversesPage() {
     }
   };
 
+  const handleGenerateVideo = async () => {
+    if (!videoPrompt.trim()) return;
+    
+    try {
+      const result = await generateVideoMutation.mutateAsync({
+        prompt: videoPrompt,
+        model: 'ray-flash-2',
+        resolution: '720p',
+        duration: '5s'
+      }) as { id: string; status: string };
+      
+      setGeneratedVideoId(result.id);
+      setGeneratedVideoUrl(null);
+      alert(`Video generation started! ID: ${result.id}`);
+      
+      // Start polling for status
+      const pollStatus = setInterval(async () => {
+        const status = await refetchVideoStatus();
+        if (status.data?.status === 'completed') {
+          setGeneratedVideoUrl(status.data.videoUrl || null);
+          clearInterval(pollStatus);
+          alert('Video generation completed!');
+        } else if (status.data?.status === 'failed') {
+          clearInterval(pollStatus);
+          alert(`Video generation failed: ${status.data.failureReason}`);
+        }
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error generating video:', error);
+      alert('Error generating video: ' + error);
+    }
+  };
+
   return (
     <div className="container mx-auto p-6">
       {/* Blockchain Timeline Actions */}
@@ -116,6 +169,60 @@ function UniversesPage() {
         <h2 className="text-xl font-bold text-blue-800 mb-4">Blockchain Timeline Actions</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Video Generation Section */}
+          <div className="space-y-3 md:col-span-3 p-4 bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-lg">
+            <h3 className="font-semibold text-pink-700 text-lg">🎬 AI Video Generation</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-pink-700 mb-1">Video Prompt</label>
+              <input
+                type="text"
+                placeholder="A majestic character walking through a cyberpunk city..."
+                value={videoPrompt}
+                onChange={(e) => setVideoPrompt(e.target.value)}
+                className="w-full px-3 py-2 border border-pink-300 rounded focus:outline-none focus:ring-2 focus:ring-pink-500"
+              />
+            </div>
+            
+            <div className="flex gap-4 items-center">
+              <button
+                onClick={handleGenerateVideo}
+                disabled={!videoPrompt.trim() || generateVideoMutation.isPending}
+                className="px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded hover:from-pink-600 hover:to-purple-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {generateVideoMutation.isPending ? 'Generating...' : 'Generate Video'}
+              </button>
+              
+              {videoStatus && (
+                <div className="flex items-center gap-2">
+                  <Badge variant={videoStatus.status === 'completed' ? 'default' : videoStatus.status === 'failed' ? 'destructive' : 'secondary'}>
+                    {videoStatus.status}
+                  </Badge>
+                  {videoStatus.status === 'dreaming' && (
+                    <span className="text-sm text-purple-600">Creating your video...</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+
+            {generatedVideoUrl && (
+              <div className="mt-4 p-3 bg-white border border-pink-200 rounded">
+                <h4 className="font-medium text-pink-700 mb-2">Generated Video:</h4>
+                <video 
+                  controls 
+                  className="w-full max-w-md rounded"
+                  src={generatedVideoUrl}
+                >
+                  Your browser does not support the video tag.
+                </video>
+                <p className="text-xs text-gray-600 mt-2">
+                  Video URL: <a href={generatedVideoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{generatedVideoUrl}</a>
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Create Node Section */}
           <div className="space-y-3">
             <h3 className="font-semibold text-blue-700">Create Node</h3>

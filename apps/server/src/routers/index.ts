@@ -8,6 +8,7 @@ import { db } from "../db";
 import { characters } from "../db/schema/characters";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { videoService } from "../services/video";
 
 export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
@@ -82,6 +83,34 @@ export const appRouter = router({
           console.error("Failed to load character from database:", error);
           throw new Error("Could not load character");
         }
+      }),
+  }),
+  video: router({
+    generate: publicProcedure
+      .input(z.object({
+        prompt: z.string().min(1, "Prompt is required"),
+        model: z.enum(['ray-flash-2', 'ray-2', 'ray-1-6']).optional(),
+        resolution: z.enum(['540p', '720p', '1080p', '4k']).optional(),
+        duration: z.enum(['5s', '10s']).optional()
+      }))
+      .mutation(async ({ input }) => {
+        return await videoService.generateVideo(input);
+      }),
+    status: publicProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        return await videoService.getGenerationStatus(input.id);
+      }),
+    generateAndWait: publicProcedure
+      .input(z.object({
+        prompt: z.string().min(1, "Prompt is required"),
+        model: z.enum(['ray-flash-2', 'ray-2', 'ray-1-6']).optional(),
+        resolution: z.enum(['540p', '720p', '1080p', '4k']).optional(),
+        duration: z.enum(['5s', '10s']).optional()
+      }))
+      .mutation(async ({ input }) => {
+        const generation = await videoService.generateVideo(input);
+        return await videoService.waitForCompletion(generation.id);
       }),
   }),
 });
