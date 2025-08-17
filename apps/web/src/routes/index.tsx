@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { trpc } from "@/utils/trpc";
 import { useQuery } from "@tanstack/react-query";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useDynamicContext, useUserWallets } from "@dynamic-labs/sdk-react-core";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Wallet, ArrowRight, Shield, Zap, Globe } from "lucide-react";
@@ -14,6 +14,7 @@ export const Route = createFileRoute("/")({
 function HomeComponent() {
   const healthCheck = useQuery(trpc.healthCheck.queryOptions());
   const { user, handleConnect } = useDynamicContext();
+  const userWallets = useUserWallets();
 
   console.log("HomeComponent render:", { user, hasHandleConnect: !!handleConnect });
 
@@ -58,7 +59,7 @@ function HomeComponent() {
             {user ? (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Connected: {user.wallets?.[0]?.address?.slice(0, 6)}...{user.wallets?.[0]?.address?.slice(-4)}
+                  Connected: {userWallets[0]?.address?.slice(0, 6)}...{userWallets[0]?.address?.slice(-4)}
                 </p>
                 <Button asChild className="w-full">
                   <a href="/dashboard">
