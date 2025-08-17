@@ -2,13 +2,14 @@
 
 <div align="center">
 
-![LOAR Banner](https://i.imgur.com/placeholder.png)
+![LOAR Banner](https://fungerbil.com/LOARLOGO.png)
 
 ### *Empowering Creators to Build Collaborative Cinematic Universes*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Powered by Walrus](https://img.shields.io/badge/Powered%20by-Walrus-blue)](https://walrus.space)
+[![Powered by Walrus](https://img.shields.io/badge/Powered%20by-Walrus-blue)](https://www.walrus.xyz/)
 [![OpenSea Integration](https://img.shields.io/badge/OpenSea-Integration-blue)](https://opensea.io)
+[![Dynamic Auth](https://img.shields.io/badge/Auth%20by-Dynamic-purple)](https://www.dynamic.xyz/)
 
 </div>
 
@@ -378,9 +379,9 @@ LOAR was created by a team of passionate developers, designers, and storytellers
 
 ## 🆘 Resources
 
-- **Walrus Protocol:** [walrus.space](https://walrus.space/)
-- **OpenSea API:** [docs.opensea.io](https://docs.opensea.io/)
-- **Dynamic Documentation:** [docs.dynamic.xyz](https://docs.dynamic.xyz/)
+- **Walrus Protocol:** [walrus.xyz](https://www.walrus.xyz/)
+- **OpenSea API:** [opensea.io](https://opensea.io/)
+- **Dynamic Auth:** [dynamic.xyz](https://www.dynamic.xyz/)
 - **ReactFlow:** [reactflow.dev](https://reactflow.dev/)
 
 ---
