@@ -157,6 +157,66 @@ export const appRouter = router({
         const generation = await klingService.createMultiImageVideo(input);
         return await klingService.waitForCompletion(generation.data.task_id);
       }),
+    // Add provider selection for video generation
+    generateWithProvider: publicProcedure
+      .input(z.object({
+        provider: z.enum(['lumaai', 'kling']),
+        prompt: z.string().min(1, "Prompt is required"),
+        model: z.enum(['ray-flash-2', 'ray-2', 'ray-1-6']).optional(),
+        resolution: z.enum(['540p', '720p', '1080p', '4k']).optional(),
+        duration: z.enum(['5s', '10s']).optional(),
+        imageUrl: z.string().url().optional(), // For single image (LumaAI)
+        imageUrls: z.array(z.string().url()).optional() // For multiple images (Kling)
+      }))
+      .mutation(async ({ input }) => {
+        if (input.provider === 'lumaai') {
+          // Use existing LumaAI service
+          return await videoService.generateVideo({
+            prompt: input.prompt,
+            model: input.model,
+            resolution: input.resolution,
+            duration: input.duration,
+            imageUrl: input.imageUrl
+          });
+        } else {
+          // Use Kling service for multi-image
+          const imageUrls = input.imageUrls && input.imageUrls.length > 0 
+            ? input.imageUrls 
+            : [input.imageUrl].filter(Boolean);
+          
+          console.log('Kling generation - Processing image URLs:', {
+            inputImageUrls: input.imageUrls,
+            inputImageUrl: input.imageUrl,
+            finalImageUrls: imageUrls,
+            imageCount: imageUrls.length
+          });
+          
+          if (imageUrls.length === 0) {
+            throw new Error('No image URLs provided for Kling generation');
+          }
+          
+          const imageList = imageUrls.map(url => ({ 
+            image: `https://images.weserv.nl/?url=${encodeURIComponent(url!)}` 
+          }));
+          
+          console.log('Kling generation - Final image list:', imageList);
+          
+          const result = await klingService.createMultiImageVideo({
+            image_list: imageList,
+            prompt: input.prompt,
+            mode: 'std', // Cheapest mode
+            duration: '5', // Shortest duration
+            aspect_ratio: '16:9'
+          });
+          
+          return {
+            id: result.data.task_id,
+            status: result.data.task_status === 'submitted' ? 'pending' : 
+                   result.data.task_status === 'processing' ? 'dreaming' : 
+                   result.data.task_status === 'succeed' ? 'completed' : 'failed'
+          };
+        }
+      }),
   }),
   walrus: router({
     uploadFromUrl: publicProcedure

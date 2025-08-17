@@ -182,23 +182,68 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
               if (sourceNode.type === 'character' && targetNode.type === 'plotPoint') {
                 // Character -> PlotPoint: Setup image-to-video generation
                 console.log('Character-to-Plot connection detected:', {
+                  sourceNodeId: sourceNode.id,
+                  targetNodeId: targetNode.id,
                   characterData: sourceNode.data,
                   plotData: targetNode.data,
-                  characterImage: sourceNode.data.characterImage
+                  characterImage: sourceNode.data.characterImage,
+                  characterName: sourceNode.data.characterName,
+                  selectedCharacterId: sourceNode.data.selectedCharacterId
                 });
+                
+                // Handle multiple character connections - accumulate into arrays
+                const existingCharacterImages = Array.isArray(updatedData.characterImageUrls) ? updatedData.characterImageUrls : [];
+                const existingCharacterNames = Array.isArray(updatedData.characterNames) ? updatedData.characterNames : [];
+                const existingCharacterIds = Array.isArray(updatedData.characterIds) ? updatedData.characterIds : [];
+                
+                console.log('Existing arrays before accumulation:', {
+                  existingCharacterImages: existingCharacterImages,
+                  existingCharacterNames: existingCharacterNames,
+                  existingCharacterIds: existingCharacterIds
+                });
+                
+                // Only add if not already present (avoid duplicates by ID)
+                const newCharacterImage = sourceNode.data.characterImage;
+                const newCharacterName = sourceNode.data.characterName;
+                const newCharacterId = sourceNode.data.selectedCharacterId;
+                
+                const imageExists = existingCharacterImages.includes(newCharacterImage);
+                const idExists = newCharacterId && existingCharacterIds.includes(newCharacterId);
+                
+                let finalCharacterImages = existingCharacterImages;
+                let finalCharacterNames = existingCharacterNames;
+                let finalCharacterIds = existingCharacterIds;
+                
+                if (!imageExists && !idExists && newCharacterImage) {
+                  finalCharacterImages = [...existingCharacterImages, newCharacterImage];
+                  finalCharacterNames = [...existingCharacterNames, newCharacterName].filter(Boolean);
+                  finalCharacterIds = [...existingCharacterIds, newCharacterId].filter(Boolean);
+                  console.log('Added new character to arrays');
+                } else {
+                  console.log('Character already exists in arrays, skipping duplicate');
+                }
                 
                 updatedData = {
                   ...updatedData,
-                  // Add character image for image-to-video generation
-                  characterImageUrl: sourceNode.data.characterImage,
-                  characterName: sourceNode.data.characterName,
-                  characterId: sourceNode.data.selectedCharacterId,
+                  // Single character data (for backwards compatibility with LumaAI)
+                  characterImageUrl: newCharacterImage,
+                  characterName: newCharacterName,
+                  characterId: newCharacterId,
+                  // Multi-character data (for Kling)
+                  characterImageUrls: finalCharacterImages,
+                  characterNames: finalCharacterNames,
+                  characterIds: finalCharacterIds,
                   // Mark as image-to-video instead of text-to-video
                   isImageToVideo: true,
                   connectionType: 'character-to-plot'
                 };
                 
-                console.log('Updated plot data after connection:', updatedData);
+                console.log('Updated plot data after connection:', {
+                  characterImageUrls: updatedData.characterImageUrls,
+                  characterNames: updatedData.characterNames,
+                  characterIds: updatedData.characterIds,
+                  totalCharacters: updatedData.characterImageUrls?.length || 0
+                });
               } else if (sourceNode.type === 'plotPoint' && targetNode.type === 'plotPoint') {
                 // PlotPoint -> PlotPoint: Setup blockchain timeline connection
                 let previousNodeId = 0;
