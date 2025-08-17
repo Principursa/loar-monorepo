@@ -1,37 +1,35 @@
-FROM oven/bun:1.1.8-alpine AS base
+FROM oven/bun:1.1.8-alpine
 
 WORKDIR /app
+
+# Install curl for health checks
+RUN apk add --no-cache curl
 
 # Copy package files
 COPY package.json bun.lock ./
 COPY apps/server/package.json ./apps/server/
 COPY turbo.json ./
 
-# Install dependencies
-RUN bun install --frozen-lockfile
+# Install only production dependencies
+RUN bun install --production --frozen-lockfile && \
+    rm -rf ~/.bun/install/cache && \
+    rm -rf /tmp/*
 
 # Copy source code
-COPY apps/server/ ./apps/server/
+COPY apps/server/src ./apps/server/src
+COPY apps/server/tsconfig.json ./apps/server/
 
-# Build the application
-RUN cd apps/server && bun run build
-
-# Production stage
-FROM oven/bun:1.1.8-alpine AS production
-
-WORKDIR /app
-
-# Copy built application
-COPY --from=base /app/apps/server/dist ./
-COPY --from=base /app/node_modules ./node_modules
-COPY --from=base /app/apps/server/package.json ./package.json
-
-# Install curl for health checks
-RUN apk add --no-cache curl
+# Build and clean up in single layer
+RUN cd apps/server && \
+    bun run build && \
+    rm -rf src tsconfig.json && \
+    rm -rf ../node_modules/.cache && \
+    rm -rf ~/.bun/install/cache
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S bun -u 1001
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S bun -u 1001
+
 USER bun
 
 EXPOSE 3000
@@ -39,4 +37,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/health || exit 1
 
-CMD ["bun", "run", "index.js"]
+CMD ["bun", "run", "apps/server/dist/index.js"]
