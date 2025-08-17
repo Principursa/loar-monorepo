@@ -4,6 +4,7 @@ import { useChainId } from 'wagmi'
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test'
 import { TimelineEventNode } from '@/components/flow/TimelineNodes'
 import { type Address } from 'viem'
+
 //----------READ FUNCTIONS---------
 export function useGetNode(id: number) {
   const chainId = useChainId()
