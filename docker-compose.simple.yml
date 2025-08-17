@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: loar-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./apps/web/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - app-server
+    restart: unless-stopped
+    networks:
+      - loar-network
+
+  app-server:
+    image: oven/bun:1.1.8-alpine
+    container_name: loar-server
+    working_dir: /app
+    volumes:
+      - ./apps/server:/app
+      - ./node_modules:/app/node_modules:ro
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
+      - CORS_ORIGIN=http://localhost
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_URL=http://localhost
+    command: ["bun", "run", "dist/index.js"]
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - loar-network
+    ports:
+      - "3000:3000"
+
+  postgres:
+    image: postgres:15
+    container_name: loar-postgres
+    environment:
+      POSTGRES_DB: loar-fullstack
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - loar-network
+
+volumes:
+  postgres_data:
+
+networks:
+  loar-network:
+    driver: bridge
