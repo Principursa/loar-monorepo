@@ -99,8 +99,20 @@ export function useSetMedia(id: number, link: string) {
     contract.writeContractAsync({
       abi: timelineAbi,
       address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
-      functionName: 'useSetMedia',
+      functionName: 'setMedia',
       args: [id, link]
     })
 
+}
+export function useSetCanon(id: number) {
+  const chainId = useChainId()
+  const contract = useWriteContract()
+
+  const writeAsync = (id: number, link: string) =>
+    contract.writeContractAsync({
+      timelineAbi,
+      address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
+      functionName: "setCanon",
+      abi: [id]
+    })
 }
