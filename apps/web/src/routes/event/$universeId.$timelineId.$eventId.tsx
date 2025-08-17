@@ -2,8 +2,13 @@ import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useGetNode } from "@/hooks/useTimeline";
 import { ArrowLeft, Play, Users, Calendar } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { trpcClient } from "@/utils/trpc";
+import { useReadContract, useChainId } from 'wagmi';
+import { timelineAbi } from '@/generated';
+import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
+import { type Address } from 'viem';
 
 interface EventParams {
   universeId: string;
@@ -13,19 +18,52 @@ interface EventParams {
 
 function EventDetailPage() {
   const { universeId, timelineId, eventId } = useParams({ from: "/event/$universeId/$timelineId/$eventId" });
+  const chainId = useChainId();
   
   // Extract node ID from eventId (format: "node-X")
   const nodeId = eventId.startsWith('node-') ? parseInt(eventId.replace('node-', '')) : null;
   
-  // Fetch node data from blockchain
-  const { data: nodeData, isLoading, error } = useGetNode(nodeId || 0);
+  // Fetch universe data to get the timeline contract address
+  const { data: universeData, isLoading: isLoadingUniverse } = useQuery({
+    queryKey: ['universeData', universeId],
+    queryFn: () => trpcClient.cinematicUniverses.get.query({ id: universeId }),
+    enabled: universeId !== 'blockchain-universe',
+  });
   
-  // Define universe info (since we only have one blockchain universe)
-  const universe = {
-    id: 'blockchain-universe',
-    name: 'Cyberpunk City',
-    description: 'A decentralized narrative universe powered by blockchain technology'
-  };
+  // Determine universe info and contract address
+  const universe = universeId === 'blockchain-universe' 
+    ? {
+        id: 'blockchain-universe',
+        name: 'Cyberpunk City',
+        description: 'A decentralized narrative universe powered by blockchain technology',
+        address: null // Uses default contract
+      }
+    : universeData?.data 
+      ? {
+          id: universeData.data.id,
+          name: `Universe ${universeData.data.id.slice(0, 8)}...`,
+          description: universeData.data.description,
+          address: universeData.data.address
+        }
+      : null;
+  
+  // Determine which contract address to use
+  const contractAddress = universe?.address 
+    ? (universe.address as Address)
+    : (TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address);
+  
+  // Fetch node data from the appropriate timeline contract
+  const { data: nodeData, isLoading: isLoadingNode, error } = useReadContract({
+    abi: timelineAbi,
+    address: contractAddress,
+    functionName: "getNode",
+    args: [BigInt(nodeId || 0)],
+    query: {
+      enabled: !!nodeId && !!contractAddress && !!universe
+    }
+  });
+  
+  const isLoading = isLoadingUniverse || isLoadingNode;
 
   if (isLoading) {
     return (
@@ -40,18 +78,43 @@ function EventDetailPage() {
     );
   }
 
-  if (!nodeData || !Array.isArray(nodeData) || nodeData.length < 4) {
+  // Handle universe not found
+  if (universeId !== 'blockchain-universe' && !isLoadingUniverse && !universe) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <h2 className="text-2xl font-bold mb-4">Universe Not Found</h2>
+            <p className="text-muted-foreground mb-4">
+              The universe with ID "{universeId}" could not be found.
+            </p>
+            <Button asChild>
+              <Link to="/universes">Back to Universes</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Handle event not found
+  if (!isLoading && (!nodeData || !Array.isArray(nodeData) || nodeData.length < 4)) {
     return (
       <div className="container mx-auto p-6">
         <Card>
           <CardContent className="p-8 text-center">
             <h2 className="text-2xl font-bold mb-4">Event Not Found</h2>
             <p className="text-muted-foreground mb-4">
-              The requested event could not be found on the blockchain.
+              The requested event could not be found on the timeline contract.
             </p>
-            <Button asChild>
-              <Link to="/universes">Back to Universes</Link>
-            </Button>
+            <div className="space-y-2">
+              <Button asChild>
+                <Link to="/universe/$id" params={{ id: universeId }}>Back to Timeline</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/universes">Back to Universes</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -74,7 +137,7 @@ function EventDetailPage() {
           </Link>
           <span>/</span>
           <Link to="/universe/$id" params={{ id: universeId }} className="hover:text-foreground">
-            {universe.name}
+            {universe?.name || 'Unknown Universe'}
           </Link>
           <span>/</span>
           <span>Timeline {timelineId.replace('timeline-', '')}</span>
@@ -94,7 +157,7 @@ function EventDetailPage() {
                   <CardTitle className="text-3xl mb-2">Event {eventNodeId}</CardTitle>
                   <div className="flex items-center gap-3">
                     <Badge variant="outline">Timeline {timelineId.replace('timeline-', '')}</Badge>
-                    <Badge variant="secondary">{universe.name}</Badge>
+                    <Badge variant="secondary">{universe?.name || 'Unknown Universe'}</Badge>
                     <Badge variant="outline" className="bg-blue-50">Blockchain Event</Badge>
                   </div>
                 </div>
