@@ -2,7 +2,7 @@ import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { universes } from "@/data/universes";
+import { useGetNode } from "@/hooks/useTimeline";
 import { ArrowLeft, Play, Users, Calendar } from "lucide-react";
 
 interface EventParams {
@@ -14,18 +14,40 @@ interface EventParams {
 function EventDetailPage() {
   const { universeId, timelineId, eventId } = useParams({ from: "/event/$universeId/$timelineId/$eventId" });
   
-  const universe = universes.find(u => u.id === universeId);
-  const timeline = universe?.timelines.find(t => t.id === timelineId);
-  const event = timeline?.nodes.find(n => n.id === eventId);
+  // Extract node ID from eventId (format: "node-X")
+  const nodeId = eventId.startsWith('node-') ? parseInt(eventId.replace('node-', '')) : null;
+  
+  // Fetch node data from blockchain
+  const { data: nodeData, isLoading, error } = useGetNode(nodeId || 0);
+  
+  // Define universe info (since we only have one blockchain universe)
+  const universe = {
+    id: 'blockchain-universe',
+    name: 'Cyberpunk City',
+    description: 'A decentralized narrative universe powered by blockchain technology'
+  };
 
-  if (!universe || !timeline || !event) {
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading event data...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!nodeData || !Array.isArray(nodeData) || nodeData.length < 4) {
     return (
       <div className="container mx-auto p-6">
         <Card>
           <CardContent className="p-8 text-center">
             <h2 className="text-2xl font-bold mb-4">Event Not Found</h2>
             <p className="text-muted-foreground mb-4">
-              The requested event could not be found.
+              The requested event could not be found on the blockchain.
             </p>
             <Button asChild>
               <Link to="/universes">Back to Universes</Link>
@@ -35,6 +57,12 @@ function EventDetailPage() {
       </div>
     );
   }
+
+  // Extract data from blockchain response [id, url, desc, prev_node_id, array, bool]
+  const eventNodeId = nodeData[0];
+  const videoUrl = nodeData[1];
+  const description = nodeData[2];
+  const previousNodeId = nodeData[3];
 
   return (
     <div className="container mx-auto p-6">
@@ -49,9 +77,9 @@ function EventDetailPage() {
             {universe.name}
           </Link>
           <span>/</span>
-          <span>{timeline.name}</span>
+          <span>Timeline {timelineId.replace('timeline-', '')}</span>
           <span>/</span>
-          <span className="text-foreground font-medium">{event.title}</span>
+          <span className="text-foreground font-medium">Event {eventNodeId}</span>
         </div>
       </div>
 
@@ -63,10 +91,11 @@ function EventDetailPage() {
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-3xl mb-2">{event.title}</CardTitle>
+                  <CardTitle className="text-3xl mb-2">Event {eventNodeId}</CardTitle>
                   <div className="flex items-center gap-3">
-                    <Badge variant="outline">{timeline.name}</Badge>
+                    <Badge variant="outline">Timeline {timelineId.replace('timeline-', '')}</Badge>
                     <Badge variant="secondary">{universe.name}</Badge>
+                    <Badge variant="outline" className="bg-blue-50">Blockchain Event</Badge>
                   </div>
                 </div>
                 <Button variant="outline" size="sm" asChild>
@@ -79,7 +108,7 @@ function EventDetailPage() {
             </CardHeader>
             <CardContent>
               <p className="text-lg text-muted-foreground">
-                {event.description}
+                {description || `Timeline event ${eventNodeId} from blockchain`}
               </p>
             </CardContent>
           </Card>
@@ -91,58 +120,78 @@ function EventDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <video 
-                  className="w-full aspect-video object-cover rounded-lg border" 
-                  controls
-                  preload="metadata"
-                >
-                  <source src={event.videoUrl} type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-                
-                <div className="flex items-center justify-between">
-                  <Button asChild>
-                    <a href={event.videoUrl} target="_blank" rel="noopener noreferrer">
-                      <Play className="w-4 h-4 mr-2" />
-                      Open in Walrus
-                    </a>
-                  </Button>
-                  
-                  <p className="text-sm text-muted-foreground">
-                    Stored on Walrus Protocol
-                  </p>
-                </div>
+                {videoUrl ? (
+                  <>
+                    <video 
+                      className="w-full aspect-video object-cover rounded-lg border" 
+                      controls
+                      preload="metadata"
+                    >
+                      <source src={videoUrl} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                    
+                    <div className="flex items-center justify-between">
+                      <Button asChild>
+                        <a href={videoUrl} target="_blank" rel="noopener noreferrer">
+                          <Play className="w-4 h-4 mr-2" />
+                          Open in Walrus
+                        </a>
+                      </Button>
+                      
+                      <p className="text-sm text-muted-foreground">
+                        Stored on Walrus Protocol
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No video available for this event</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Characters Section */}
-          {event.characters && event.characters.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  Featured Characters
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {event.characters.map((characterId) => (
-                    <Card key={characterId} className="border">
-                      <CardContent className="p-4">
-                        <h4 className="font-medium text-sm">
-                          {characterId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Character ID: {characterId}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))}
+          {/* Blockchain Data Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Blockchain Data
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground">Node ID</h4>
+                    <p className="text-lg font-mono">{eventNodeId}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground">Previous Node</h4>
+                    <p className="text-lg font-mono">{previousNodeId?.toString() || 'None'}</p>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                
+                {videoUrl && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Video URL</h4>
+                    <p className="text-xs font-mono bg-muted p-2 rounded break-all">
+                      {videoUrl}
+                    </p>
+                  </div>
+                )}
+                
+                {description && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
+                    <p className="text-sm">{description}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Sidebar */}
@@ -154,64 +203,61 @@ function EventDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <h4 className="text-sm font-medium mb-1">Timeline Position</h4>
-                <p className="text-sm text-muted-foreground">
-                  Event {timeline.nodes.indexOf(event) + 1} of {timeline.nodes.length}
-                </p>
+                <h4 className="text-sm font-medium mb-1">Node ID</h4>
+                <p className="text-2xl font-bold">{eventNodeId}</p>
               </div>
               
               <div>
-                <h4 className="text-sm font-medium mb-1">Characters Involved</h4>
-                <p className="text-2xl font-bold">{event.characters?.length || 0}</p>
+                <h4 className="text-sm font-medium mb-1">Data Source</h4>
+                <Badge variant="outline" className="bg-blue-50">
+                  Smart Contract
+                </Badge>
               </div>
 
               <div>
-                <h4 className="text-sm font-medium mb-1">Connections</h4>
+                <h4 className="text-sm font-medium mb-1">Previous Event</h4>
                 <p className="text-sm text-muted-foreground">
-                  {event.connections.length > 0 
-                    ? `Leads to ${event.connections.length} other event${event.connections.length !== 1 ? 's' : ''}`
-                    : 'End of timeline branch'
+                  {previousNodeId && previousNodeId !== 0 
+                    ? `Node ${previousNodeId}` 
+                    : 'Root/Start of timeline'
                   }
+                </p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium mb-1">Timeline</h4>
+                <p className="text-sm text-muted-foreground">
+                  {timelineId.replace('timeline-', 'Timeline ')}
                 </p>
               </div>
             </CardContent>
           </Card>
 
-          {/* Connected Events */}
-          {event.connections.length > 0 && (
+          {/* Previous Event Link */}
+          {previousNodeId && previousNodeId !== 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Next Events</CardTitle>
+                <CardTitle>Previous Event</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {event.connections.map((connectionId) => {
-                    const connectedEvent = timeline.nodes.find(n => n.id === connectionId);
-                    if (!connectedEvent) return null;
-                    
-                    return (
-                      <Button
-                        key={connectionId}
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start"
-                        asChild
-                      >
-                        <Link 
-                          to="/event/$universeId/$timelineId/$eventId" 
-                          params={{ 
-                            universeId: universeId,
-                            timelineId: timelineId,
-                            eventId: connectionId 
-                          }}
-                        >
-                          <ArrowLeft className="w-3 h-3 mr-2 rotate-180" />
-                          {connectedEvent.title}
-                        </Link>
-                      </Button>
-                    );
-                  })}
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start"
+                  asChild
+                >
+                  <Link 
+                    to="/event/$universeId/$timelineId/$eventId" 
+                    params={{ 
+                      universeId: universeId,
+                      timelineId: timelineId,
+                      eventId: `node-${previousNodeId}`
+                    }}
+                  >
+                    <ArrowLeft className="w-3 h-3 mr-2" />
+                    Node {previousNodeId}
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
           )}
@@ -228,13 +274,8 @@ function EventDetailPage() {
                 </Link>
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                <Link to="/timeline" search={{ universe: universeId, timeline: timelineId }}>
-                  View Full Timeline
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start" asChild>
                 <Link to="/universes">
-                  Browse All Universes
+                  Back to Universe Hub
                 </Link>
               </Button>
             </CardContent>

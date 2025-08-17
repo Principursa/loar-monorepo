@@ -3,12 +3,16 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { universes, type Universe, type Timeline } from "@/data/universes";
-import { useCreateNode, useGetNode, useGetTimeline, useGetLeaves, useGetMedia, useGetCanonChain, useGetFullGraph } from "@/hooks/useTimeline";
+import { useCreateNode, useGetNode, useGetTimeline, useGetLeaves, useGetMedia, useGetCanonChain } from "@/hooks/useTimeline";
 
 function UniversesPage() {
-  const [selectedUniverse, setSelectedUniverse] = useState<Universe | null>(null);
-  const [selectedTimeline, setSelectedTimeline] = useState<Timeline | null>(null);
+  // Define our single blockchain universe
+  const blockchainUniverse = {
+    id: 'blockchain-universe',
+    name: 'Cyberpunk City',
+    description: 'A decentralized narrative universe powered by blockchain technology',
+    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=800&h=400&fit=crop'
+  };
   
   // Timeline contract interaction states
   const [nodeLink, setNodeLink] = useState('');
@@ -24,7 +28,19 @@ function UniversesPage() {
   const { data: leavesData, isLoading: isLoadingLeaves, refetch: refetchLeaves } = useGetLeaves();
   const { data: mediaData, isLoading: isLoadingMedia, refetch: refetchMedia } = useGetMedia(mediaNodeId);
   const { data: canonChainData, isLoading: isLoadingCanonChain, refetch: refetchCanonChain } = useGetCanonChain();
-  const { data: fullGraphData, isLoading: isLoadingFullGraph, refetch: refetchFullGraph } = useGetFullGraph();
+  
+  // Fetch individual nodes (IDs 0-4) for timeline building
+  const { data: node0 } = useGetNode(0);
+  const { data: node1 } = useGetNode(1);
+  const { data: node2 } = useGetNode(2);
+  const { data: node3 } = useGetNode(3);
+  const { data: node4 } = useGetNode(4);
+  
+  const nodeDataArray = [node0, node1, node2, node3, node4];
+  const availableNodeCount = nodeDataArray.filter(Boolean).length;
+  
+  // Calculate timeline count from leaves
+  const timelineCount = leavesData && Array.isArray(leavesData) ? leavesData.length : 0;
 
   const handleCreateNode = async () => {
     if (!nodeLink || !nodePlot) return;
@@ -131,11 +147,12 @@ function UniversesPage() {
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
                 <h4 className="font-medium text-green-700 mb-2">Node Data:</h4>
                 <div className="text-sm space-y-1">
-                  {Array.isArray(nodeData) && nodeData.length >= 3 ? (
+                  {Array.isArray(nodeData) && nodeData.length >= 4 ? (
                     <>
-                      <div><strong>Link:</strong> {nodeData[0] || 'N/A'}</div>
-                      <div><strong>Plot:</strong> {nodeData[1] || 'N/A'}</div>
-                      <div><strong>Previous:</strong> {nodeData[2]?.toString() || 'N/A'}</div>
+                      <div><strong>ID:</strong> {nodeData[0]?.toString() || 'N/A'}</div>
+                      <div><strong>URL:</strong> {nodeData[1] || 'N/A'}</div>
+                      <div><strong>Description:</strong> {nodeData[2] || 'N/A'}</div>
+                      <div><strong>Previous:</strong> {nodeData[3]?.toString() || 'N/A'}</div>
                     </>
                   ) : (
                     <div>No data or invalid format</div>
@@ -173,11 +190,10 @@ function UniversesPage() {
           </button>
           
           <button
-            onClick={() => refetchFullGraph()}
-            disabled={isLoadingFullGraph}
-            className="px-3 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 disabled:bg-gray-400 text-sm"
+            onClick={() => window.location.reload()}
+            className="px-3 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 text-sm"
           >
-            {isLoadingFullGraph ? 'Loading...' : 'Get Full Graph'}
+            Refresh Nodes
           </button>
           
           <div className="flex gap-1">
@@ -224,11 +240,10 @@ function UniversesPage() {
             </div>
           )}
           
-          {fullGraphData && (
+          {availableNodeCount > 0 && (
             <div className="p-3 bg-indigo-50 border border-indigo-200 rounded">
-              <h4 className="font-medium text-indigo-700">Full Graph Data:</h4>
-              <pre className="text-xs mt-1 overflow-x-auto">{JSON.stringify(fullGraphData, (key, value) => 
-                typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
+              <h4 className="font-medium text-indigo-700">Node Count:</h4>
+              <p className="text-sm mt-1">{availableNodeCount} nodes available (IDs: 0-4)</p>
             </div>
           )}
           
@@ -243,197 +258,105 @@ function UniversesPage() {
       </div>
       
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-4">Universes</h1>
+        <h1 className="text-4xl font-bold mb-4">Blockchain Universe</h1>
         <p className="text-lg text-muted-foreground">
-          Explore different narrative universes and their branching timelines
+          Explore the decentralized narrative universe with blockchain-powered timelines
         </p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Single Blockchain Universe Card */}
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold">Available Universes</h2>
-          <div className="space-y-4">
-            {universes.map((universe) => (
-              <Card 
-                key={universe.id}
-                className={`cursor-pointer transition-all hover:shadow-lg ${
-                  selectedUniverse?.id === universe.id ? "ring-2 ring-primary" : ""
-                }`}
-                onClick={() => {
-                  setSelectedUniverse(universe);
-                  setSelectedTimeline(null);
-                }}
-              >
-                <div className="relative">
-                  <img 
-                    src={universe.imageUrl} 
-                    alt={universe.name}
-                    className="w-full h-32 object-cover rounded-t-lg"
-                  />
-                  <div className="absolute inset-0 bg-black/20 rounded-t-lg" />
-                  <div className="absolute bottom-2 left-2 text-white">
-                    <h3 className="font-bold text-lg">{universe.name}</h3>
-                  </div>
+          <h2 className="text-2xl font-semibold">Universe</h2>
+          <Card className="transition-all hover:shadow-lg">
+            <div className="relative">
+              <img 
+                src={blockchainUniverse.imageUrl} 
+                alt={blockchainUniverse.name}
+                className="w-full h-48 object-cover rounded-t-lg"
+              />
+              <div className="absolute inset-0 bg-black/20 rounded-t-lg" />
+              <div className="absolute bottom-4 left-4 text-white">
+                <h3 className="font-bold text-2xl">{blockchainUniverse.name}</h3>
+              </div>
+            </div>
+            <CardContent className="p-6">
+              <p className="text-muted-foreground mb-4">
+                {blockchainUniverse.description}
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-blue-50">
+                    Smart Contract Powered
+                  </Badge>
+                  <Badge variant="outline" className="bg-green-50">
+                    Live Data
+                  </Badge>
                 </div>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {universe.description}
-                  </p>
-                  <div className="mt-2 flex items-center justify-between">
-                    <Badge variant="outline">
-                      {universe.timelines.length} Timeline{universe.timelines.length !== 1 ? 's' : ''}
-                    </Badge>
-                    <Button size="sm" variant="ghost" asChild onClick={(e) => e.stopPropagation()}>
-                      <Link to="/universe/$id" params={{ id: universe.id }}>
-                        View Graph →
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h2 className="text-2xl font-semibold">Timelines</h2>
-          {selectedUniverse ? (
-            <div className="space-y-4">
-              {selectedUniverse.timelines.map((timeline) => (
-                <Card 
-                  key={timeline.id}
-                  className={`cursor-pointer transition-all hover:shadow-lg ${
-                    selectedTimeline?.id === timeline.id ? "ring-2 ring-primary" : ""
-                  }`}
-                  onClick={() => setSelectedTimeline(timeline)}
-                >
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">{timeline.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {timeline.description}
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Active Timelines:</p>
+                    <p className="text-2xl font-bold">
+                      {timelineCount}
                     </p>
-                    <div className="flex items-center justify-between">
-                      <Badge variant="secondary">
-                        {timeline.nodes.length} Event{timeline.nodes.length !== 1 ? 's' : ''}
-                      </Badge>
-                      <Button size="sm" variant="outline" asChild>
-                        <Link to="/timeline" search={{ universe: selectedUniverse.id, timeline: timeline.id }}>
-                          View Timeline
-                        </Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <p className="text-muted-foreground">
-                  Select a universe to view its timelines
-                </p>
-              </CardContent>
-            </Card>
-          )}
+                  </div>
+                  <Button asChild>
+                    <Link to="/universe/$id" params={{ id: blockchainUniverse.id }}>
+                      View Timeline Graph →
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
+        {/* Blockchain Data Display */}
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold">Timeline Events</h2>
-          {selectedTimeline ? (
-            <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    {selectedTimeline.name}
-                    <Badge variant="outline">{selectedUniverse?.name}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {selectedTimeline.description}
+          <h2 className="text-2xl font-semibold">Live Blockchain Data</h2>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Timeline Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Timeline Leaves:</span>
+                  <Badge variant="secondary">
+                    {timelineCount}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Available Events:</span>
+                  <Badge variant="outline">
+                    {availableNodeCount}
+                  </Badge>
+                </div>
+                
+                {leavesData && Array.isArray(leavesData) && leavesData.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Timeline Endpoints:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {leavesData.map((leafId, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          Leaf {typeof leafId === 'bigint' ? Number(leafId) : leafId}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="pt-3 border-t">
+                  <p className="text-xs text-muted-foreground">
+                    Timelines traced from leaves using getLeaves() and getNode()
                   </p>
-                  
-                  <div className="space-y-3">
-                    {selectedTimeline.nodes.map((node, index) => (
-                      <Card key={node.id} className="border-l-4 border-l-primary">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between mb-2">
-                            <h4 className="font-semibold">{node.title}</h4>
-                            <Badge variant="outline" className="text-xs">
-                              Event {index + 1}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-3">
-                            {node.description}
-                          </p>
-
-                          <div className="mb-3">
-                            <video 
-                              className="w-full h-32 object-cover rounded-lg border" 
-                              controls
-                              preload="metadata"
-                            >
-                              <source src={node.videoUrl} type="video/mp4" />
-                              Your browser does not support the video tag.
-                            </video>
-                          </div>
-                          
-                          {node.characters.length > 0 && (
-                            <div className="mb-3">
-                              <p className="text-xs font-medium mb-1">Characters:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {node.characters.map((characterId) => (
-                                  <Badge key={characterId} variant="secondary" className="text-xs">
-                                    {characterId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-between">
-                            <Button size="sm" variant="outline" asChild>
-                              <a href={node.videoUrl} target="_blank" rel="noopener noreferrer">
-                                Watch Full Video
-                              </a>
-                            </Button>
-                            {node.connections.length > 0 && (
-                              <Badge variant="outline" className="text-xs">
-                                {node.connections.length} Connection{node.connections.length !== 1 ? 's' : ''}
-                              </Badge>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-
-                  <div className="pt-4 space-y-2">
-                    <Button className="w-full" asChild>
-                      <Link to="/timeline" search={{ universe: selectedUniverse?.id, timeline: selectedTimeline.id }}>
-                        Open Interactive Timeline
-                      </Link>
-                    </Button>
-                    <Button variant="outline" className="w-full" asChild>
-                      <Link to="/universe/$id" params={{ id: selectedUniverse?.id || '' }}>
-                        View Universe Graph
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <p className="text-muted-foreground">
-                  Select a timeline to view its events
-                </p>
-              </CardContent>
-            </Card>
-          )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
