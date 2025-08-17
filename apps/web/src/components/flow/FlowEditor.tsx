@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useEffect } from 'react';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -67,9 +67,72 @@ const initialEdges: Edge[] = [
   { id: 'e3-4', source: '3', target: '4', animated: true },
 ];
 
-export default function FlowEditor() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+interface FlowEditorProps {
+  timelineData?: Array<{
+    id: number;
+    url: string;
+    description: string;
+    previousNode: string;
+    isCanon: boolean;
+  }>;
+}
+
+export default function FlowEditor({ timelineData }: FlowEditorProps) {
+  // Generate initial nodes from timeline data if provided
+  const generatedNodes = useMemo(() => {
+    if (!timelineData || timelineData.length === 0) return initialNodes;
+    
+    return timelineData.map((node, index) => ({
+      id: `timeline-${node.id}`,
+      type: 'plotPoint',
+      data: {
+        label: `Timeline Node ${node.id}`,
+        emoji: node.isCanon ? '⭐' : '📝',
+        description: node.description || `Timeline event ${node.id}`,
+        canonicity: node.isCanon ? 'Canon' : 'Branch',
+        timelineId: node.id,
+        videoUrl: node.url
+      },
+      position: { 
+        x: 100 + (index % 3) * 300, 
+        y: 100 + Math.floor(index / 3) * 150 
+      },
+    }));
+  }, [timelineData]);
+  
+  // Generate edges based on previous node relationships
+  const generatedEdges = useMemo(() => {
+    if (!timelineData || timelineData.length === 0) return initialEdges;
+    
+    const edges: Edge[] = [];
+    timelineData.forEach(node => {
+      if (node.previousNode && String(node.previousNode) !== '0') {
+        const previousNodeId = parseInt(String(node.previousNode));
+        const previousExists = timelineData.find(n => n.id === previousNodeId);
+        
+        if (previousExists) {
+          edges.push({
+            id: `edge-timeline-${previousNodeId}-${node.id}`,
+            source: `timeline-${previousNodeId}`,
+            target: `timeline-${node.id}`,
+            animated: node.isCanon,
+            style: node.isCanon ? { stroke: '#3b82f6', strokeWidth: 3 } : undefined
+          });
+        }
+      }
+    });
+    
+    return edges;
+  }, [timelineData]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(generatedNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(generatedEdges);
+
+  // Update nodes and edges when timeline data changes
+  useEffect(() => {
+    setNodes(generatedNodes);
+    setEdges(generatedEdges);
+  }, [generatedNodes, generatedEdges, setNodes, setEdges]);
 
   // Handle new connections between nodes
   const onConnect = useCallback(
@@ -132,6 +195,11 @@ export default function FlowEditor() {
             <h3 className="text-lg font-bold mb-2">Narrative Flow Editor</h3>
             <p className="text-sm text-muted-foreground mb-3">
               Create and connect narrative elements to establish canon
+              {timelineData && timelineData.length > 0 && (
+                <span className="block text-green-600 font-medium mt-1">
+                  ✓ {timelineData.length} timeline nodes loaded
+                </span>
+              )}
             </p>
             <div className="flex flex-col gap-2">
               <button 
