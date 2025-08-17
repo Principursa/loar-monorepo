@@ -11,8 +11,10 @@ import ReactFlow, {
 import type { NodeDragHandler, SelectionDragHandler } from 'reactflow';
 import { type Node, type Edge, type Connection, ConnectionMode, BackgroundVariant } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { CharacterNode, PlotPointNode, MediaNode, VotingNode } from './CustomNodes';
-import { EditableCharacterNode, EditablePlotPointNode, EditableMediaNode, EditableVotingNode } from './EditableNodes';
+import { 
+  CharacterNode, PlotPointNode, MediaNode, VotingNode,
+  EditableCharacterNode, EditablePlotPointNode, EditableMediaNode, EditableVotingNode 
+} from '.';
 
 // Initial nodes and edges for the flow with custom node types
 const initialNodes: Node[] = [
