@@ -116,7 +116,9 @@ export class WalrusService {
       
       const { stdout, stderr } = await execAsync(curlCommand);
       
-      console.log(`💾 Temp file kept for inspection: ${tempFileName}`);
+      // Clean up temp file
+      fs.unlinkSync(tempFileName);
+      console.log(`🧹 Temp file cleaned up: ${tempFileName}`);
       
       if (stderr) {
         console.error('❌ Curl error:', stderr);
