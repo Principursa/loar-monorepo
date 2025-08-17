@@ -95,11 +95,13 @@ function FlowPage() {
       universeIdFromParams,
       universeData: universeData?.data,
       universeAddress: universeData?.data?.address,
-      universeId: timelineData?.universeId,
+      contractAddress,
+      fullGraphData,
+      timelineNodesCount: timelineNodes?.length || 0,
       isQueryEnabled: !!universeIdFromParams && universeIdFromParams !== 'blockchain-universe' && universeIdFromParams !== 'unknown',
       isLoadingUniverse: universeData === undefined
     });
-  }, [searchParams, timelineData, universeData, universeIdFromParams]);
+  }, [searchParams, timelineData, universeData, universeIdFromParams, contractAddress, fullGraphData, timelineNodes]);
 
   return (
     <div className="container mx-auto py-8">

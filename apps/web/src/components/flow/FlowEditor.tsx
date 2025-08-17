@@ -161,8 +161,40 @@ export default function FlowEditor({ timelineData, universeAddress, universeId }
 
   // Handle new connections between nodes
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
+    (params: Connection) => {
+      // Add the edge
+      setEdges((eds) => addEdge(params, eds));
+      
+      // Update target node with previousNode information
+      if (params.source && params.target) {
+        setNodes((nds) => nds.map((node) => {
+          if (node.id === params.target) {
+            // Extract node ID from source node
+            let previousNodeId = 0;
+            
+            // Handle timeline nodes (format: "timeline-X")
+            if (params.source && params.source.startsWith('timeline-')) {
+              previousNodeId = parseInt(params.source.replace('timeline-', ''));
+            }
+            // Handle other node types - for now, we'll use 0 as default
+            // You could extend this to handle other node ID formats
+            
+            // Update the node's data with previousNode info
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                previousNode: previousNodeId,
+                // Add visual indicator that this node is connected
+                isConnectedToBlockchain: previousNodeId > 0
+              }
+            };
+          }
+          return node;
+        }));
+      }
+    },
+    [setEdges, setNodes]
   );
 
   // Register custom node types

@@ -100,10 +100,15 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
   const createNodeMutation = useMutation({
     mutationFn: async () => {
       const universeAddress = data.universeAddress;
+      // Use the previousNode from connections, fallback to 0 if not connected
+      const previousNodeId = data.previousNode || 0;
+      
       console.log('Creating node with:', {
         universeAddress,
         walrusUrl,
         description,
+        previousNodeId,
+        isConnected: previousNodeId > 0,
         nodeData: data
       });
       
@@ -115,11 +120,13 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
         throw new Error('No Walrus URL available');
       }
       
+      console.log('Creating blockchain node with previousNode:', previousNodeId);
+      
       await writeContractAsync({
         abi: timelineAbi,
         address: universeAddress as Address,
         functionName: 'createNode',
-        args: [walrusUrl, description || 'Plot point created in flow editor', BigInt(0)],
+        args: [walrusUrl, description || 'Plot point created in flow editor', BigInt(previousNodeId)],
       });
     },
   });
@@ -237,6 +244,11 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
               <span className={data.canonicity === 'Canon' ? 'text-green-500' : 'text-amber-500'}>
                 {data.canonicity}
               </span>
+            </div>
+          )}
+          {data.previousNode && data.previousNode > 0 && (
+            <div className="text-xs text-blue-600">
+              🔗 Connected to Node {data.previousNode}
             </div>
           )}
         </div>
