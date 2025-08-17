@@ -21,13 +21,14 @@ services:
     working_dir: /app
     volumes:
       - .:/app
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
       - CORS_ORIGIN=http://159.65.179.124
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-defaultsecret}
       - BETTER_AUTH_URL=http://159.65.179.124
-      - LUMAAI_API_KEY=${LUMAAI_API_KEY}
     command: ["bun", "run", "apps/server/dist/index.js"]
     depends_on:
       - postgres
