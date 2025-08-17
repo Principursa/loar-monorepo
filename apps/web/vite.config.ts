@@ -10,8 +10,22 @@ export default defineConfig({
     react(),
     tanstackRouter({}),
   ],
+    build: {
+    minify: 'esbuild',
+    chunkSizeWarningLimit: 10000,
+    sourcemap:false,
+    rollupOptions: {
+	output: {
+		manualChunks: {
+	core: ['src/core', 'node_modules/starknetkit'],
+        },
+      },
+
+
+    }
+  },
   optimizeDeps: {
-    include: ['@dynamic-labs/sdk-react-core']
+    exclude: ['@dynamic-labs/sdk-react-core']
   },
   ssr: {
     noExternal: ['@dynamic-labs/sdk-react-core']
