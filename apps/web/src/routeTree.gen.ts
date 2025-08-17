@@ -14,9 +14,12 @@ import { Route as TimelineRouteImport } from './routes/timeline'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FlowRouteImport } from './routes/flow'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CinematicUniversesRouteImport } from './routes/cinematicUniverses'
+import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WikiIndexRouteImport } from './routes/wiki/index'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
+import { Route as CinematicUniversesIdRouteImport } from './routes/cinematicUniverses.$id'
 import { Route as WikiCharacterIdRouteImport } from './routes/wiki/character/$id'
 import { Route as EventUniverseIdTimelineIdEventIdRouteImport } from './routes/event/$universeId.$timelineId.$eventId'
 
@@ -45,6 +48,16 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CinematicUniversesRoute = CinematicUniversesRouteImport.update({
+  id: '/cinematicUniverses',
+  path: '/cinematicUniverses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CinematicUniverseCreateRoute = CinematicUniverseCreateRouteImport.update({
+  id: '/cinematicUniverseCreate',
+  path: '/cinematicUniverseCreate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -60,6 +73,11 @@ const UniverseIdRoute = UniverseIdRouteImport.update({
   path: '/universe/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CinematicUniversesIdRoute = CinematicUniversesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => CinematicUniversesRoute,
+} as any)
 const WikiCharacterIdRoute = WikiCharacterIdRouteImport.update({
   id: '/wiki/character/$id',
   path: '/wiki/character/$id',
@@ -74,11 +92,14 @@ const EventUniverseIdTimelineIdEventIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
+  '/cinematicUniverses': typeof CinematicUniversesRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/flow': typeof FlowRoute
   '/login': typeof LoginRoute
   '/timeline': typeof TimelineRoute
   '/universes': typeof UniversesRoute
+  '/cinematicUniverses/$id': typeof CinematicUniversesIdRoute
   '/universe/$id': typeof UniverseIdRoute
   '/wiki': typeof WikiIndexRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
@@ -86,11 +107,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
+  '/cinematicUniverses': typeof CinematicUniversesRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/flow': typeof FlowRoute
   '/login': typeof LoginRoute
   '/timeline': typeof TimelineRoute
   '/universes': typeof UniversesRoute
+  '/cinematicUniverses/$id': typeof CinematicUniversesIdRoute
   '/universe/$id': typeof UniverseIdRoute
   '/wiki': typeof WikiIndexRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
@@ -99,11 +123,14 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
+  '/cinematicUniverses': typeof CinematicUniversesRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/flow': typeof FlowRoute
   '/login': typeof LoginRoute
   '/timeline': typeof TimelineRoute
   '/universes': typeof UniversesRoute
+  '/cinematicUniverses/$id': typeof CinematicUniversesIdRoute
   '/universe/$id': typeof UniverseIdRoute
   '/wiki/': typeof WikiIndexRoute
   '/wiki/character/$id': typeof WikiCharacterIdRoute
@@ -113,11 +140,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/cinematicUniverseCreate'
+    | '/cinematicUniverses'
     | '/dashboard'
     | '/flow'
     | '/login'
     | '/timeline'
     | '/universes'
+    | '/cinematicUniverses/$id'
     | '/universe/$id'
     | '/wiki'
     | '/wiki/character/$id'
@@ -125,11 +155,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/cinematicUniverseCreate'
+    | '/cinematicUniverses'
     | '/dashboard'
     | '/flow'
     | '/login'
     | '/timeline'
     | '/universes'
+    | '/cinematicUniverses/$id'
     | '/universe/$id'
     | '/wiki'
     | '/wiki/character/$id'
@@ -137,11 +170,14 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/cinematicUniverseCreate'
+    | '/cinematicUniverses'
     | '/dashboard'
     | '/flow'
     | '/login'
     | '/timeline'
     | '/universes'
+    | '/cinematicUniverses/$id'
     | '/universe/$id'
     | '/wiki/'
     | '/wiki/character/$id'
@@ -150,6 +186,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
+  CinematicUniversesRoute: typeof CinematicUniversesRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   FlowRoute: typeof FlowRoute
   LoginRoute: typeof LoginRoute
@@ -198,6 +236,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cinematicUniverses': {
+      id: '/cinematicUniverses'
+      path: '/cinematicUniverses'
+      fullPath: '/cinematicUniverses'
+      preLoaderRoute: typeof CinematicUniversesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cinematicUniverseCreate': {
+      id: '/cinematicUniverseCreate'
+      path: '/cinematicUniverseCreate'
+      fullPath: '/cinematicUniverseCreate'
+      preLoaderRoute: typeof CinematicUniverseCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -219,6 +271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UniverseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cinematicUniverses/$id': {
+      id: '/cinematicUniverses/$id'
+      path: '/$id'
+      fullPath: '/cinematicUniverses/$id'
+      preLoaderRoute: typeof CinematicUniversesIdRouteImport
+      parentRoute: typeof CinematicUniversesRoute
+    }
     '/wiki/character/$id': {
       id: '/wiki/character/$id'
       path: '/wiki/character/$id'
@@ -236,8 +295,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface CinematicUniversesRouteChildren {
+  CinematicUniversesIdRoute: typeof CinematicUniversesIdRoute
+}
+
+const CinematicUniversesRouteChildren: CinematicUniversesRouteChildren = {
+  CinematicUniversesIdRoute: CinematicUniversesIdRoute,
+}
+
+const CinematicUniversesRouteWithChildren =
+  CinematicUniversesRoute._addFileChildren(CinematicUniversesRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
+  CinematicUniversesRoute: CinematicUniversesRouteWithChildren,
   DashboardRoute: DashboardRoute,
   FlowRoute: FlowRoute,
   LoginRoute: LoginRoute,

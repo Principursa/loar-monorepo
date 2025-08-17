@@ -8,8 +8,12 @@ import { db } from "../db";
 import { characters } from "../db/schema/characters";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+
 import { videoService } from "../services/video";
 import { walrusService } from "../services/walrus";
+
+import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverses.index";
+
 
 export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
@@ -21,6 +25,7 @@ export const appRouter = router({
       user: ctx.session.user,
     };
   }),
+  cinematicUniverses: cinematicUniversesRouter,
   wiki: router({
     characters: publicProcedure.query(async () => {
       try {
