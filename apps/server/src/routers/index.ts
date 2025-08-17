@@ -9,6 +9,7 @@ import { characters } from "../db/schema/characters";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { videoService } from "../services/video";
+import { walrusService } from "../services/walrus";
 
 export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
@@ -111,6 +112,33 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const generation = await videoService.generateVideo(input);
         return await videoService.waitForCompletion(generation.id);
+      }),
+  }),
+  walrus: router({
+    uploadFromUrl: publicProcedure
+      .input(z.object({
+        url: z.string().min(1, "URL is required")
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          console.log(`🌐 Walrus upload request for: ${input.url}`);
+          const result = await walrusService.uploadFromUrl(input.url);
+          console.log(`✅ Walrus upload success: ${result.blobId}`);
+          return result;
+        } catch (error) {
+          console.error('❌ Walrus upload error:', error);
+          throw error;
+        }
+      }),
+    getBlobInfo: publicProcedure
+      .input(z.object({ blobId: z.string() }))
+      .query(async ({ input }) => {
+        return await walrusService.getBlobInfo(input.blobId);
+      }),
+    getFileUrl: publicProcedure
+      .input(z.object({ blobId: z.string() }))
+      .query(({ input }) => {
+        return { url: walrusService.getFileUrl(input.blobId) };
       }),
   }),
 });

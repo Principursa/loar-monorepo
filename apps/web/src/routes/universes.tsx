@@ -35,6 +35,12 @@ function UniversesPage() {
   const [videoPrompt, setVideoPrompt] = useState('');
   const [generatedVideoId, setGeneratedVideoId] = useState<string | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  
+  // Walrus upload states
+  const [walrusBlobId, setWalrusBlobId] = useState<string | null>(null);
+  const [walrusVideoUrl, setWalrusVideoUrl] = useState<string | null>(null);
+  const [isUploadingToWalrus, setIsUploadingToWalrus] = useState(false);
+  const [walrusUploadUrl, setWalrusUploadUrl] = useState('');
 
   const { writeAsync: createNode } = useCreateNode(nodeLink, nodePlot, previousNode);
   const { writeAsync: setMediaAsync } = useSetMedia(updateMediaNodeId, updateMediaLink);
@@ -49,13 +55,19 @@ function UniversesPage() {
 
   // Video generation hooks
   const generateVideoMutation = useMutation({
-    mutationFn: (input: { prompt: string; model?: string; resolution?: string; duration?: string }) =>
+    mutationFn: (input: { prompt: string; model?: 'ray-flash-2' | 'ray-2' | 'ray-1-6'; resolution?: '540p' | '720p' | '1080p' | '4k'; duration?: '5s' | '10s' }) =>
       trpcClient.video.generate.mutate(input),
   });
   
   const { data: videoStatus, refetch: refetchVideoStatus } = useQuery({
     ...trpc.video.status.queryOptions({ id: generatedVideoId! }),
     enabled: !!generatedVideoId,
+  });
+
+  // Walrus upload hooks
+  const uploadToWalrusMutation = useMutation({
+    mutationFn: (input: { url: string }) =>
+      trpcClient.walrus.uploadFromUrl.mutate(input),
   });
   
   // Fetch individual nodes (IDs 0-4) for timeline building
@@ -162,15 +174,35 @@ function UniversesPage() {
     }
   };
 
+  const handleUploadToWalrus = async () => {
+    if (!walrusUploadUrl.trim()) return;
+    
+    try {
+      setIsUploadingToWalrus(true);
+      const walrusResult = await uploadToWalrusMutation.mutateAsync({
+        url: walrusUploadUrl.trim()
+      }) as { blobId: string; url: string };
+      
+      setWalrusBlobId(walrusResult.blobId);
+      setWalrusVideoUrl(walrusResult.url);
+      alert(`Video uploaded to Walrus! Blob ID: ${walrusResult.blobId}`);
+    } catch (error) {
+      console.error('Error uploading to Walrus:', error);
+      alert('Walrus upload failed: ' + error);
+    } finally {
+      setIsUploadingToWalrus(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-6">
       {/* Blockchain Timeline Actions */}
       <div className="mb-6 p-6 bg-blue-50 border border-blue-200 rounded-lg">
         <h2 className="text-xl font-bold text-blue-800 mb-4">Blockchain Timeline Actions</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Video Generation Section */}
-          <div className="space-y-3 md:col-span-3 p-4 bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-lg">
+          <div className="space-y-3 p-4 bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-lg">
             <h3 className="font-semibold text-pink-700 text-lg">🎬 AI Video Generation</h3>
             
             <div>
@@ -184,7 +216,7 @@ function UniversesPage() {
               />
             </div>
             
-            <div className="flex gap-4 items-center">
+            <div className="flex gap-2 items-center">
               <button
                 onClick={handleGenerateVideo}
                 disabled={!videoPrompt.trim() || generateVideoMutation.isPending}
@@ -194,31 +226,67 @@ function UniversesPage() {
               </button>
               
               {videoStatus && (
-                <div className="flex items-center gap-2">
-                  <Badge variant={videoStatus.status === 'completed' ? 'default' : videoStatus.status === 'failed' ? 'destructive' : 'secondary'}>
-                    {videoStatus.status}
-                  </Badge>
-                  {videoStatus.status === 'dreaming' && (
-                    <span className="text-sm text-purple-600">Creating your video...</span>
-                  )}
-                </div>
+                <Badge variant={videoStatus.status === 'completed' ? 'default' : videoStatus.status === 'failed' ? 'destructive' : 'secondary'}>
+                  {videoStatus.status}
+                </Badge>
               )}
             </div>
-
 
             {generatedVideoUrl && (
               <div className="mt-4 p-3 bg-white border border-pink-200 rounded">
                 <h4 className="font-medium text-pink-700 mb-2">Generated Video:</h4>
                 <video 
                   controls 
-                  className="w-full max-w-md rounded"
+                  className="w-full rounded"
                   src={generatedVideoUrl}
                 >
                   Your browser does not support the video tag.
                 </video>
                 <p className="text-xs text-gray-600 mt-2">
-                  Video URL: <a href={generatedVideoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{generatedVideoUrl}</a>
+                  <a href={generatedVideoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{generatedVideoUrl}</a>
                 </p>
+              </div>
+            )}
+          </div>
+
+          {/* Walrus Upload Section */}
+          <div className="space-y-3 p-4 bg-gradient-to-r from-blue-50 to-teal-50 border border-blue-200 rounded-lg">
+            <h3 className="font-semibold text-blue-700 text-lg">🐙 Upload to Walrus</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-blue-700 mb-1">Video URL</label>
+              <input
+                type="text"
+                placeholder="https://storage.cdn-luma.com/... or any video URL"
+                value={walrusUploadUrl}
+                onChange={(e) => setWalrusUploadUrl(e.target.value)}
+                className="w-full px-3 py-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <button
+              onClick={handleUploadToWalrus}
+              disabled={!walrusUploadUrl.trim() || isUploadingToWalrus}
+              className="px-6 py-2 bg-gradient-to-r from-blue-500 to-teal-500 text-white rounded hover:from-blue-600 hover:to-teal-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {isUploadingToWalrus ? 'Uploading...' : 'Upload to Walrus'}
+            </button>
+
+            {walrusVideoUrl && (
+              <div className="mt-4 p-3 bg-white border border-blue-200 rounded">
+                <h4 className="font-medium text-blue-700 mb-2">🐙 Video on Walrus:</h4>
+                <video 
+                  controls 
+                  className="w-full rounded"
+                  src={walrusVideoUrl}
+                >
+                  Your browser does not support the video tag.
+                </video>
+                <div className="text-xs text-gray-600 mt-2 space-y-1">
+                  <p><strong>Blob ID:</strong> <code className="bg-gray-100 px-1 rounded">{walrusBlobId}</code></p>
+                  <p><strong>Walrus URL:</strong> <a href={walrusVideoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{walrusVideoUrl}</a></p>
+                  <p className="text-green-600 font-medium">✅ Stored on decentralized Walrus network!</p>
+                </div>
               </div>
             )}
           </div>
