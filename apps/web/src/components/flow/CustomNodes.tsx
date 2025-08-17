@@ -166,18 +166,32 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
         />
       </div>
       
-      {/* Display generated video if available */}
-      {generatedVideoUrl && (
+      {/* Display generated video or loading animation */}
+      {(generatedVideoUrl || generatedVideoId) && (
         <div className="mt-2 text-xs text-muted-foreground">
           <strong>Plot Video:</strong>
-          <video 
-            controls 
-            className="w-full mt-1 rounded"
-            src={generatedVideoUrl}
-            style={{ maxHeight: '120px' }}
-          >
-            Your browser does not support the video tag.
-          </video>
+          {generatedVideoUrl ? (
+            <video 
+              controls 
+              className="w-full mt-1 rounded"
+              src={generatedVideoUrl}
+              style={{ maxHeight: '120px' }}
+            >
+              Your browser does not support the video tag.
+            </video>
+          ) : (
+            <div className="w-full mt-1 rounded bg-gradient-to-r from-green-100 to-green-200 dark:from-green-800 dark:to-green-700 flex items-center justify-center" style={{ height: '120px' }}>
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-green-600 mx-auto mb-2" />
+                <div className="text-xs text-green-700 dark:text-green-300 font-medium">
+                  Generating video...
+                </div>
+                <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  This may take a few minutes
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
       
@@ -376,10 +390,32 @@ export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
         />
       </div>
       
-      {/* Display current media URL if available */}
-      {data.mediaUrl && (
-        <div className="mt-2 text-xs text-muted-foreground break-all">
-          <strong>Media URL:</strong> {data.mediaUrl}
+      {/* Display generated video or loading animation */}
+      {(generatedVideoUrl || generatedVideoId) && (
+        <div className="mt-2 text-xs text-muted-foreground">
+          <strong>Media Video:</strong>
+          {generatedVideoUrl ? (
+            <video 
+              controls 
+              className="w-full mt-1 rounded"
+              src={generatedVideoUrl}
+              style={{ maxHeight: '120px' }}
+            >
+              Your browser does not support the video tag.
+            </video>
+          ) : (
+            <div className="w-full mt-1 rounded bg-gradient-to-r from-purple-100 to-purple-200 dark:from-purple-800 dark:to-purple-700 flex items-center justify-center" style={{ height: '120px' }}>
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-2" />
+                <div className="text-xs text-purple-700 dark:text-purple-300 font-medium">
+                  Generating video...
+                </div>
+                <div className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                  This may take a few minutes
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
       
