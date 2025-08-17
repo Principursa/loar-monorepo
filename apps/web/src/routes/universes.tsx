@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useCreateNode, useGetNode, useGetTimeline, useGetLeaves, useGetMedia, useGetCanonChain } from "@/hooks/useTimeline";
+import { useCreateNode, useGetNode, useGetTimeline, useGetLeaves, useGetMedia, useGetCanonChain, useGetFullGraph, useSetMedia, useSetCanon } from "@/hooks/useTimeline";
 
 function UniversesPage() {
   // Define our single blockchain universe
@@ -21,13 +21,23 @@ function UniversesPage() {
   const [queryNodeId, setQueryNodeId] = useState(1);
   const [mediaNodeId, setMediaNodeId] = useState(1);
   const [isCreating, setIsCreating] = useState(false);
+  
+  // New function states
+  const [updateMediaNodeId, setUpdateMediaNodeId] = useState(1);
+  const [updateMediaLink, setUpdateMediaLink] = useState('');
+  const [canonNodeId, setCanonNodeId] = useState(1);
+  const [isSettingMedia, setIsSettingMedia] = useState(false);
+  const [isSettingCanon, setIsSettingCanon] = useState(false);
 
   const { writeAsync: createNode } = useCreateNode(nodeLink, nodePlot, previousNode);
+  const { writeAsync: setMediaAsync } = useSetMedia(updateMediaNodeId, updateMediaLink);
+  const { writeAsync: setCanonAsync } = useSetCanon(canonNodeId);
   const { data: nodeData, isLoading: isLoadingNode, refetch: refetchNode } = useGetNode(queryNodeId);
   const { data: timelineData, isLoading: isLoadingTimeline, refetch: refetchTimeline } = useGetTimeline();
   const { data: leavesData, isLoading: isLoadingLeaves, refetch: refetchLeaves } = useGetLeaves();
   const { data: mediaData, isLoading: isLoadingMedia, refetch: refetchMedia } = useGetMedia(mediaNodeId);
   const { data: canonChainData, isLoading: isLoadingCanonChain, refetch: refetchCanonChain } = useGetCanonChain();
+  const { data: fullGraphData, isLoading: isLoadingFullGraph, refetch: refetchFullGraph } = useGetFullGraph();
   
   // Fetch individual nodes (IDs 0-4) for timeline building
   const { data: node0 } = useGetNode(0);
@@ -41,6 +51,9 @@ function UniversesPage() {
   
   // Calculate timeline count from leaves
   const timelineCount = leavesData && Array.isArray(leavesData) ? leavesData.length : 0;
+  
+  // Calculate total nodes from full graph
+  const totalNodesFromGraph = fullGraphData && Array.isArray(fullGraphData) ? fullGraphData.length : availableNodeCount;
 
   const handleCreateNode = async () => {
     if (!nodeLink || !nodePlot) return;
@@ -65,13 +78,44 @@ function UniversesPage() {
     refetchNode();
   };
 
+  const handleSetMedia = async () => {
+    if (!updateMediaLink) return;
+    
+    try {
+      setIsSettingMedia(true);
+      await setMediaAsync(updateMediaNodeId, updateMediaLink);
+      setUpdateMediaLink('');
+      setUpdateMediaNodeId(1);
+      alert('Media set successfully!');
+    } catch (error) {
+      console.error('Error setting media:', error);
+      alert('Error setting media: ' + error);
+    } finally {
+      setIsSettingMedia(false);
+    }
+  };
+
+  const handleSetCanon = async () => {
+    try {
+      setIsSettingCanon(true);
+      await setCanonAsync(canonNodeId);
+      setCanonNodeId(1);
+      alert('Canon set successfully!');
+    } catch (error) {
+      console.error('Error setting canon:', error);
+      alert('Error setting canon: ' + error);
+    } finally {
+      setIsSettingCanon(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-6">
       {/* Blockchain Timeline Actions */}
       <div className="mb-6 p-6 bg-blue-50 border border-blue-200 rounded-lg">
         <h2 className="text-xl font-bold text-blue-800 mb-4">Blockchain Timeline Actions</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Create Node Section */}
           <div className="space-y-3">
             <h3 className="font-semibold text-blue-700">Create Node</h3>
@@ -161,6 +205,65 @@ function UniversesPage() {
               </div>
             )}
           </div>
+
+          {/* Set Media Section */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-orange-700">Set Media</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-orange-700 mb-1">Node ID</label>
+              <input
+                type="number"
+                placeholder="1"
+                value={updateMediaNodeId}
+                onChange={(e) => setUpdateMediaNodeId(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-orange-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-orange-700 mb-1">Media Link</label>
+              <input
+                type="text"
+                placeholder="https://aggregator.walrus-testnet.walrus.space/v1/blobs/..."
+                value={updateMediaLink}
+                onChange={(e) => setUpdateMediaLink(e.target.value)}
+                className="w-full px-3 py-2 border border-orange-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            
+            <button
+              onClick={handleSetMedia}
+              disabled={!updateMediaLink || isSettingMedia}
+              className="w-full px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {isSettingMedia ? 'Setting...' : 'Set Media'}
+            </button>
+          </div>
+
+          {/* Set Canon Section */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-purple-700">Set Canon</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-purple-700 mb-1">Node ID</label>
+              <input
+                type="number"
+                placeholder="1"
+                value={canonNodeId}
+                onChange={(e) => setCanonNodeId(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-purple-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+            
+            <button
+              onClick={handleSetCanon}
+              disabled={isSettingCanon}
+              className="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {isSettingCanon ? 'Setting...' : 'Set Canon'}
+            </button>
+          </div>
         </div>
         
         {/* Additional Getter Functions */}
@@ -190,10 +293,11 @@ function UniversesPage() {
           </button>
           
           <button
-            onClick={() => window.location.reload()}
-            className="px-3 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 text-sm"
+            onClick={() => refetchFullGraph()}
+            disabled={isLoadingFullGraph}
+            className="px-3 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 disabled:bg-gray-400 text-sm"
           >
-            Refresh Nodes
+            {isLoadingFullGraph ? 'Loading...' : 'Get Full Graph'}
           </button>
           
           <div className="flex gap-1">
@@ -240,9 +344,17 @@ function UniversesPage() {
             </div>
           )}
           
-          {availableNodeCount > 0 && (
+          {fullGraphData && (
             <div className="p-3 bg-indigo-50 border border-indigo-200 rounded">
-              <h4 className="font-medium text-indigo-700">Node Count:</h4>
+              <h4 className="font-medium text-indigo-700">Full Graph Data:</h4>
+              <pre className="text-xs mt-1 overflow-x-auto">{JSON.stringify(fullGraphData, (key, value) => 
+                typeof value === 'bigint' ? value.toString() : value, 2)}</pre>
+            </div>
+          )}
+          
+          {availableNodeCount > 0 && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+              <h4 className="font-medium text-blue-700">Node Count:</h4>
               <p className="text-sm mt-1">{availableNodeCount} nodes available (IDs: 0-4)</p>
             </div>
           )}
@@ -296,9 +408,9 @@ function UniversesPage() {
                 
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Active Timelines:</p>
+                    <p className="text-sm font-medium">Total Nodes:</p>
                     <p className="text-2xl font-bold">
-                      {timelineCount}
+                      {totalNodesFromGraph}
                     </p>
                   </div>
                   <Button asChild>

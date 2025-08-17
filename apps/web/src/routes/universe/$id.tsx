@@ -1,8 +1,8 @@
-import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { createFileRoute, Link, useParams, useNavigate } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, GitBranch } from "lucide-react";
+import { ArrowRight, GitBranch, Edit } from "lucide-react";
 import ReactFlow, {
   Controls,
   Background,
@@ -16,7 +16,7 @@ import 'reactflow/dist/style.css';
 import { useMemo } from 'react';
 import { TimelineEventNode } from '@/components/flow/TimelineNodes';
 import { TimelineActions } from '@/components/TimelineActions';
-import { useGetNode, useGetLeaves } from '@/hooks/useTimeline';
+import { useGetNode, useGetLeaves, useGetFullGraph } from '@/hooks/useTimeline';
 
 interface UniverseParams {
   id: string;
@@ -24,6 +24,7 @@ interface UniverseParams {
 
 function UniverseViewPage() {
   const { id } = useParams({ from: "/universe/$id" });
+  const navigate = useNavigate();
   
   // Define our single blockchain universe
   const universe = {
@@ -33,77 +34,49 @@ function UniverseViewPage() {
     imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=800&h=400&fit=crop'
   };
 
-  // Get timeline leaves (endpoints)
+  // Get timeline leaves (endpoints) and full graph
   const { data: leavesData, isLoading: isLoadingLeaves } = useGetLeaves();
+  const { data: fullGraphData, isLoading: isLoadingFullGraph } = useGetFullGraph();
   
-  // Fetch individual nodes (IDs 0-4) for building timelines
-  const { data: node0, isLoading: isLoading0 } = useGetNode(0);
-  const { data: node1, isLoading: isLoading1 } = useGetNode(1);
-  const { data: node2, isLoading: isLoading2 } = useGetNode(2);
-  const { data: node3, isLoading: isLoading3 } = useGetNode(3);
-  const { data: node4, isLoading: isLoading4 } = useGetNode(4);
+  // Parse full graph data structure
+  const graphData = useMemo(() => {
+    if (!fullGraphData || !Array.isArray(fullGraphData) || fullGraphData.length < 6) {
+      return { nodeIds: [], urls: [], descriptions: [], previousNodes: [], children: [], flags: [] };
+    }
+    
+    return {
+      nodeIds: fullGraphData[0] || [],
+      urls: fullGraphData[1] || [],
+      descriptions: fullGraphData[2] || [],
+      previousNodes: fullGraphData[3] || [],
+      children: fullGraphData[4] || [],
+      flags: fullGraphData[5] || []
+    };
+  }, [fullGraphData]);
   
-  const nodeDataMap = new Map([
-    [0, node0],
-    [1, node1], 
-    [2, node2],
-    [3, node3],
-    [4, node4]
-  ]);
-  
-  const isLoadingAny = isLoadingLeaves || isLoading0 || isLoading1 || isLoading2 || isLoading3 || isLoading4;
+  // Extract node IDs for iteration
+  const nodeIds = graphData.nodeIds.map(id => typeof id === 'bigint' ? Number(id) : parseInt(String(id)));
 
-  // Build timelines from leaves and trace back via previous relationships
+  const isLoadingAny = isLoadingLeaves || isLoadingFullGraph;
+
+  // Build timelines by using getNode for each node in the chain
   const timelines = useMemo(() => {
-    if (!leavesData || !Array.isArray(leavesData)) return [];
+    if (!leavesData || !Array.isArray(leavesData) || !fullGraphData) return [];
     
-    const timelinesList: Array<{id: string, events: Array<{id: number, data: any}>}> = [];
-    
-    leavesData.forEach((leafId, timelineIndex) => {
-      const leafNodeId = typeof leafId === 'bigint' ? Number(leafId) : leafId;
-      const timeline = { id: `timeline-${leafNodeId}`, events: [] as Array<{id: number, data: any}> };
-      
-      // Trace back from leaf to root
-      let currentNodeId = leafNodeId;
-      const visited = new Set();
-      
-      while (currentNodeId !== null && currentNodeId !== undefined && !visited.has(currentNodeId)) {
-        visited.add(currentNodeId);
-        const nodeData = nodeDataMap.get(currentNodeId);
-        
-        if (nodeData && Array.isArray(nodeData)) {
-          timeline.events.unshift({ id: currentNodeId, data: nodeData });
-          
-          // Get previous node ID (index 3 in the response)
-          const previous = nodeData[3];
-          const prevNodeId = typeof previous === 'bigint' ? Number(previous) : previous;
-          
-          // Stop if previous is 0 (root) or invalid
-          if (!prevNodeId || prevNodeId === 0) {
-            // Add node 0 as root if it exists
-            if (currentNodeId !== 0) {
-              const rootData = nodeDataMap.get(0);
-              if (rootData) {
-                timeline.events.unshift({ id: 0, data: rootData });
-              }
-            }
-            break;
-          }
-          
-          currentNodeId = prevNodeId;
-        } else {
-          break;
-        }
-      }
-      
-      timelinesList.push(timeline);
-    });
-    
-    return timelinesList;
-  }, [leavesData, nodeDataMap]);
+    // For now, return a simplified structure - we'll fetch nodes on demand in the visualization
+    return leavesData.map((leafId, index) => ({
+      id: `timeline-${typeof leafId === 'bigint' ? Number(leafId) : leafId}`,
+      leafNodeId: typeof leafId === 'bigint' ? Number(leafId) : leafId,
+      events: [] // We'll populate this dynamically
+    }));
+  }, [leavesData, fullGraphData]);
 
-  // Generate React Flow nodes and edges from timelines
+  // Generate React Flow nodes and edges from structured graph data
   const { nodes: flowNodes, edges: flowEdges } = useMemo(() => {
+    if (!graphData.nodeIds.length) {
+      return { nodes: [], edges: [] };
+    }
+    
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     const verticalSpacing = 120;
@@ -113,73 +86,90 @@ function UniverseViewPage() {
     // Colors for different timelines
     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
     
-    // Track node positions to avoid duplicates
-    const nodePositions = new Map();
-    
-    timelines.forEach((timeline, timelineIndex) => {
-      const color = colors[timelineIndex % colors.length];
+    // Create nodes using the structured data
+    graphData.nodeIds.forEach((nodeIdStr, index) => {
+      const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
+      const url = graphData.urls[index] || '';
+      const description = graphData.descriptions[index] || '';
+      const previousNode = graphData.previousNodes[index] || '';
+      const children = graphData.children[index] || [];
+      const isCanon = graphData.flags[index] || false;
       
-      timeline.events.forEach((event, eventIndex) => {
-        const nodeId = event.id;
-        const nodeData = event.data;
-        
-        // Extract data from node response [id, url, desc, prev_node_id, array, bool]
-        const nodeIdFromData = nodeData[0];
-        const url = nodeData[1] || '';
-        const description = nodeData[2] || '';
-        
-        // Position nodes
-        const x = startX + (timelineIndex * horizontalSpacing);
-        const y = eventIndex * verticalSpacing;
-        
-        // Check if node already exists
-        const existingNodeId = `blockchain-node-${nodeId}`;
-        if (!nodePositions.has(nodeId)) {
-          nodePositions.set(nodeId, { x, y });
-          
-          nodes.push({
-            id: existingNodeId,
-            type: 'timelineEvent',
-            position: { x, y },
-            data: {
-              label: `${nodeIdFromData || nodeId}`,
-              description: description || `Timeline event ${nodeId}`,
-              videoUrl: url || 'https://aggregator.walrus-testnet.walrus.space/v1/blobs/lBt_Ua5p8I56LFOYgG_z8YiLf3IBVvBNRBlO_94giMI',
-              characters: [],
-              timelineColor: color,
-              timelineName: `Timeline ${timelineIndex + 1}`,
-              eventId: `node-${nodeId}`,
-              timelineId: timeline.id,
-              universeId: universe.id,
-              isRoot: nodeId === 0
-            }
-          });
-        }
-        
-        // Create edges between consecutive events in timeline
-        if (eventIndex > 0) {
-          const prevEvent = timeline.events[eventIndex - 1];
-          const prevNodeId = prevEvent.id;
-          
-          edges.push({
-            id: `edge-${prevNodeId}-${nodeId}`,
-            source: `blockchain-node-${prevNodeId}`,
-            target: `blockchain-node-${nodeId}`,
-            type: 'straight',
-            style: { stroke: color, strokeWidth: 3 },
-            animated: false,
-            markerEnd: undefined
-          });
+      // Determine timeline position - leaves get their own columns
+      const isLeaf = children.length === 0;
+      const leafIndex = leavesData?.findIndex(leaf => 
+        (typeof leaf === 'bigint' ? Number(leaf) : leaf) === nodeId
+      ) || 0;
+      
+      // Position based on whether it's a leaf or part of main chain
+      const x = isLeaf ? 
+        startX + (leafIndex + 1) * horizontalSpacing : 
+        startX + (index % 2) * horizontalSpacing;
+      const y = index * verticalSpacing;
+      
+      const color = isCanon ? colors[0] : colors[(leafIndex + 1) % colors.length];
+      
+      nodes.push({
+        id: `blockchain-node-${nodeId}`,
+        type: 'timelineEvent',
+        position: { x, y },
+        data: {
+          label: `${nodeId}`,
+          description: description || `Timeline event ${nodeId}`,
+          videoUrl: url || 'https://aggregator.walrus-testnet.walrus.space/v1/blobs/lBt_Ua5p8I56LFOYgG_z8YiLf3IBVvBNRBlO_94giMI',
+          characters: [],
+          timelineColor: color,
+          timelineName: isCanon ? 'Canon Timeline' : `Timeline ${leafIndex + 1}`,
+          eventId: `node-${nodeId}`,
+          timelineId: `timeline-${nodeId}`,
+          universeId: universe.id,
+          isRoot: String(previousNode) === '0' || !previousNode
         }
       });
     });
     
+    // Create edges based on previous node relationships
+    graphData.nodeIds.forEach((nodeIdStr, index) => {
+      const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
+      const previousNodeStr = graphData.previousNodes[index];
+      
+      if (previousNodeStr && String(previousNodeStr) !== '0') {
+        const previousNodeId = typeof previousNodeStr === 'bigint' ? Number(previousNodeStr) : parseInt(String(previousNodeStr));
+        const color = graphData.flags[index] ? colors[0] : colors[(index + 1) % colors.length];
+        
+        edges.push({
+          id: `edge-${previousNodeId}-${nodeId}`,
+          source: `blockchain-node-${previousNodeId}`,
+          target: `blockchain-node-${nodeId}`,
+          type: 'straight',
+          style: { stroke: color, strokeWidth: 3 },
+          animated: false,
+          markerEnd: undefined
+        });
+      }
+    });
+    
     return { nodes, edges };
-  }, [timelines, universe.id]);
+  }, [graphData, leavesData, universe.id]);
 
   const nodeTypes = useMemo(() => ({
     timelineEvent: TimelineEventNode,
   }), []);
+
+  // Handle loading timeline to flow editor
+  const handleLoadToFlowEditor = () => {
+    // Encode the timeline data as URL parameters
+    const timelineParams = {
+      nodeIds: nodeIds.join(','),
+      universeId: universe.id,
+      totalNodes: nodeIds.length.toString()
+    };
+    
+    navigate({ 
+      to: '/flow', 
+      search: timelineParams 
+    });
+  };
 
   return (
     <div className="container mx-auto p-6">
@@ -211,9 +201,20 @@ function UniverseViewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Timeline Graph Visualization */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center gap-2 mb-4">
-            <GitBranch className="w-5 h-5" />
-            <h2 className="text-2xl font-semibold">Timeline Branches</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <GitBranch className="w-5 h-5" />
+              <h2 className="text-2xl font-semibold">Timeline Branches</h2>
+            </div>
+            <Button 
+              onClick={handleLoadToFlowEditor}
+              disabled={nodeIds.length === 0 || isLoadingAny}
+              className="flex items-center gap-2"
+              variant="outline"
+            >
+              <Edit className="w-4 h-4" />
+              Load to Flow Editor
+            </Button>
           </div>
           
           <Card className="overflow-hidden bg-background">
@@ -283,9 +284,9 @@ function UniverseViewPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <h4 className="text-sm font-medium mb-2">Active Timelines</h4>
+                <h4 className="text-sm font-medium mb-2">Total Nodes</h4>
                 <p className="text-2xl font-bold">
-                  {timelines.length}
+                  {nodeIds.length}
                 </p>
               </div>
               
@@ -336,7 +337,7 @@ function UniverseViewPage() {
                 </Link>
               </Button>
               
-              {timelines.length > 0 && timelines[0].events.length > 0 && (
+              {nodeIds.length > 0 && (
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -345,11 +346,11 @@ function UniverseViewPage() {
                 >
                   <Link to="/event/$universeId/$timelineId/$eventId" params={{ 
                     universeId: universe.id, 
-                    timelineId: timelines[0].id, 
-                    eventId: `node-${timelines[0].events[0].id}`
+                    timelineId: 'blockchain-timeline', 
+                    eventId: `node-${nodeIds[0]}`
                   }}>
                     <ArrowRight className="w-3 h-3 mr-2" />
-                    View First Event
+                    View First Node
                   </Link>
                 </Button>
               )}
