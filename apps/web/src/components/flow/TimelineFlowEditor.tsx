@@ -17,7 +17,6 @@ import type {
 import 'reactflow/dist/style.css';
 import { TimelineEventNode } from './TimelineNodes';
 import type { TimelineNodeData } from './TimelineNodes';
-import { CreateTimelineNode } from './CreateTimelineNode';
 import { Button } from '@/components/ui/button';
 import { Video, Plus, FileVideo } from 'lucide-react';
 
