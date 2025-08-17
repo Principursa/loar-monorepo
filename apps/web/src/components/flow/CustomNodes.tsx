@@ -1,8 +1,23 @@
-import { memo } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
+import { Loader2 } from 'lucide-react';
 
 // Character Node - For representing characters in the narrative
 export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
+  const [description, setDescription] = useState(data.description || '');
+  
+  // Update the node data when description changes
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newDescription = e.target.value;
+    setDescription(newDescription);
+    data.description = newDescription; // Update the node data directly
+  };
+  
+  // Prevent node drag when interacting with the textarea
+  const onTextareaClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+  
   return (
     <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-blue-500 dark:bg-slate-800">
       <div className="flex items-center">
@@ -16,9 +31,17 @@ export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
           )}
         </div>
       </div>
-      {data.description && (
-        <div className="mt-2 text-sm">{data.description}</div>
-      )}
+      <div className="mt-2">
+        <textarea
+          className="w-full p-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
+          value={description}
+          onChange={handleDescriptionChange}
+          onClick={onTextareaClick}
+          onMouseDown={onTextareaClick}
+          placeholder="Enter character description..."
+          rows={2}
+        />
+      </div>
       <Handle
         type="target"
         position={Position.Top}
@@ -35,6 +58,20 @@ export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
 
 // Plot Point Node - For representing key narrative events
 export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
+  const [description, setDescription] = useState(data.description || '');
+  
+  // Update the node data when description changes
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newDescription = e.target.value;
+    setDescription(newDescription);
+    data.description = newDescription; // Update the node data directly
+  };
+  
+  // Prevent node drag when interacting with the textarea
+  const onTextareaClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+  
   return (
     <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-green-500 dark:bg-slate-800">
       <div className="flex">
@@ -53,9 +90,17 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
           )}
         </div>
       </div>
-      {data.description && (
-        <div className="mt-2 text-sm">{data.description}</div>
-      )}
+      <div className="mt-2">
+        <textarea
+          className="w-full p-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-slate-700"
+          value={description}
+          onChange={handleDescriptionChange}
+          onClick={onTextareaClick}
+          onMouseDown={onTextareaClick}
+          placeholder="Enter plot point description..."
+          rows={2}
+        />
+      </div>
       <Handle
         type="target"
         position={Position.Top}
@@ -72,6 +117,47 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
 
 // Media Node - For representing media content (videos, images, etc.)
 export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
+  const [description, setDescription] = useState(data.description || '');
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Update the node data when description changes
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newDescription = e.target.value;
+    setDescription(newDescription);
+    data.description = newDescription; // Update the node data directly
+  };
+  
+  // Prevent node drag when interacting with the textarea or button
+  const onInteractionClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+  
+  // Generate content and update the mediaUrl
+  const handleGenerateContent = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent node drag when clicking the button
+    
+    try {
+      setIsGenerating(true);
+      
+      // Mock API call to generate content and get Walrus link
+      // In a real implementation, this would call your backend API
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+      
+      // Simulate getting a Walrus link back
+      const walrusLink = `https://walrus.com/video/${Math.random().toString(36).substring(2, 10)}`;
+      
+      // Update the node data
+      data.mediaUrl = walrusLink;
+      
+      alert(`Content generated! Walrus link: ${walrusLink}`);
+    } catch (error) {
+      console.error('Error generating content:', error);
+      alert('Failed to generate content. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [data]);
+  
   return (
     <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-purple-500 dark:bg-slate-800">
       <div className="flex">
@@ -87,9 +173,43 @@ export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
           )}
         </div>
       </div>
-      {data.description && (
-        <div className="mt-2 text-sm">{data.description}</div>
+      
+      <div className="mt-2">
+        <textarea
+          className="w-full p-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-slate-700"
+          value={description}
+          onChange={handleDescriptionChange}
+          onClick={onInteractionClick}
+          onMouseDown={onInteractionClick}
+          placeholder="Enter media description..."
+          rows={2}
+        />
+      </div>
+      
+      {/* Display current media URL if available */}
+      {data.mediaUrl && (
+        <div className="mt-2 text-xs text-muted-foreground break-all">
+          <strong>Media URL:</strong> {data.mediaUrl}
+        </div>
       )}
+      
+      {/* Generate Content Button */}
+      <button
+        onClick={handleGenerateContent}
+        onMouseDown={onInteractionClick}
+        disabled={isGenerating}
+        className={`mt-2 w-full py-1 px-2 text-sm rounded ${isGenerating ? 'bg-gray-400' : 'bg-purple-600 hover:bg-purple-700'} text-white flex items-center justify-center`}
+      >
+        {isGenerating ? (
+          <>
+            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+            Generating...
+          </>
+        ) : (
+          'Generate Content'
+        )}
+      </button>
+      
       <Handle
         type="target"
         position={Position.Top}
@@ -106,6 +226,20 @@ export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
 
 // Voting Node - For representing governance decisions
 export const VotingNode = memo(({ data, isConnectable }: NodeProps) => {
+  const [description, setDescription] = useState(data.description || '');
+  
+  // Update the node data when description changes
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newDescription = e.target.value;
+    setDescription(newDescription);
+    data.description = newDescription; // Update the node data directly
+  };
+  
+  // Prevent node drag when interacting with the textarea
+  const onTextareaClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+  
   return (
     <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-amber-500 dark:bg-slate-800">
       <div className="flex">
@@ -127,9 +261,17 @@ export const VotingNode = memo(({ data, isConnectable }: NodeProps) => {
           )}
         </div>
       </div>
-      {data.description && (
-        <div className="mt-2 text-sm">{data.description}</div>
-      )}
+      <div className="mt-2">
+        <textarea
+          className="w-full p-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-amber-500 dark:bg-slate-700"
+          value={description}
+          onChange={handleDescriptionChange}
+          onClick={onTextareaClick}
+          onMouseDown={onTextareaClick}
+          placeholder="Enter voting description..."
+          rows={2}
+        />
+      </div>
       <Handle
         type="target"
         position={Position.Top}

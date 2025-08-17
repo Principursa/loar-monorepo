@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -8,9 +8,11 @@ import ReactFlow, {
   addEdge,
   Panel,
 } from 'reactflow';
+import type { NodeDragHandler, SelectionDragHandler } from 'reactflow';
 import { type Node, type Edge, type Connection, ConnectionMode, BackgroundVariant } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { CharacterNode, PlotPointNode, MediaNode, VotingNode } from './CustomNodes';
+import { EditableCharacterNode, EditablePlotPointNode, EditableMediaNode, EditableVotingNode } from './EditableNodes';
 
 // Initial nodes and edges for the flow with custom node types
 const initialNodes: Node[] = [
@@ -75,9 +77,10 @@ interface FlowEditorProps {
     previousNode: string;
     isCanon: boolean;
   }>;
+  editorRef?: React.MutableRefObject<any>;
 }
 
-export default function FlowEditor({ timelineData }: FlowEditorProps) {
+export default function FlowEditor({ timelineData, editorRef }: FlowEditorProps) {
   // Generate initial nodes from timeline data if provided
   const generatedNodes = useMemo(() => {
     if (!timelineData || timelineData.length === 0) return initialNodes;
@@ -133,6 +136,42 @@ export default function FlowEditor({ timelineData }: FlowEditorProps) {
     setNodes(generatedNodes);
     setEdges(generatedEdges);
   }, [generatedNodes, generatedEdges, setNodes, setEdges]);
+  
+  // Track if we're currently interacting with a node element (like textarea or button)
+  const [isInteractingWithNodeElement, setIsInteractingWithNodeElement] = useState(false);
+
+  // Expose nodes and edges data through the ref
+  if (editorRef) {
+    editorRef.current = {
+      nodes,
+      edges,
+      getNodeData: () => {
+        // Extract relevant data from nodes for blockchain submission
+        return nodes.map(node => ({
+          id: node.id,
+          type: node.type,
+          data: node.data,
+          connections: edges
+            .filter(edge => edge.source === node.id || edge.target === node.id)
+            .map(edge => ({
+              source: edge.source,
+              target: edge.target,
+              id: edge.id
+            }))
+        }));
+      },
+      updateNodeData: (nodeId: string, newData: any) => {
+        setNodes(nds => 
+          nds.map(node => {
+            if (node.id === nodeId) {
+              return { ...node, data: { ...node.data, ...newData } };
+            }
+            return node;
+          })
+        );
+      }
+    };
+  }
 
   // Handle new connections between nodes
   const onConnect = useCallback(
@@ -175,6 +214,29 @@ export default function FlowEditor({ timelineData }: FlowEditorProps) {
     setNodes((nds) => nds.concat(newNode));
   }, [setNodes]);
 
+  // Custom handlers for node dragging
+  const onNodeDragStart: NodeDragHandler = useCallback(() => {
+    // Only set dragging state if we're not interacting with a node element
+    if (!isInteractingWithNodeElement) {
+      document.body.style.cursor = 'grabbing';
+    }
+  }, [isInteractingWithNodeElement]);
+
+  const onNodeDrag: NodeDragHandler = useCallback(() => {
+    // This is intentionally empty to allow the default behavior
+  }, []);
+
+  const onNodeDragStop: NodeDragHandler = useCallback(() => {
+    document.body.style.cursor = 'default';
+  }, []);
+
+  // Custom handler for selection dragging
+  const onSelectionDragStart: SelectionDragHandler = useCallback(() => {
+    if (!isInteractingWithNodeElement) {
+      document.body.style.cursor = 'grabbing';
+    }
+  }, [isInteractingWithNodeElement]);
+
   return (
     <div style={{ width: '100%', height: '80vh' }}>
       <ReactFlow
@@ -185,6 +247,11 @@ export default function FlowEditor({ timelineData }: FlowEditorProps) {
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDrag={onNodeDrag}
+        onNodeDragStop={onNodeDragStop}
+        onSelectionDragStart={onSelectionDragStart}
+        selectNodesOnDrag={!isInteractingWithNodeElement}
         fitView
       >
         <Controls />

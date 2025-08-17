@@ -20,7 +20,7 @@ import { SolanaWalletConnectors } from "@dynamic-labs/solana";
 import { StarknetWalletConnectors } from "@dynamic-labs/starknet";
 import { SuiWalletConnectors } from "@dynamic-labs/sui";
 import { WagmiProvider } from "wagmi";
-import {config} from "../config"
+import {config, defaultChain} from "../config"
 
 const router = createRouter({
   routeTree,
@@ -33,15 +33,10 @@ const router = createRouter({
         settings={{
           environmentId: import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID || "71c32f18-fd5d-4b01-8bfc-0c3be42ac705",
           walletConnectors: [
-            AlgorandWalletConnectors,
-            BitcoinWalletConnectors,
-            CosmosWalletConnectors,
-            EthereumWalletConnectors,
-            FlowWalletConnectors,
-            SolanaWalletConnectors,
-            StarknetWalletConnectors,
-            SuiWalletConnectors,
+            EthereumWalletConnectors, // Only include the connectors we need
           ],
+          // Basic settings for local development
+          debugError: true
         }}
       >
       <WagmiProvider config={config}>
@@ -49,7 +44,8 @@ const router = createRouter({
           {children}
         </QueryClientProvider>
         </WagmiProvider>
-        <DynamicWidget />
+        {/* Add DynamicWidget to ensure wallet connection works */}
+        <DynamicWidget variant="modal" />
       </DynamicContextProvider>
     );
   },
