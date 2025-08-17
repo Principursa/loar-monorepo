@@ -1,9 +1,11 @@
 import { createFileRoute, useSearch } from '@tanstack/react-router';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import FlowEditor from '@/components/flow/FlowEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useGetFullGraph } from '@/hooks/useTimeline';
+import { trpcClient } from '@/utils/trpc';
+import { useQuery } from '@tanstack/react-query';
 
 export const Route = createFileRoute('/flow')({
   component: FlowPage,
@@ -24,8 +26,18 @@ function FlowPage() {
     };
   }, [searchParams]);
 
+  // Extract universe ID from search params even if no timeline data
+  const universeIdFromParams = searchParams?.universeId;
+
   // Get full graph data if timeline data is loaded
   const { data: fullGraphData } = useGetFullGraph();
+  
+  // Fetch universe data if we have a universe ID (from timeline data OR direct search params)
+  const { data: universeData } = useQuery({
+    queryKey: ['universeData', universeIdFromParams],
+    queryFn: () => trpcClient.cinematicUniverses.get.query({ id: universeIdFromParams! }),
+    enabled: !!universeIdFromParams && universeIdFromParams !== 'blockchain-universe' && universeIdFromParams !== 'unknown',
+  });
   
   // Parse timeline nodes for display
   const timelineNodes = useMemo(() => {
@@ -58,6 +70,20 @@ function FlowPage() {
       };
     }).filter(Boolean);
   }, [timelineData, fullGraphData]);
+
+  // Debug universe data
+  useEffect(() => {
+    console.log('Flow page debug - detailed:', {
+      searchParams,
+      timelineData,
+      universeIdFromParams,
+      universeData: universeData?.data,
+      universeAddress: universeData?.data?.address,
+      universeId: timelineData?.universeId,
+      isQueryEnabled: !!universeIdFromParams && universeIdFromParams !== 'blockchain-universe' && universeIdFromParams !== 'unknown',
+      isLoadingUniverse: universeData === undefined
+    });
+  }, [searchParams, timelineData, universeData, universeIdFromParams]);
 
   return (
     <div className="container mx-auto py-8">
@@ -110,7 +136,11 @@ function FlowPage() {
       )}
       
       <div className="border rounded-lg overflow-hidden">
-        <FlowEditor timelineData={timelineNodes as any} />
+        <FlowEditor 
+          timelineData={timelineNodes as any}
+          universeAddress={universeData?.data?.address}
+          universeId={universeIdFromParams}
+        />
       </div>
     </div>
   );

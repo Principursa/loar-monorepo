@@ -3,6 +3,9 @@ import { Handle, Position, type NodeProps } from 'reactflow';
 import { Loader2, Video } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useWriteContract } from 'wagmi';
+import { timelineAbi } from '@/generated';
+import { type Address } from 'viem';
 
 // Character Node - For representing characters in the narrative
 export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
@@ -66,6 +69,7 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
   const [generatedVideoId, setGeneratedVideoId] = useState<string | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(data.plotVideoUrl || null);
   const [walrusUrl, setWalrusUrl] = useState<string | null>(data.plotWalrusUrl || null);
+  const [blockchainNodeCreated, setBlockchainNodeCreated] = useState<boolean>(data.blockchainNodeCreated || false);
   
   // Video generation mutation
   const generateVideoMutation = useMutation({
@@ -77,6 +81,37 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
   const uploadToWalrusMutation = useMutation({
     mutationFn: (input: { url: string }) =>
       trpcClient.walrus.uploadFromUrl.mutate(input),
+  });
+  
+  // Blockchain contract integration
+  const { writeContractAsync } = useWriteContract();
+  
+  // Blockchain node creation mutation
+  const createNodeMutation = useMutation({
+    mutationFn: async () => {
+      const universeAddress = data.universeAddress;
+      console.log('Creating node with:', {
+        universeAddress,
+        walrusUrl,
+        description,
+        nodeData: data
+      });
+      
+      if (!universeAddress) {
+        throw new Error('No universe address found in node data');
+      }
+      
+      if (!walrusUrl) {
+        throw new Error('No Walrus URL available');
+      }
+      
+      await writeContractAsync({
+        abi: timelineAbi,
+        address: universeAddress as Address,
+        functionName: 'createNode',
+        args: [walrusUrl, description || 'Plot point created in flow editor', BigInt(0)],
+      });
+    },
   });
   
   // Video status query - only enabled when we have a video ID
@@ -143,6 +178,21 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
     }
   }, [videoPrompt, generateVideoMutation]);
   
+  // Handle manual blockchain node creation
+  const handleAddNode = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      await createNodeMutation.mutateAsync();
+      setBlockchainNodeCreated(true);
+      data.blockchainNodeCreated = true;
+      alert('Timeline node added to blockchain!');
+    } catch (error) {
+      console.error('Error creating timeline node:', error);
+      alert('Failed to add node to blockchain. Please try again.');
+    }
+  }, [createNodeMutation, data]);
+  
   // Upload to Walrus
   const handleUploadToWalrus = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -156,6 +206,7 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
       setWalrusUrl(walrusResult.url);
       data.plotWalrusUrl = walrusResult.url;
       data.plotWalrusBlobId = walrusResult.blobId;
+      
     } catch (error) {
       console.error('Error uploading to Walrus:', error);
       alert('Failed to upload to Walrus. Please try again.');
@@ -253,6 +304,24 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
               </>
             ) : (
               <>🐙 Upload to Walrus</>
+            )}
+          </button>
+        )}
+        
+        {walrusUrl && !blockchainNodeCreated && (
+          <button
+            onClick={handleAddNode}
+            onMouseDown={onInteractionClick}
+            disabled={createNodeMutation.isPending}
+            className={`w-full py-1 px-2 text-xs rounded ${createNodeMutation.isPending ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'} text-white flex items-center justify-center`}
+          >
+            {createNodeMutation.isPending ? (
+              <>
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>⛓️ Add Node</>
             )}
           </button>
         )}

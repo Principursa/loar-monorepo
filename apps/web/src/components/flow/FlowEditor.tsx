@@ -75,12 +75,34 @@ interface FlowEditorProps {
     previousNode: string;
     isCanon: boolean;
   }>;
+  universeAddress?: string;
+  universeId?: string;
 }
 
-export default function FlowEditor({ timelineData }: FlowEditorProps) {
+export default function FlowEditor({ timelineData, universeAddress, universeId }: FlowEditorProps) {
+  // Debug what props FlowEditor is receiving
+  useEffect(() => {
+    console.log('FlowEditor received props:', {
+      timelineData,
+      universeAddress,
+      universeId,
+      hasTimelineData: !!timelineData,
+      timelineDataLength: timelineData?.length || 0
+    });
+  }, [timelineData, universeAddress, universeId]);
   // Generate initial nodes from timeline data if provided
   const generatedNodes = useMemo(() => {
-    if (!timelineData || timelineData.length === 0) return initialNodes;
+    if (!timelineData || timelineData.length === 0) {
+      // Add universe context to initial nodes too
+      return initialNodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          universeAddress: universeAddress,
+          universeId: universeId,
+        }
+      }));
+    }
     
     return timelineData.map((node, index) => ({
       id: `timeline-${node.id}`,
@@ -91,14 +113,17 @@ export default function FlowEditor({ timelineData }: FlowEditorProps) {
         description: node.description || `Timeline event ${node.id}`,
         canonicity: node.isCanon ? 'Canon' : 'Branch',
         timelineId: node.id,
-        videoUrl: node.url
+        videoUrl: node.url,
+        // Add universe context to existing timeline nodes
+        universeAddress: universeAddress,
+        universeId: universeId,
       },
       position: { 
         x: 100 + (index % 3) * 300, 
         y: 100 + Math.floor(index / 3) * 150 
       },
     }));
-  }, [timelineData]);
+  }, [timelineData, universeAddress, universeId]);
   
   // Generate edges based on previous node relationships
   const generatedEdges = useMemo(() => {
@@ -169,11 +194,14 @@ export default function FlowEditor({ timelineData }: FlowEditorProps) {
         ...(type === 'plotPoint' && { canonicity: 'Pending' }),
         ...(type === 'media' && { storageType: 'Walrus Protocol' }),
         ...(type === 'voting' && { status: 'Pending' }),
+        // Add universe context for blockchain integration
+        universeAddress: universeAddress,
+        universeId: universeId,
       },
     };
 
     setNodes((nds) => nds.concat(newNode));
-  }, [setNodes]);
+  }, [setNodes, universeAddress, universeId]);
 
   return (
     <div style={{ width: '100%', height: '80vh' }}>
