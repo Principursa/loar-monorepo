@@ -52,6 +52,13 @@ export function useGetMedia(id: number) {
 
 }
 export function useGetCanonChain() {
+  const chainId = useChainId()
+
+  return useReadContract({
+    abi: timelineAbi,
+    address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
+    functionName: "getCanonChain"
+  })
 
 }
 export function useGetFullGraph() {
