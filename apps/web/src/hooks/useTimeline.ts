@@ -1,8 +1,7 @@
 import { useReadContract, useWriteContract } from 'wagmi'
 import { timelineAbi } from '@/generated'
 import { useChainId } from 'wagmi'
-import { TIMELINE_ADDRESSES, SupportedChainId } from '@/configs/addresses-test'
-import { TimelineEventNode } from '@/components/flow/TimelineNodes'
+import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test'
 
 //----------READ FUNCTIONS---------
 export function useGetNode(id: number) {
