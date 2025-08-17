@@ -75,9 +75,10 @@ interface FlowEditorProps {
     previousNode: string;
     isCanon: boolean;
   }>;
+  editorRef?: React.MutableRefObject<any>;
 }
 
-export default function FlowEditor({ timelineData }: FlowEditorProps) {
+export default function FlowEditor({ timelineData, editorRef }: FlowEditorProps) {
   // Generate initial nodes from timeline data if provided
   const generatedNodes = useMemo(() => {
     if (!timelineData || timelineData.length === 0) return initialNodes;
@@ -133,6 +134,29 @@ export default function FlowEditor({ timelineData }: FlowEditorProps) {
     setNodes(generatedNodes);
     setEdges(generatedEdges);
   }, [generatedNodes, generatedEdges, setNodes, setEdges]);
+  
+  // Expose nodes and edges data through the ref
+  if (editorRef) {
+    editorRef.current = {
+      nodes,
+      edges,
+      getNodeData: () => {
+        // Extract relevant data from nodes for blockchain submission
+        return nodes.map(node => ({
+          id: node.id,
+          type: node.type,
+          data: node.data,
+          connections: edges
+            .filter(edge => edge.source === node.id || edge.target === node.id)
+            .map(edge => ({
+              source: edge.source,
+              target: edge.target,
+              id: edge.id
+            }))
+        }));
+      }
+    };
+  }
 
   // Handle new connections between nodes
   const onConnect = useCallback(

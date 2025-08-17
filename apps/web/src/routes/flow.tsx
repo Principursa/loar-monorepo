@@ -1,9 +1,34 @@
 import { createFileRoute, useSearch } from '@tanstack/react-router';
-import { useMemo } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import FlowEditor from '@/components/flow/FlowEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useGetFullGraph } from '@/hooks/useTimeline';
+import { useGetFullGraph, useCreateNode } from '@/hooks/useTimeline';
+
+// Define types for node data
+interface NodeConnection {
+  source: string;
+  target: string;
+  id: string;
+}
+
+interface NodeData {
+  label: string;
+  emoji: string;
+  description: string;
+  mediaUrl?: string;
+  nftId?: string;
+  canonicity?: string;
+  storageType?: string;
+  status?: string;
+}
+
+interface FlowNode {
+  id: string;
+  type: string;
+  data: NodeData;
+  connections: NodeConnection[];
+}
 
 export const Route = createFileRoute('/flow')({
   component: FlowPage,
@@ -58,14 +83,83 @@ function FlowPage() {
       };
     }).filter(Boolean);
   }, [timelineData, fullGraphData]);
+  
+  // Blockchain posting functionality
+  const [isPosting, setIsPosting] = useState(false);
+  const [postStatus, setPostStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const editorRef = useRef<any>(null);
+  const { writeAsync } = useCreateNode('', '', 0); // Initialize with empty values
+  
+  const handlePostToBlockchain = async () => {
+    if (!editorRef.current) {
+      alert('Flow editor not initialized');
+      return;
+    }
+    
+    try {
+      setIsPosting(true);
+      setPostStatus('loading');
+      
+      // Get node data from the editor
+      const nodeData = editorRef.current.getNodeData();
+      
+      if (nodeData.length === 0) {
+        alert('No nodes found in the editor. Please create at least one node.');
+        setIsPosting(false);
+        setPostStatus('idle');
+        return;
+      }
+      
+      // Find the most relevant node to post (could be selected node, latest node, etc.)
+      // For this example, we'll use the first node of type 'plotPoint' or the first node if no plot points
+      const plotNode = nodeData.find((node: FlowNode) => node.type === 'plotPoint') || nodeData[0];
+      
+      // Extract data for blockchain submission
+      const link = plotNode.data.mediaUrl || ''; // URL to media content if available
+      const plot = plotNode.data.description || plotNode.data.label || 'Narrative content'; // Plot description
+      const previous = 0; // Previous node ID in the blockchain (0 for root node)
+      
+      console.log('Submitting to blockchain:', { link, plot, previous });
+      
+      // Call the blockchain contract
+      const tx = await writeAsync(link, plot, previous);
+      console.log('Transaction submitted:', tx);
+      
+      setPostStatus('success');
+      alert(`Successfully posted narrative content to the blockchain!\nTransaction: ${tx}`);
+    } catch (error) {
+      console.error('Error posting to blockchain:', error);
+      setPostStatus('error');
+      alert(`Error posting to blockchain: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsPosting(false);
+    }
+  };
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">Narrative Flow Editor</h1>
-      <p className="mb-6 text-muted-foreground">
-        Create and manage your narrative structures using the interactive flow editor below.
-        {timelineData && ` Timeline data loaded from ${timelineData.universeId} with ${timelineData.totalNodes} nodes.`}
-      </p>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Narrative Flow Editor</h1>
+          <p className="text-muted-foreground mt-2">
+            Create and manage your narrative structures using the interactive flow editor below.
+            {timelineData && ` Timeline data loaded from ${timelineData.universeId} with ${timelineData.totalNodes} nodes.`}
+          </p>
+        </div>
+        
+        {/* Prominent button outside the flow editor */}
+        <button 
+          onClick={handlePostToBlockchain}
+          disabled={isPosting}
+          className={`bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 py-3 rounded-md text-base font-medium flex items-center gap-2 shadow-lg ${isPosting ? 'opacity-70 cursor-not-allowed' : ''}`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+          </svg>
+          {isPosting ? 'Posting to Blockchain...' : 'Post Narrative to Blockchain'}
+        </button>
+      </div>
       
       {/* Timeline Data Display */}
       {timelineData && (
@@ -110,8 +204,20 @@ function FlowPage() {
       )}
       
       <div className="border rounded-lg overflow-hidden">
-        <FlowEditor timelineData={timelineNodes as any} />
+        <FlowEditor timelineData={timelineNodes as any} editorRef={editorRef} />
       </div>
+      
+      {postStatus === 'success' && (
+        <div className="mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+          Narrative content successfully posted to the blockchain!
+        </div>
+      )}
+      
+      {postStatus === 'error' && (
+        <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          Error posting narrative content to the blockchain. Please try again.
+        </div>
+      )}
     </div>
   );
 }
