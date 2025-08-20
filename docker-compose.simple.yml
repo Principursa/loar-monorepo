@@ -1,4 +1,17 @@
 services:
+  web:
+    image: nginx:alpine
+    container_name: loar-web
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.simple.conf:/etc/nginx/nginx.conf:ro
+      - ./apps/web/dist:/usr/share/nginx/html:ro
+    env_file:
+      - ./apps/web/.env   # Dokploy injects here
+    restart: unless-stopped
+    networks:
+      - loar-network
   nginx:
     image: nginx:alpine
     container_name: loar-nginx
@@ -24,10 +37,10 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
-      - CORS_ORIGIN=http://159.65.179.124
+      - CORS_ORIGIN=http://178.156.142.77
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-defaultsecret}
-      - BETTER_AUTH_URL=http://159.65.179.124
-    command: ["sh", "-c", "apk add --no-cache curl && bun run apps/server/dist/index.js"]
+      - BETTER_AUTH_URL=http://178.156.142.77
+    command: ["sh", "-c", "apk add --no-cache curl && bun run db:push && bun run apps/server/dist/index.js"]
 
     depends_on:
       - postgres
