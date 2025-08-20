@@ -7,8 +7,6 @@ services:
     volumes:
       - ./nginx.simple.conf:/etc/nginx/nginx.conf:ro
       - ./apps/web/dist:/usr/share/nginx/html:ro
-    env_file:
-      - ./apps/web/.env   # Dokploy injects here
     restart: unless-stopped
     networks:
       - loar-network
@@ -32,8 +30,6 @@ services:
     working_dir: /app
     volumes:
       - .:/app
-    env_file:
-      - ./apps/server/.env
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
