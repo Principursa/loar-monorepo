@@ -1,31 +1,28 @@
 FROM oven/bun:1.1.8-alpine AS builder
 
-WORKDIR /app
+WORKDIR /app/web
 
-# Copy package files
-COPY package.json bun.lock ./
-COPY apps/web/package.json ./apps/web/
-COPY turbo.json ./
+# Copy web app package files only
+COPY apps/web/package.json ./
+COPY apps/web/bun.lock* ./
 
-# Install dependencies and clean up in single layer
+# Install only web app dependencies
 RUN bun install --frozen-lockfile && \
     rm -rf ~/.bun/install/cache && \
     rm -rf /tmp/*
 
 # Copy source code
-COPY apps/web/ ./apps/web/
+COPY apps/web/ ./
 
 # Build and clean up
-RUN cd apps/web && \
-    bun run build && \
-    rm -rf src node_modules && \
-    rm -rf ../node_modules
+RUN bun run build && \
+    rm -rf src node_modules
 
 # Production stage - lightweight nginx
 FROM nginx:alpine
 
 # Copy built application
-COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
+COPY --from=builder /app/web/dist /usr/share/nginx/html
 
 # Copy custom nginx config  
 COPY nginx.simple.conf /etc/nginx/conf.d/default.conf
