@@ -1,28 +1,33 @@
 FROM oven/bun:1.1.8-alpine AS builder
 
-WORKDIR /app/web
+WORKDIR /app
 
-# Copy web app package files only
-COPY apps/web/package.json ./
-COPY apps/web/bun.lock* ./
+# Copy package files for monorepo context
+COPY package.json bun.lock ./
+COPY apps/web/package.json ./apps/web/
+COPY turbo.json ./
 
-# Install only web app dependencies
+# Install dependencies
 RUN bun install --frozen-lockfile && \
     rm -rf ~/.bun/install/cache && \
     rm -rf /tmp/*
 
-# Copy source code
-COPY apps/web/ ./
+# Copy only web app source code
+COPY apps/web/ ./apps/web/
 
-# Build and clean up
-RUN bun run build && \
+# Create minimal server tsconfig to satisfy build dependencies
+RUN mkdir -p apps/server && echo '{"compilerOptions":{"target":"ES2020","module":"ESNext","strict":true}}' > apps/server/tsconfig.json
+
+# Build web app only  
+RUN cd apps/web && \
+    bun run build && \
     rm -rf src node_modules
 
 # Production stage - lightweight nginx
 FROM nginx:alpine
 
 # Copy built application
-COPY --from=builder /app/web/dist /usr/share/nginx/html
+COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
 # Copy custom nginx config  
 COPY nginx.simple.conf /etc/nginx/conf.d/default.conf
