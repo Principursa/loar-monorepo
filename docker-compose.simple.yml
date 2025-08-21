@@ -3,7 +3,7 @@ services:
     image: nginx:alpine
     container_name: loar-nginx
     ports:
-      - "8080:80"  # remapped host port from 80 → 8080
+      - "80:80"  # remapped host port from 80 → 8080
     volumes:
       - ./nginx.simple.conf:/etc/nginx/nginx.conf:ro
       - ./apps/web/dist:/usr/share/nginx/html:ro
