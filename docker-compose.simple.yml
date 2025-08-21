@@ -1,20 +1,9 @@
 services:
-  web:
-    image: nginx:alpine
-    container_name: loar-web
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.simple.conf:/etc/nginx/nginx.conf:ro
-      - ./apps/web/dist:/usr/share/nginx/html:ro
-    restart: unless-stopped
-    networks:
-      - loar-network
   nginx:
     image: nginx:alpine
     container_name: loar-nginx
     ports:
-      - "80:80"
+      - "8080:80"  # remapped host port from 80 → 8080
     volumes:
       - ./nginx.simple.conf:/etc/nginx/nginx.conf:ro
       - ./apps/web/dist:/usr/share/nginx/html:ro
@@ -37,14 +26,13 @@ services:
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-defaultsecret}
       - BETTER_AUTH_URL=http://178.156.142.77
     command: ["sh", "-c", "apk add --no-cache curl && bun run db:push && bun run apps/server/dist/index.js"]
-
     depends_on:
       - postgres
     restart: unless-stopped
     networks:
       - loar-network
     ports:
-      - "3000:3000"
+      - "3005:3000"  # remapped host port from 3000 → 3005
 
   postgres:
     image: postgres:15
@@ -54,7 +42,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
     ports:
-      - "5432:5432"
+      - "5433:5432"  # optional: remap host port if needed
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
