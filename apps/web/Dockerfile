@@ -20,7 +20,12 @@ COPY apps/server/src/routers ./apps/server/src/routers
 
 # Build web app only  
 RUN cd apps/web && \
+    echo "=== Starting web build ===" && \
     bun run build && \
+    echo "=== Build complete, checking output ===" && \
+    ls -la dist/ || echo "No dist directory found" && \
+    echo "=== Contents of dist ===" && \
+    find dist -type f | head -10 || echo "No files in dist" && \
     rm -rf src node_modules
 
 # Production stage - lightweight nginx
@@ -32,8 +37,12 @@ COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 # Copy custom nginx config  
 COPY nginx.simple.conf /etc/nginx/conf.d/default.conf
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+# Install curl for health checks and verify files
+RUN apk add --no-cache curl && \
+    echo "=== Checking nginx html directory ===" && \
+    ls -la /usr/share/nginx/html/ && \
+    echo "=== Checking for index.html ===" && \
+    test -f /usr/share/nginx/html/index.html && echo "index.html exists" || echo "index.html missing"
 
 EXPOSE 80
 
