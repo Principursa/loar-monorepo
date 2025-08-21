@@ -15,13 +15,16 @@ RUN bun install --frozen-lockfile && \
     rm -rf ~/.bun/install/cache && \
     rm -rf /tmp/*
 
-# Copy source code
+# Copy all server files needed for build
 COPY apps/server/src ./apps/server/src
 COPY apps/server/tsconfig.json ./apps/server/
+COPY apps/server/drizzle.config.ts ./apps/server/
 
 # Build and clean up in single layer
 RUN cd apps/server && \
     bun run build && \
+    ls -la && \
+    ls -la dist/ || echo "No dist directory found" && \
     rm -rf src tsconfig.json && \
     rm -rf ../node_modules/.cache && \
     rm -rf ~/.bun/install/cache
