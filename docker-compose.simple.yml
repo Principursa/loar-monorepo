@@ -27,6 +27,10 @@ services:
       - CORS_ORIGIN=https://loartech.xyz
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-defaultsecret}
       - BETTER_AUTH_URL=https://loartech.xyz:3005
+      - LUMAAI_API_KEY=${LUMAAI_API_KEY}
+      - KLING_API_KEY=${KLING_API_KEY}
+      - WALRUS_PUBLISHER_URL=${WALRUS_PUBLISHER_URL:-https://publisher.walrus.xyz}
+      - WALRUS_AGGREGATOR_URL=${WALRUS_AGGREGATOR_URL:-https://aggregator.walrus.xyz}
     command: ["sh", "-c", "apk add --no-cache curl && cd apps/server && bun add drizzle-kit && bun run db:push && (bun run start || bun run src/index.ts)"]
     depends_on:
       - postgres
