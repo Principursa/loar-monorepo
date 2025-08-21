@@ -22,9 +22,14 @@ COPY apps/server/drizzle.config.ts ./apps/server/
 
 # Build and clean up in single layer
 RUN cd apps/server && \
+    echo "=== Running build ===" && \
     bun run build && \
+    echo "=== Build complete, checking output ===" && \
     ls -la && \
+    echo "=== Contents of dist directory ===" && \
     ls -la dist/ || echo "No dist directory found" && \
+    echo "=== All JS files ===" && \
+    find . -name "*.js" || echo "No JS files found" && \
     rm -rf src tsconfig.json && \
     rm -rf ../node_modules/.cache && \
     rm -rf ~/.bun/install/cache
