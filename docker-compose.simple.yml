@@ -6,9 +6,8 @@ services:
       - "80:80" 
       - "443:443" 
     volumes:
-      - ./nginx.default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx.simple.conf:/etc/nginx/conf.d/default.conf:ro
       - ./apps/web/dist:/usr/share/nginx/html:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro   # Dokploy SSL certs
     depends_on:
       - app-server
     restart: unless-stopped
