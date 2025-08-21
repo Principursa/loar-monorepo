@@ -1,6 +1,6 @@
 services:
   web-builder:
-    image: oven/bun:1.1.8-alpine
+    image: oven/bun:1.1.8
     container_name: loar-web-builder
     working_dir: /app
     volumes:
