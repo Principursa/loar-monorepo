@@ -27,8 +27,8 @@ FROM nginx:alpine
 # Copy built application
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
-# Copy custom nginx config
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+# Copy custom nginx config  
+COPY nginx.simple.conf /etc/nginx/conf.d/default.conf
 
 # Install curl for health checks
 RUN apk add --no-cache curl
