@@ -43,4 +43,12 @@ app.get("/health", (c) => {
   return c.json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
-export default app;
+const port = parseInt(process.env.PORT || "3000");
+
+console.log(`🚀 Starting server on port ${port}`);
+console.log(`🌍 CORS origin: ${process.env.CORS_ORIGIN || "not set"}`);
+
+export default {
+  port,
+  fetch: app.fetch,
+};
