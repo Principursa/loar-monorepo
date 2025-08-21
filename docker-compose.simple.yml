@@ -5,7 +5,7 @@ services:
     working_dir: /app
     volumes:
       - .:/app
-    command: ["sh", "-c", "cd apps/web && rm -rf node_modules && bun install --force && bun run build"]
+    command: ["sh", "-c", "cd apps/web && rm -rf node_modules bun.lockb && bun install && bun add @rollup/rollup-linux-x64-gnu && bun run build"]
     restart: "no"
 
   nginx:
