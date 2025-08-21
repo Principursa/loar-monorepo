@@ -10,8 +10,8 @@ COPY package.json bun.lock ./
 COPY apps/server/package.json ./apps/server/
 COPY turbo.json ./
 
-# Install only production dependencies
-RUN bun install --production --frozen-lockfile && \
+# Install all dependencies (including drizzle-kit for DB setup)
+RUN bun install --frozen-lockfile && \
     rm -rf ~/.bun/install/cache && \
     rm -rf /tmp/*
 
