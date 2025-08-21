@@ -5,6 +5,7 @@ WORKDIR /app
 # Copy package files for monorepo context
 COPY package.json bun.lock ./
 COPY apps/web/package.json ./apps/web/
+COPY apps/server/package.json ./apps/server/
 COPY turbo.json ./
 
 # Install dependencies
@@ -12,11 +13,10 @@ RUN bun install --frozen-lockfile && \
     rm -rf ~/.bun/install/cache && \
     rm -rf /tmp/*
 
-# Copy only web app source code
+# Copy only web app source code and minimal server files for build
 COPY apps/web/ ./apps/web/
-
-# Create minimal server tsconfig to satisfy build dependencies
-RUN mkdir -p apps/server && echo '{"compilerOptions":{"target":"ES2020","module":"ESNext","strict":true}}' > apps/server/tsconfig.json
+COPY apps/server/tsconfig.json ./apps/server/
+COPY apps/server/src/routers ./apps/server/src/routers
 
 # Build web app only  
 RUN cd apps/web && \
