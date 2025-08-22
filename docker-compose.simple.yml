@@ -1,17 +1,4 @@
 services:
-  web-builder:
-    image: oven/bun:latest
-    container_name: loar-web-builder
-    working_dir: /app
-    volumes:
-      - .:/app
-    environment:
-      - NODE_OPTIONS=--max-old-space-size=256
-      - VITE_BUILD_MEMORY_LIMIT=256
-    command: ["sh", "-c", "cd apps/web && rm -rf node_modules && bun install --no-dev && bun run build --mode production"]
-    restart: "no"
-    mem_limit: 800m
-
   nginx:
     image: nginx:alpine
     container_name: loar-nginx
