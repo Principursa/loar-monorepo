@@ -5,9 +5,12 @@ services:
     working_dir: /app
     volumes:
       - .:/app
-    command: ["sh", "-c", "cd apps/web && rm -rf node_modules && bun install && NODE_OPTIONS='--max-old-space-size=2048' bun run build"]
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=256
+      - VITE_BUILD_MEMORY_LIMIT=256
+    command: ["sh", "-c", "cd apps/web && rm -rf node_modules && bun install --no-dev && bun run build --mode production"]
     restart: "no"
-    mem_limit: 3g
+    mem_limit: 800m
 
   nginx:
     image: nginx:alpine
