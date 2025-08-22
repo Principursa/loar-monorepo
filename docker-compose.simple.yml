@@ -25,14 +25,14 @@ services:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
       - CORS_ORIGIN=https://loartech.xyz
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-defaultsecret}
-      - BETTER_AUTH_URL=https://loartech.xyz:3005
+      - BETTER_AUTH_URL=https://loartech.xyz
       - LUMAAI_API_KEY=${LUMAAI_API_KEY}
       - KLING_API_KEY=${KLING_API_KEY}
       - KLING_ACCESS_KEY=${KLING_ACCESS_KEY}
       - KLING_SECRET_KEY=${KLING_SECRET_KEY}
       - WALRUS_PUBLISHER_URL=${WALRUS_PUBLISHER_URL:-https://publisher.walrus.xyz}
       - WALRUS_AGGREGATOR_URL=${WALRUS_AGGREGATOR_URL:-https://aggregator.walrus.xyz}
-    command: ["sh", "-c", "apk add --no-cache curl && cd apps/server && bun add drizzle-kit && bun run db:push && echo 'Starting server...' && (test -f dist/index.js && bun run dist/index.js || bun run src/index.ts)"]
+    command: ["sh", "-c", "apk add --no-cache curl && echo 'Building frontend...' && cd apps/web && bun install && bun run build && echo 'Frontend built, starting server...' && cd ../server && bun add drizzle-kit && bun run db:push && echo 'Starting server...' && (test -f dist/index.js && bun run dist/index.js || bun run src/index.ts)"]
     depends_on:
       - postgres
     restart: unless-stopped
