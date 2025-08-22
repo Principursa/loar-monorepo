@@ -32,7 +32,7 @@ services:
       - KLING_SECRET_KEY=${KLING_SECRET_KEY}
       - WALRUS_PUBLISHER_URL=${WALRUS_PUBLISHER_URL:-https://publisher.walrus.xyz}
       - WALRUS_AGGREGATOR_URL=${WALRUS_AGGREGATOR_URL:-https://aggregator.walrus.xyz}
-    command: ["sh", "-c", "apt-get update && apt-get install -y curl && echo 'Building frontend...' && cd apps/web && bun install && bun run build && echo 'Frontend built, starting server...' && cd ../server && bun add drizzle-kit && bun run db:push && echo 'Starting server...' && (test -f dist/index.js && bun run dist/index.js || bun run src/index.ts)"]
+    command: ["sh", "-c", "apt-get update && apt-get install -y curl && echo 'Building frontend...' && cd apps/web && rm -rf node_modules bun.lockb && bun install --no-cache && bun run build && echo 'Frontend built, starting server...' && cd ../server && bun add drizzle-kit && bun run db:push && echo 'Starting server...' && (test -f dist/index.js && bun run dist/index.js || bun run src/index.ts)"]
     depends_on:
       - postgres
     restart: unless-stopped
