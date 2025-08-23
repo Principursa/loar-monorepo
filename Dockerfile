@@ -4,7 +4,7 @@ FROM oven/bun:1.1.8-alpine
 WORKDIR /app
 
 # Install system dependencies
-RUN apk add --no-cache curl nodejs npm
+RUN apk add --no-cache curl nodejs npm git
 
 # Copy entire monorepo
 COPY . .
