@@ -5,6 +5,7 @@ FROM node:18-alpine AS web-builder
 WORKDIR /app
 COPY package.json bun.lockb ./
 COPY apps/web/package.json ./apps/web/
+COPY packages ./packages
 RUN npm install -g bun
 RUN bun install
 
@@ -18,6 +19,7 @@ FROM oven/bun:1.1.8-alpine AS server-builder
 WORKDIR /app
 COPY package.json bun.lockb ./
 COPY apps/server/package.json ./apps/server/
+COPY packages ./packages
 RUN bun install
 
 COPY apps/server ./apps/server
@@ -42,6 +44,7 @@ COPY --from=web-builder /app/apps/web/dist ./apps/web/dist
 
 # Copy root package.json for workspace resolution
 COPY package.json bun.lockb ./
+COPY packages ./packages
 
 WORKDIR /app/apps/server
 
