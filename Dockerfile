@@ -11,7 +11,7 @@ COPY . .
 
 # Build web frontend using npm (to avoid Rollup issues)
 WORKDIR /app/apps/web
-RUN npm install && npm run build
+RUN npm install --legacy-peer-deps && npm run build
 
 # Build and setup server
 WORKDIR /app/apps/server
