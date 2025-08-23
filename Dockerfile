@@ -4,13 +4,11 @@ FROM node:18-alpine AS web-builder
 # Build web frontend
 WORKDIR /app
 COPY package.json bun.lockb ./
-COPY turbo.json ./
-# Create empty directories for workspace resolution
-RUN mkdir -p apps/server contracts packages
-COPY apps/web ./apps/web
+COPY apps/web/package.json ./apps/web/
 RUN npm install -g bun
 RUN bun install
 
+COPY apps/web ./apps/web
 WORKDIR /app/apps/web
 RUN bun run build
 
@@ -19,12 +17,10 @@ FROM oven/bun:1.1.8-alpine AS server-builder
 
 WORKDIR /app
 COPY package.json bun.lockb ./
-COPY turbo.json ./
-# Create empty directories for workspace resolution
-RUN mkdir -p apps/web contracts packages
-COPY apps/server ./apps/server
+COPY apps/server/package.json ./apps/server/
 RUN bun install
 
+COPY apps/server ./apps/server
 WORKDIR /app/apps/server
 RUN bun run build
 
