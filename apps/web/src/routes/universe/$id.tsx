@@ -566,7 +566,7 @@ function UniverseTimelineEditor() {
           <h1 className="text-2xl font-bold mb-4">Universe Not Found</h1>
           <p className="text-muted-foreground mb-6">The universe with ID "{id}" could not be found.</p>
           <Button asChild>
-            <Link to="/dashboard">← Back to Dashboard</Link>
+            <Link to="/universes">← Back to Universes</Link>
           </Button>
         </div>
       </div>
@@ -581,9 +581,9 @@ function UniverseTimelineEditor() {
           {/* Back Button */}
           <div>
             <Button variant="ghost" size="sm" asChild className="mb-4">
-              <Link to="/dashboard">
+              <Link to="/universes">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
+                Back to Universes
               </Link>
             </Button>
           </div>

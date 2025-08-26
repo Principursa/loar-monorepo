@@ -28,7 +28,7 @@ function HomeComponent() {
             </a>
             {user ? (
               <Button asChild size="sm">
-                <a href="/dashboard">Dashboard</a>
+                <a href="/universes">Universes</a>
               </Button>
             ) : (
               <>

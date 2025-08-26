@@ -6,10 +6,9 @@ import { DynamicWalletButton } from "./dynamic-wallet-button";
 export default function Header() {
   const links = [
     { to: "/", label: "Home" },
-    { to: "/dashboard", label: "Dashboard" },
+    { to: "/universes", label: "Universes" },
     { to: "/flow", label: "Narrative Flow" },
     { to: "/wiki", label: "Characters" },
-    { to: "/universes", label: "Universes" },
     { to: "/cinematicuniversecreate", label: "Create Universe" },
   ];
 
