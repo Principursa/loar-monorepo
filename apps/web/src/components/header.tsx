@@ -7,7 +7,6 @@ export default function Header() {
   const links = [
     { to: "/", label: "Home" },
     { to: "/universes", label: "Universes" },
-    { to: "/flow", label: "Narrative Flow" },
     { to: "/wiki", label: "Characters" },
     { to: "/cinematicuniversecreate", label: "Create Universe" },
   ];

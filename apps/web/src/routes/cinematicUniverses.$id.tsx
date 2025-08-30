@@ -200,12 +200,6 @@ function CinematicUniverseDetail() {
                 </Button>
               </Link>
               
-              <Link to="/flow" search={{ universe: universe.id }}>
-                <Button variant="outline" className="w-full">
-                  Flow Editor
-                </Button>
-              </Link>
-              
               <Button variant="outline" className="w-full" disabled>
                 Governance (Coming Soon)
               </Button>
