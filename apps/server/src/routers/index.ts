@@ -14,6 +14,7 @@ import { walrusService } from "../services/walrus";
 import { klingService } from "../services/kling";
 
 import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverses.index";
+import { geminiRouter } from "./gemini/gemini.routes";
 
 
 export const appRouter = router({
@@ -27,6 +28,7 @@ export const appRouter = router({
     };
   }),
   cinematicUniverses: cinematicUniversesRouter,
+  gemini: geminiRouter,
   wiki: router({
     characters: publicProcedure.query(async () => {
       try {

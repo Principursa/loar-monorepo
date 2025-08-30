@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Film, Plus, Settings, Clock, Users } from "lucide-react";
+import { ArrowLeft, Film, Plus, Settings, Clock, Users, Sparkles, Image, Loader2 } from "lucide-react";
 import ReactFlow, {
   Background,
   Controls,
@@ -23,8 +23,9 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { TimelineEventNode } from '@/components/flow/TimelineNodes';
 import { TimelineActions } from '@/components/TimelineActions';
 import { trpcClient } from '@/utils/trpc';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useReadContract, useChainId } from 'wagmi';
+import { trpc } from '@/utils/trpc';
 import { timelineAbi } from '@/generated';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
 import { type Address } from 'viem';
@@ -62,6 +63,12 @@ function UniverseTimelineEditor() {
   const [videoDescription, setVideoDescription] = useState("");
   const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
   const [additionType, setAdditionType] = useState<'after' | 'branch'>('after');
+  
+  // Image generation state
+  const [showImageDialog, setShowImageDialog] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
@@ -312,6 +319,41 @@ function UniverseTimelineEditor() {
       setTimelineDescription(universeToUse.description || "Blockchain-powered narrative timeline");
     }
   }, [universe, id, isBlockchainUniverse]);
+
+  // Image generation mutation using tRPC
+  const generateImageMutation = useMutation({
+    mutationFn: async (prompt: string) => {
+      const result = await trpcClient.gemini.generateImage.mutate({
+        prompt,
+        universeId: id,
+        context: finalUniverse?.description || timelineDescription
+      });
+      return result;
+    },
+    onSuccess: (data) => {
+      if (data.imageUrl) {
+        setGeneratedImageUrl(data.imageUrl);
+      }
+    },
+    onError: (error) => {
+      console.error("Error generating image:", error);
+      alert("Failed to generate image. Please try again.");
+    }
+  });
+
+  // Handle image generation
+  const handleGenerateImage = useCallback(async () => {
+    if (!imagePrompt.trim()) return;
+    
+    setIsGeneratingImage(true);
+    try {
+      await generateImageMutation.mutateAsync(imagePrompt);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  }, [imagePrompt, generateImageMutation]);
 
   // Handle showing video generation dialog
   const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
@@ -708,6 +750,35 @@ function UniverseTimelineEditor() {
             </CardContent>
           </Card>
 
+          {/* Generate Image */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Sparkles className="h-4 w-4" />
+                Generate Image
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button 
+                onClick={() => setShowImageDialog(true)} 
+                className="w-full"
+                variant="secondary"
+              >
+                <Image className="h-4 w-4 mr-2" />
+                Generate Scene Image
+              </Button>
+              {generatedImageUrl && (
+                <div className="mt-2">
+                  <img 
+                    src={generatedImageUrl} 
+                    alt="Generated scene" 
+                    className="w-full rounded-lg"
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Selected Event */}
           {selectedNode && selectedNode.data.nodeType === 'scene' && (
             <Card>
@@ -875,6 +946,93 @@ function UniverseTimelineEditor() {
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Create Scene
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Image Generation Modal */}
+      {showImageDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-lg mx-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                Generate Scene Image with Gemini AI
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Describe the scene you want to visualize
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="image-prompt">Scene Description</Label>
+                <textarea
+                  id="image-prompt"
+                  value={imagePrompt}
+                  onChange={(e) => setImagePrompt(e.target.value)}
+                  placeholder="Describe the scene in detail... (e.g., 'A futuristic city at sunset with flying cars and neon lights')"
+                  rows={4}
+                  className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                />
+              </div>
+              
+              {generatedImageUrl && (
+                <div className="space-y-2">
+                  <Label>Generated Image</Label>
+                  <div className="relative">
+                    <img 
+                      src={generatedImageUrl} 
+                      alt="Generated scene" 
+                      className="w-full rounded-lg border"
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="absolute top-2 right-2"
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = generatedImageUrl;
+                        link.download = `scene-${Date.now()}.png`;
+                        link.click();
+                      }}
+                    >
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowImageDialog(false);
+                    setImagePrompt("");
+                    setGeneratedImageUrl(null);
+                  }}
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={handleGenerateImage}
+                  disabled={!imagePrompt.trim() || isGeneratingImage}
+                  className="flex-1"
+                >
+                  {isGeneratingImage ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate Image
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>
