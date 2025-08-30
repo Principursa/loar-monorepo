@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus, Database } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
-import { trpcClient } from '@/utils/trpc';
 import { useChainId, useReadContract } from 'wagmi';
 import { timelineAbi } from '@/generated';
 import { createPublicClient, http, parseEventLogs } from 'viem';
@@ -148,32 +147,18 @@ function RouteComponent() {
     queryKey: ['blockchain-universes'],
     queryFn: async () => {
       try {
-        // Try database first
-        console.log('Fetching universes from database...');
-        const dbResult = await trpcClient.cinematicUniverses.getAll.query();
+        // Get universes directly from localStorage (no database dependency)
+        console.log('Fetching universes from localStorage...');
         
-        if (dbResult?.success && dbResult.data && dbResult.data.length > 0) {
-          console.log('Found universes in database:', dbResult.data);
-          return dbResult.data;
-        }
-        
-        console.log('Database empty or failed, checking localStorage backup...');
-        
-        // Fallback to localStorage
         const stored = localStorage.getItem('createdUniverses');
         const localUniverses = stored ? JSON.parse(stored) : [];
         
-        console.log('localStorage backup universes:', localUniverses);
+        console.log('📦 Found', localUniverses.length, 'universes in localStorage:', localUniverses);
         return localUniverses;
         
       } catch (error) {
-        console.error('Database fetch failed, using localStorage backup:', error);
-        
-        // Fallback to localStorage on any error
-        const stored = localStorage.getItem('createdUniverses');
-        const localUniverses = stored ? JSON.parse(stored) : [];
-        console.log('Using localStorage fallback:', localUniverses);
-        return localUniverses;
+        console.error('localStorage fetch failed:', error);
+        return [];
       }
     },
     enabled: true,

@@ -245,18 +245,50 @@ function UniverseTimelineEditor() {
     }
   };
 
-  // Use dummy data for testing
-  const universe = dummyUniverses[id as keyof typeof dummyUniverses] || null;
+  // Try to get universe data from localStorage first, then fall back to dummy data
+  const { data: universeFromStorage } = useQuery({
+    queryKey: ['universe-metadata', id],
+    queryFn: () => {
+      const stored = localStorage.getItem('createdUniverses');
+      const universes = stored ? JSON.parse(stored) : [];
+      const found = universes.find((u: any) => u.id === id);
+      console.log('Looking for universe with id:', id);
+      console.log('Found in localStorage:', found);
+      return found;
+    }
+  });
+
+  // Use localStorage data if available, otherwise fall back to dummy data
+  const universe = universeFromStorage || dummyUniverses[id as keyof typeof dummyUniverses] || null;
   const isLoadingUniverse = false;
-  const isLoadingLeaves = false;
-  const isLoadingFullGraph = false;
   
-  // Get dummy timeline data for this universe (memoized to prevent infinite loops)
+  // For blockchain universes (addresses starting with 0x), use blockchain data
+  const isBlockchainUniverse = id?.startsWith('0x');
+  
+  // Blockchain data fetching hooks
+  const { data: leavesData, isLoading: isLoadingLeaves } = useUniverseLeaves(isBlockchainUniverse ? id : undefined);
+  const { data: fullGraphData, isLoading: isLoadingFullGraph } = useUniverseFullGraph(isBlockchainUniverse ? id : undefined);
+  
+  // Get timeline data: use blockchain data if available, otherwise dummy data
   const graphData = useMemo(() => {
+    if (isBlockchainUniverse && fullGraphData) {
+      // Convert blockchain data to the expected format
+      const [nodeIds, urls, descriptions, previousIds, nextIds, flags] = fullGraphData;
+      return {
+        nodeIds: nodeIds || [],
+        urls: urls || [],
+        descriptions: descriptions || [],
+        previousNodes: previousIds || [],
+        children: nextIds || [],
+        flags: flags || []
+      };
+    }
+    
+    // Fall back to dummy data for testing
     return dummyTimelineData[id as keyof typeof dummyTimelineData] || {
       nodeIds: [], urls: [], descriptions: [], previousNodes: [], children: [], flags: []
     };
-  }, [id]);
+  }, [id, isBlockchainUniverse, fullGraphData]);
 
   // Commented out real API calls for testing
   // const { data: cinematicUniverse, isLoading: isLoadingUniverse } = useQuery({
@@ -270,11 +302,16 @@ function UniverseTimelineEditor() {
 
   // Update timeline title when universe data loads
   useEffect(() => {
-    if (universe?.name) {
-      setTimelineTitle(universe.name);
-      setTimelineDescription(universe.description || "Blockchain-powered narrative timeline");
+    const universeToUse = universe || (isBlockchainUniverse ? {
+      name: `Universe ${id.slice(0, 8)}...`,
+      description: 'Blockchain-based cinematic universe'
+    } : null);
+    
+    if (universeToUse?.name) {
+      setTimelineTitle(universeToUse.name);
+      setTimelineDescription(universeToUse.description || "Blockchain-powered narrative timeline");
     }
-  }, [universe]);
+  }, [universe, id, isBlockchainUniverse]);
 
   // Handle showing video generation dialog
   const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
@@ -438,7 +475,7 @@ function UniverseTimelineEditor() {
           nodeType: 'scene',
           eventId: `node-${nodeId}`,
           timelineId: `timeline-${nodeId}`,
-          universeId: universe?.id || 'unknown',
+          universeId: finalUniverse?.id || id,
           isRoot: String(previousNode) === '0' || !previousNode,
           onAddScene: handleAddEvent,
         }
@@ -546,8 +583,8 @@ function UniverseTimelineEditor() {
 
   const isLoadingAny = isLoadingLeaves || isLoadingFullGraph || isLoadingUniverse;
 
-  // Loading state
-  if (isLoadingUniverse || (id !== 'blockchain-universe' && !universe)) {
+  // Loading state - only show loading if we're actually loading blockchain data
+  if (isLoadingUniverse || (isBlockchainUniverse && (isLoadingLeaves || isLoadingFullGraph))) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -558,8 +595,17 @@ function UniverseTimelineEditor() {
     );
   }
 
-  // Not found state
-  if (id !== 'blockchain-universe' && !universe) {
+  // For blockchain universes, create a default universe object if not found in localStorage
+  const finalUniverse = universe || (isBlockchainUniverse ? {
+    id: id,
+    name: `Universe ${id.slice(0, 8)}...`,
+    description: 'Blockchain-based cinematic universe',
+    address: id,
+    isDefault: false
+  } : null);
+
+  // Not found state - only for non-blockchain universes
+  if (!isBlockchainUniverse && !finalUniverse) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -599,16 +645,16 @@ function UniverseTimelineEditor() {
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="universe-name">Name</Label>
-                <div className="text-sm font-medium">{universe?.name}</div>
+                <div className="text-sm font-medium">{finalUniverse?.name}</div>
               </div>
               <div>
                 <Label htmlFor="universe-description">Description</Label>
-                <div className="text-sm text-muted-foreground">{universe?.description}</div>
+                <div className="text-sm text-muted-foreground">{finalUniverse?.description}</div>
               </div>
-              {!universe?.isDefault && (
+              {!finalUniverse?.isDefault && (
                 <div className="text-xs text-muted-foreground">
-                  <div>Creator: {universe?.creator?.slice(0, 6)}...{universe?.creator?.slice(-4)}</div>
-                  <div>Contract: {universe?.address?.slice(0, 6)}...{universe?.address?.slice(-4)}</div>
+                  <div>Creator: {finalUniverse?.creator?.slice(0, 6)}...{finalUniverse?.creator?.slice(-4)}</div>
+                  <div>Contract: {finalUniverse?.address?.slice(0, 6)}...{finalUniverse?.address?.slice(-4)}</div>
                 </div>
               )}
             </CardContent>
