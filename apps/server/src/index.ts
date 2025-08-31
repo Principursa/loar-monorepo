@@ -6,6 +6,7 @@ import { auth } from "./lib/auth";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { imageRouter } from "./routes/image";
 
 const app = new Hono();
 
@@ -22,6 +23,8 @@ app.use(
 
 app.on(["POST", "GET"], "/api/auth/**", (c) => auth.handler(c.req.raw));
 
+// Add image serving routes
+app.route("/images", imageRouter);
 
 app.use(
   "/trpc/*",

@@ -1,3 +1,6 @@
+import { storeImage } from '../routes/image';
+import { walrusService } from './walrus';
+
 interface GeminiImageRequest {
   prompt: string;
   universeId?: string;
@@ -49,13 +52,42 @@ export async function generateImageWithGemini({ prompt }: GeminiImageRequest): P
       
       if (imageParts.length > 0) {
         const imageData = imageParts[0];
-        const imageUrl = `data:image/png;base64,${imageData}`;
         
-        return {
-          success: true,
-          imageUrl,
-          enhancedPrompt: prompt
-        };
+        try {
+          // Convert base64 to buffer for upload
+          const imageBuffer = Buffer.from(imageData, 'base64');
+          
+          console.log('Uploading generated image to public service...');
+          
+          // Try multiple upload services like in test_lumaai.py
+          const uploadUrl = await uploadImageToPublicService(imageBuffer);
+          
+          if (uploadUrl) {
+            console.log('Image uploaded successfully:', uploadUrl);
+            return {
+              success: true,
+              imageUrl: uploadUrl,
+              enhancedPrompt: prompt
+            };
+          } else {
+            throw new Error('All upload services failed');
+          }
+          
+        } catch (uploadError) {
+          console.error('Failed to upload to public services:', uploadError);
+          
+          // Fallback to temporary storage if all services fail
+          const imageId = storeImage(imageData, 'image/png');
+          const publicUrl = `http://localhost:${process.env.PORT || '3000'}`;
+          const imageUrl = `${publicUrl}/images/temp/${imageId}`;
+          
+          return {
+            success: true,
+            imageUrl,
+            enhancedPrompt: prompt,
+            error: 'Using temporary storage - may not work with LumaAI'
+          };
+        }
       }
     }
 
@@ -200,4 +232,69 @@ async function generateImagePromptWithGemini({ prompt, universeId }: { prompt: s
       error: error instanceof Error ? error.message : "Failed to generate image or prompt"
     };
   }
+}
+
+// Upload function similar to test_lumaai.py
+async function uploadImageToPublicService(imageBuffer: Buffer): Promise<string | null> {
+  const services = [
+    {
+      name: 'tmpfiles.org',
+      url: 'https://tmpfiles.org/api/v1/upload',
+      fieldName: 'file'
+    },
+    {
+      name: 'catbox.moe', 
+      url: 'https://catbox.moe/user/api.php',
+      fieldName: 'fileToUpload'
+    }
+  ];
+
+  for (const service of services) {
+    try {
+      console.log(`Trying ${service.name}...`);
+      
+      const FormData = require('form-data');
+      const form = new FormData();
+      
+      form.append(service.fieldName, imageBuffer, {
+        filename: 'generated_image.png',
+        contentType: 'image/png'
+      });
+
+      if (service.name === 'catbox.moe') {
+        form.append('reqtype', 'fileupload');
+      }
+
+      const response = await fetch(service.url, {
+        method: 'POST',
+        body: form,
+        headers: form.getHeaders()
+      });
+
+      if (response.ok) {
+        if (service.name === 'tmpfiles.org') {
+          const result = await response.json();
+          if (result?.status === 'success') {
+            const fileUrl = result.data.url;
+            const uploadUrl = fileUrl.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+            console.log(`✅ Image uploaded to ${service.name}: ${uploadUrl}`);
+            return uploadUrl;
+          }
+        } else if (service.name === 'catbox.moe') {
+          const uploadUrl = (await response.text()).trim();
+          if (uploadUrl) {
+            console.log(`✅ Image uploaded to ${service.name}: ${uploadUrl}`);
+            return uploadUrl;
+          }
+        }
+      } else {
+        console.log(`❌ ${service.name} failed: ${response.status}`);
+      }
+    } catch (error) {
+      console.log(`❌ ${service.name} error:`, error);
+    }
+  }
+
+  console.log('❌ All upload services failed');
+  return null;
 }

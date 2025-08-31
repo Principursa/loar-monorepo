@@ -64,11 +64,16 @@ function UniverseTimelineEditor() {
   const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
   const [additionType, setAdditionType] = useState<'after' | 'branch'>('after');
   
-  // Image generation state
-  const [showImageDialog, setShowImageDialog] = useState(false);
-  const [imagePrompt, setImagePrompt] = useState("");
+  // Image generation state (now part of event creation)
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [showVideoStep, setShowVideoStep] = useState(false);
+  
+  // File upload state  
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
@@ -332,7 +337,14 @@ function UniverseTimelineEditor() {
     },
     onSuccess: (data) => {
       if (data.imageUrl) {
+        console.log('=== GENERATED IMAGE URL ===');
+        console.log('Image URL:', data.imageUrl);
+        console.log('Image URL Length:', data.imageUrl.length);
+        console.log('Starts with data:', data.imageUrl.startsWith('data:'));
+        console.log('===========================');
+        
         setGeneratedImageUrl(data.imageUrl);
+        setShowVideoStep(true); // Show video generation step after image is ready
       }
     },
     onError: (error) => {
@@ -341,19 +353,116 @@ function UniverseTimelineEditor() {
     }
   });
 
-  // Handle image generation
-  const handleGenerateImage = useCallback(async () => {
-    if (!imagePrompt.trim()) return;
+  // Handle image generation for the event
+  const handleGenerateEventImage = useCallback(async () => {
+    if (!videoDescription.trim()) return;
     
     setIsGeneratingImage(true);
     try {
-      await generateImageMutation.mutateAsync(imagePrompt);
+      // Use the video description as the image prompt
+      await generateImageMutation.mutateAsync(videoDescription);
     } catch (error) {
       console.error("Error:", error);
     } finally {
       setIsGeneratingImage(false);
     }
-  }, [imagePrompt, generateImageMutation]);
+  }, [videoDescription, generateImageMutation]);
+
+  // Handle video generation with LumaAI using existing video service
+  const generateVideoMutation = useMutation({
+    mutationFn: async ({ imageUrl, prompt }: { imageUrl: string; prompt?: string }) => {
+      console.log('Generating video with:', {
+        imageUrl,
+        prompt: prompt || videoDescription
+      });
+      
+      const result = await trpcClient.video.generateAndWait.mutate({
+        prompt: prompt || videoDescription,
+        imageUrl, // Use the actual generated image
+        model: 'ray-flash-2', // Fast model like in Python test
+        duration: '5s'
+      });
+      return result;
+    },
+    onSuccess: (data) => {
+      if (data.videoUrl) {
+        setGeneratedVideoUrl(data.videoUrl);
+      }
+    },
+    onError: (error) => {
+      console.error("Error generating video:", error);
+      alert("Failed to generate video. Please try again.");
+    }
+  });
+
+  // File upload to tmpfiles.org
+  const uploadToTmpfiles = useCallback(async () => {
+    if (!generatedImageUrl) return;
+
+    setIsUploading(true);
+    try {
+      // Convert data URL to blob
+      const response = await fetch(generatedImageUrl);
+      const blob = await response.blob();
+
+      // Create form data
+      const formData = new FormData();
+      formData.append('file', blob, 'generated-image.png');
+
+      // Upload to tmpfiles.org
+      const uploadResponse = await fetch('https://tmpfiles.org/api/v1/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (uploadResponse.ok) {
+        const result = await uploadResponse.json();
+        if (result?.status === 'success') {
+          // Convert to direct access URL
+          const fileUrl = result.data.url;
+          const directUrl = fileUrl.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+          setUploadedUrl(directUrl);
+          console.log('✅ Image uploaded to tmpfiles.org:', directUrl);
+        } else {
+          throw new Error('Upload failed');
+        }
+      } else {
+        throw new Error(`Upload failed: ${uploadResponse.status}`);
+      }
+    } catch (error) {
+      console.error('Error uploading to tmpfiles.org:', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  }, [generatedImageUrl]);
+
+  const handleGenerateVideo = useCallback(async () => {
+    if (!generatedImageUrl) return;
+    
+    // Use uploaded URL if available, otherwise use the generated image URL
+    const imageUrlToUse = uploadedUrl || generatedImageUrl;
+    
+    console.log('=== VIDEO GENERATION DEBUG ===');
+    console.log('Generated Image URL:', generatedImageUrl);
+    console.log('Uploaded URL:', uploadedUrl);
+    console.log('Using URL for video:', imageUrlToUse);
+    console.log('Image URL type:', imageUrlToUse.startsWith('data:') ? 'Data URL' : 'HTTP URL');
+    console.log('Video Description:', videoDescription);
+    console.log('===============================');
+    
+    setIsGeneratingVideo(true);
+    try {
+      await generateVideoMutation.mutateAsync({
+        imageUrl: imageUrlToUse,
+        prompt: `Animate this scene: ${videoDescription}`
+      });
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsGeneratingVideo(false);
+    }
+  }, [generatedImageUrl, uploadedUrl, videoDescription, generateVideoMutation]);
 
   // Handle showing video generation dialog
   const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
@@ -362,6 +471,10 @@ function UniverseTimelineEditor() {
     setSourceNodeId(nodeId || null);
     setVideoTitle("");
     setVideoDescription("");
+    setGeneratedImageUrl(null);
+    setGeneratedVideoUrl(null);
+    setShowVideoStep(false);
+    setUploadedUrl(null);
     setShowVideoDialog(true);
   }, []);
 
@@ -478,6 +591,9 @@ function UniverseTimelineEditor() {
     setVideoTitle("");
     setVideoDescription("");
     setSourceNodeId(null);
+    setGeneratedImageUrl(null);
+    setGeneratedVideoUrl(null);
+    setShowVideoStep(false);
   }, [nodes, edges, eventCounter, id, videoTitle, videoDescription, additionType, sourceNodeId, handleAddEvent]);
 
   // Convert blockchain data to timeline nodes
@@ -702,37 +818,6 @@ function UniverseTimelineEditor() {
             </CardContent>
           </Card>
 
-          {/* Timeline Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Settings className="h-4 w-4" />
-                Timeline Settings
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="timeline-title">Timeline Title</Label>
-                <Input
-                  id="timeline-title"
-                  value={timelineTitle}
-                  onChange={(e: any) => setTimelineTitle(e.target.value)}
-                  placeholder="Enter timeline title"
-                />
-              </div>
-              <div>
-                <Label htmlFor="timeline-description">Description</Label>
-                <textarea
-                  id="timeline-description"
-                  value={timelineDescription}
-                  onChange={(e: any) => setTimelineDescription(e.target.value)}
-                  placeholder="Describe your timeline"
-                  rows={3}
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                />
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Add Event */}
           <Card>
@@ -750,34 +835,6 @@ function UniverseTimelineEditor() {
             </CardContent>
           </Card>
 
-          {/* Generate Image */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Sparkles className="h-4 w-4" />
-                Generate Image
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button 
-                onClick={() => setShowImageDialog(true)} 
-                className="w-full"
-                variant="secondary"
-              >
-                <Image className="h-4 w-4 mr-2" />
-                Generate Scene Image
-              </Button>
-              {generatedImageUrl && (
-                <div className="mt-2">
-                  <img 
-                    src={generatedImageUrl} 
-                    alt="Generated scene" 
-                    className="w-full rounded-lg"
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Selected Event */}
           {selectedNode && selectedNode.data.nodeType === 'scene' && (
@@ -896,14 +953,14 @@ function UniverseTimelineEditor() {
         </ReactFlowProvider>
       </div>
 
-      {/* Video Generation Modal */}
+      {/* Event Creation Modal with Image and Video Generation */}
       {showVideoDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <Card className="w-full max-w-lg mx-4 my-8 max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Film className="h-5 w-5" />
-                Generate Video Scene
+                Create Scene with AI Generation
               </CardTitle>
               <p className="text-sm text-muted-foreground">
                 {additionType === 'branch' ? 'Create a new story branch' : 'Continue the timeline'}
@@ -926,11 +983,156 @@ function UniverseTimelineEditor() {
                   id="video-description"
                   value={videoDescription}
                   onChange={(e) => setVideoDescription(e.target.value)}
-                  placeholder="Describe what happens in this scene..."
+                  placeholder="Describe what happens in this scene in detail... This will be used to generate the first frame image."
                   rows={4}
                   className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
                 />
               </div>
+
+              {/* Step 1: Generate Image */}
+              {!generatedImageUrl && (
+                <div className="border rounded-lg p-4 bg-muted/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">1</span>
+                    <Label className="text-sm font-medium">Generate First Frame</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Generate an image based on your scene description
+                  </p>
+                  <Button
+                    onClick={handleGenerateEventImage}
+                    disabled={!videoDescription.trim() || isGeneratingImage}
+                    className="w-full"
+                    variant="secondary"
+                  >
+                    {isGeneratingImage ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating Image...
+                      </>
+                    ) : (
+                      <>
+                        <Image className="h-4 w-4 mr-2" />
+                        Generate First Frame
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {/* Show Generated Image */}
+              {generatedImageUrl && (
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-6 h-6 rounded-full bg-green-500 text-white text-sm flex items-center justify-center">✓</span>
+                    <Label className="text-sm font-medium">First Frame Generated</Label>
+                  </div>
+                  <img 
+                    src={generatedImageUrl} 
+                    alt="Generated first frame" 
+                    className="w-full max-h-48 object-cover rounded-lg border"
+                  />
+                  
+                  {/* Upload to tmpfiles.org */}
+                  <div className="mt-3 space-y-2">
+                    <Button
+                      onClick={uploadToTmpfiles}
+                      disabled={isUploading}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                          Uploading to tmpfiles.org...
+                        </>
+                      ) : (
+                        <>
+                          <Image className="h-3 w-3 mr-2" />
+                          Upload to tmpfiles.org
+                        </>
+                      )}
+                    </Button>
+                    
+                    {/* Show uploaded URL */}
+                    {uploadedUrl && (
+                      <div className="p-2 bg-muted rounded text-xs">
+                        <Label className="text-xs font-medium">Uploaded URL:</Label>
+                        <div className="mt-1 p-1 bg-background rounded font-mono text-xs break-all">
+                          {uploadedUrl}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="mt-1 h-6 text-xs"
+                          onClick={() => navigator.clipboard.writeText(uploadedUrl)}
+                        >
+                          Copy URL
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Generate Video */}
+              {showVideoStep && !generatedVideoUrl && (
+                <div className="border rounded-lg p-4 bg-muted/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">2</span>
+                    <Label className="text-sm font-medium">Generate Video with LumaAI</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Create a video animation from the generated image
+                  </p>
+                  <Button
+                    onClick={handleGenerateVideo}
+                    disabled={isGeneratingVideo}
+                    className="w-full"
+                  >
+                    {isGeneratingVideo ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating Video...
+                      </>
+                    ) : (
+                      <>
+                        <Film className="h-4 w-4 mr-2" />
+                        Generate Video
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {/* Show Generated Video */}
+              {generatedVideoUrl && (
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-6 h-6 rounded-full bg-green-500 text-white text-sm flex items-center justify-center">✓</span>
+                    <Label className="text-sm font-medium">Video Generated</Label>
+                  </div>
+                  {generatedVideoUrl === "placeholder-video-url" ? (
+                    <div className="w-full h-32 bg-muted rounded-lg flex items-center justify-center">
+                      <p className="text-sm text-muted-foreground">Video preview placeholder</p>
+                    </div>
+                  ) : (
+                    <video 
+                      src={generatedVideoUrl} 
+                      controls 
+                      className="w-full rounded-lg border"
+                      onError={(e) => {
+                        console.error("Video playback error:", e);
+                        // Fallback to placeholder if video can't be played
+                      }}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  )}
+                </div>
+              )}
+              
               <div className="flex gap-3 pt-4">
                 <Button
                   variant="outline"
@@ -953,92 +1155,6 @@ function UniverseTimelineEditor() {
         </div>
       )}
 
-      {/* Image Generation Modal */}
-      {showImageDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-lg mx-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5" />
-                Generate Scene Image with Gemini AI
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Describe the scene you want to visualize
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="image-prompt">Scene Description</Label>
-                <textarea
-                  id="image-prompt"
-                  value={imagePrompt}
-                  onChange={(e) => setImagePrompt(e.target.value)}
-                  placeholder="Describe the scene in detail... (e.g., 'A futuristic city at sunset with flying cars and neon lights')"
-                  rows={4}
-                  className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                />
-              </div>
-              
-              {generatedImageUrl && (
-                <div className="space-y-2">
-                  <Label>Generated Image</Label>
-                  <div className="relative">
-                    <img 
-                      src={generatedImageUrl} 
-                      alt="Generated scene" 
-                      className="w-full rounded-lg border"
-                    />
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="absolute top-2 right-2"
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = generatedImageUrl;
-                        link.download = `scene-${Date.now()}.png`;
-                        link.click();
-                      }}
-                    >
-                      Download
-                    </Button>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowImageDialog(false);
-                    setImagePrompt("");
-                    setGeneratedImageUrl(null);
-                  }}
-                  className="flex-1"
-                >
-                  Close
-                </Button>
-                <Button
-                  onClick={handleGenerateImage}
-                  disabled={!imagePrompt.trim() || isGeneratingImage}
-                  className="flex-1"
-                >
-                  {isGeneratingImage ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Generate Image
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }

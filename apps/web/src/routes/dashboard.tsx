@@ -3,9 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus } from "lucide-react";
+import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus, Wand2 } from "lucide-react";
 import { trpcClient } from '@/utils/trpc';
 import { useQuery } from '@tanstack/react-query';
+import { GenerativeMedia } from "@/components/GenerativeMedia";
 
 export const Route = createFileRoute("/dashboard")({
   component: RouteComponent,
@@ -197,6 +198,15 @@ function RouteComponent() {
             </div>
           </section>
         )}
+
+        {/* AI Media Generation Section */}
+        <section className="mb-12">
+          <div className="flex items-center gap-2 mb-6">
+            <Wand2 className="h-5 w-5" />
+            <h2 className="text-xl font-semibold">AI Media Generation</h2>
+          </div>
+          <GenerativeMedia />
+        </section>
 
         {/* All Universes Grid */}
         <section>
