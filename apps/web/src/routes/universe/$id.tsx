@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Film, Plus, Settings, Clock, Users, Sparkles, Image, Loader2 } from "lucide-react";
+import { ArrowLeft, Film, Plus, Settings, Clock, Users, Sparkles, Image, Loader2, RefreshCw } from "lucide-react";
 import ReactFlow, {
   Background,
   Controls,
@@ -23,8 +23,8 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { TimelineEventNode } from '@/components/flow/TimelineNodes';
 import { TimelineActions } from '@/components/TimelineActions';
 import { trpcClient } from '@/utils/trpc';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { useReadContract, useChainId } from 'wagmi';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useReadContract, useChainId, useWriteContract } from 'wagmi';
 import { trpc } from '@/utils/trpc';
 import { timelineAbi } from '@/generated';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
@@ -75,31 +75,49 @@ function UniverseTimelineEditor() {
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
+  // Contract integration state
+  const [isSavingToContract, setIsSavingToContract] = useState(false);
+  const [contractSaved, setContractSaved] = useState(false);
+  
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
+  // Contract hooks - we'll use the write contract directly for universe-specific contracts
+  const { writeContractAsync } = useWriteContract();
 
   // Blockchain data fetching hooks
   const useUniverseLeaves = (contractAddress?: string) => {
+    if (!contractAddress) {
+      console.log('useUniverseLeaves - No contract address provided');
+      return { data: null, isLoading: false, refetch: async () => {} };
+    }
+    
+    console.log('useUniverseLeaves - Using address:', contractAddress, 'for universe:', id);
+    
     return useReadContract({
       abi: timelineAbi,
-      address: contractAddress 
-        ? (contractAddress as Address)
-        : (TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address),
+      address: contractAddress as Address,
       functionName: 'getLeaves',
       query: {
-        enabled: (!!contractAddress && contractAddress !== 'unknown') || id === 'blockchain-universe'
+        enabled: !!contractAddress
       }
     });
   };
 
   const useUniverseFullGraph = (contractAddress?: string) => {
+    if (!contractAddress) {
+      console.log('useUniverseFullGraph - No contract address provided');
+      return { data: null, isLoading: false, refetch: async () => {} };
+    }
+    
+    console.log('useUniverseFullGraph - Using address:', contractAddress, 'for universe:', id);
+    
     return useReadContract({
       abi: timelineAbi,
-      address: contractAddress 
-        ? (contractAddress as Address)
-        : (TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address),
+      address: contractAddress as Address,
       functionName: 'getFullGraph',
       query: {
-        enabled: (!!contractAddress && contractAddress !== 'unknown') || id === 'blockchain-universe'
+        enabled: !!contractAddress
       }
     });
   };
@@ -277,15 +295,40 @@ function UniverseTimelineEditor() {
   // For blockchain universes (addresses starting with 0x), use blockchain data
   const isBlockchainUniverse = id?.startsWith('0x');
   
-  // Blockchain data fetching hooks
-  const { data: leavesData, isLoading: isLoadingLeaves } = useUniverseLeaves(isBlockchainUniverse ? id : undefined);
-  const { data: fullGraphData, isLoading: isLoadingFullGraph } = useUniverseFullGraph(isBlockchainUniverse ? id : undefined);
+  // Each universe with a 0x address IS its own Timeline contract
+  // So we use the universe ID as the contract address
+  const timelineContractAddress = isBlockchainUniverse 
+    ? id  // Use the universe ID as the contract address
+    : universe?.address || undefined;  // For non-blockchain universes, use the stored address
+  
+  console.log('Universe ID:', id);
+  console.log('Is Blockchain Universe:', isBlockchainUniverse);
+  console.log('Timeline Contract Address:', timelineContractAddress);
+  console.log('Chain ID:', chainId);
+  
+  // Blockchain data fetching hooks - use the universe's own contract address
+  const { data: leavesData, isLoading: isLoadingLeaves, refetch: refetchLeaves } = useUniverseLeaves(timelineContractAddress);
+  const { data: fullGraphData, isLoading: isLoadingFullGraph, refetch: refetchFullGraph } = useUniverseFullGraph(timelineContractAddress);
   
   // Get timeline data: use blockchain data if available, otherwise dummy data
   const graphData = useMemo(() => {
-    if (isBlockchainUniverse && fullGraphData) {
+    console.log('=== GRAPH DATA DEBUG ===');
+    console.log('Is Blockchain Universe:', isBlockchainUniverse);
+    console.log('Timeline Contract Address:', timelineContractAddress);
+    console.log('Full Graph Data:', fullGraphData);
+    console.log('=========================');
+    
+    if (timelineContractAddress && fullGraphData) {
       // Convert blockchain data to the expected format
       const [nodeIds, urls, descriptions, previousIds, nextIds, flags] = fullGraphData;
+      
+      console.log('=== BLOCKCHAIN DATA PARSED ===');
+      console.log('Node IDs:', nodeIds);
+      console.log('URLs:', urls);
+      console.log('Descriptions:', descriptions);
+      console.log('Previous IDs:', previousIds);
+      console.log('==============================');
+      
       return {
         nodeIds: nodeIds || [],
         urls: urls || [],
@@ -329,9 +372,7 @@ function UniverseTimelineEditor() {
   const generateImageMutation = useMutation({
     mutationFn: async (prompt: string) => {
       const result = await trpcClient.gemini.generateImage.mutate({
-        prompt,
-        universeId: id,
-        context: finalUniverse?.description || timelineDescription
+        prompt
       });
       return result;
     },
@@ -464,6 +505,80 @@ function UniverseTimelineEditor() {
     }
   }, [generatedImageUrl, uploadedUrl, videoDescription, generateVideoMutation]);
 
+  // Save to contract function
+  const handleSaveToContract = useCallback(async () => {
+    if (!generatedVideoUrl || !videoTitle || !videoDescription) {
+      alert('Video, title, and description are required to save to contract');
+      return;
+    }
+
+    setIsSavingToContract(true);
+    try {
+      // Find the last node ID to use as previous
+      const lastNodeId = Math.max(...(graphData.nodeIds.map(id => Number(id)) || [0]), 0);
+      
+      console.log('Saving to contract:', {
+        link: generatedVideoUrl,
+        plot: videoDescription,
+        previous: lastNodeId,
+        title: videoTitle
+      });
+
+      // Determine which contract address to use
+      const contractAddressToUse = isBlockchainUniverse 
+        ? id as Address  // Use universe ID as contract address
+        : TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address;  // Fallback to default
+      
+      console.log('Saving to contract address:', contractAddressToUse);
+      
+      // Create new node in the universe's specific smart contract
+      const txHash = await writeContractAsync({
+        abi: timelineAbi,
+        address: contractAddressToUse,
+        functionName: 'createNode',
+        args: [generatedVideoUrl, videoDescription, BigInt(lastNodeId)]
+      });
+
+      console.log('Transaction submitted:', txHash);
+      setContractSaved(true);
+      
+      // Show success message
+      alert('Successfully saved to blockchain! Transaction: ' + txHash);
+      
+      // Refresh the blockchain data to show the new node
+      setTimeout(async () => {
+        if (isBlockchainUniverse) {
+          // Specifically refetch blockchain data
+          await refetchLeaves();
+          await refetchFullGraph();
+          console.log('Refetched blockchain data after contract save');
+        }
+        // Invalidate all queries as fallback
+        await queryClient.invalidateQueries();
+        console.log('Refreshed blockchain data - new node should appear');
+      }, 5000); // Wait 5 seconds for blockchain to update
+      
+    } catch (error) {
+      console.error('Error saving to contract:', error);
+      alert('Failed to save to contract: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsSavingToContract(false);
+    }
+  }, [generatedVideoUrl, videoTitle, videoDescription, graphData.nodeIds, writeContractAsync, isBlockchainUniverse, id, chainId]);
+
+  // Manual refresh function
+  const handleRefreshTimeline = useCallback(async () => {
+    console.log('Manually refreshing timeline...');
+    if (isBlockchainUniverse) {
+      // Specifically refetch blockchain data
+      await refetchLeaves();
+      await refetchFullGraph();
+      console.log('Refetched blockchain data for universe:', id);
+    }
+    // Also invalidate all queries as fallback
+    await queryClient.invalidateQueries();
+  }, [queryClient, isBlockchainUniverse, refetchLeaves, refetchFullGraph, id]);
+
   // Handle showing video generation dialog
   const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
     console.log('handleAddEvent called:', { type, nodeId });
@@ -475,6 +590,8 @@ function UniverseTimelineEditor() {
     setGeneratedVideoUrl(null);
     setShowVideoStep(false);
     setUploadedUrl(null);
+    setContractSaved(false);
+    setIsSavingToContract(false);
     setShowVideoDialog(true);
   }, []);
 
@@ -617,6 +734,9 @@ function UniverseTimelineEditor() {
       const previousNode = graphData.previousNodes[index] || '';
       const isCanon = graphData.flags[index] || false;
       
+      // Debug: Log the node creation data
+      console.log(`Creating node ${nodeId}:`, { url, description, previousNode });
+      
       const x = 100 + (index * horizontalSpacing);
       const y = startY + (isCanon ? 0 : (index % 2) * verticalSpacing);
       const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
@@ -626,13 +746,15 @@ function UniverseTimelineEditor() {
         type: 'timelineEvent',
         position: { x, y },
         data: {
-          label: `Node ${nodeId}`,
+          label: description && description.length > 0 && description !== `Timeline event ${nodeId}` 
+            ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
+            : `Event ${nodeId}`,
           description: description || `Timeline event ${nodeId}`,
           videoUrl: url,
           timelineColor: color,
           nodeType: 'scene',
-          eventId: `node-${nodeId}`,
-          timelineId: `timeline-${nodeId}`,
+          eventId: nodeId.toString(),
+          timelineId: `timeline-1`,
           universeId: finalUniverse?.id || id,
           isRoot: String(previousNode) === '0' || !previousNode,
           onAddScene: handleAddEvent,
@@ -716,8 +838,18 @@ function UniverseTimelineEditor() {
     if (node.data.nodeType === 'scene') {
       setSelectedEventTitle(node.data.label);
       setSelectedEventDescription(node.data.description);
+      
+      // Navigate to event detail page using new route structure
+      const universeId = node.data.universeId || id;
+      const eventId = node.data.eventId;
+      
+      if (eventId && universeId) {
+        // Use window.location for navigation with new route structure: /event/{universeId}/{eventId}
+        const eventUrl = `/event/${universeId}/${eventId}`;
+        window.location.href = eventUrl;
+      }
     }
-  }, []);
+  }, [id]);
 
   // Update selected node data
   const updateSelectedNode = useCallback(() => {
@@ -827,10 +959,19 @@ function UniverseTimelineEditor() {
                 Add Event
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-2">
               <Button onClick={() => handleAddEvent('after')} className="w-full">
                 <Plus className="h-4 w-4 mr-2" />
                 Add New Event
+              </Button>
+              <Button 
+                onClick={handleRefreshTimeline} 
+                variant="outline" 
+                size="sm"
+                className="w-full"
+              >
+                <RefreshCw className="h-3 w-3 mr-2" />
+                Refresh Timeline
               </Button>
             </CardContent>
           </Card>
@@ -1130,6 +1271,45 @@ function UniverseTimelineEditor() {
                       Your browser does not support the video tag.
                     </video>
                   )}
+                  
+                  {/* Save to Contract */}
+                  <div className="mt-3 space-y-2">
+                    <Button
+                      onClick={handleSaveToContract}
+                      disabled={isSavingToContract || contractSaved}
+                      variant={contractSaved ? "secondary" : "default"}
+                      size="sm"
+                      className="w-full"
+                    >
+                      {isSavingToContract ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                          Saving to Blockchain...
+                        </>
+                      ) : contractSaved ? (
+                        <>
+                          <span className="text-green-600">✓</span>
+                          <span className="ml-2">Saved to Blockchain</span>
+                        </>
+                      ) : (
+                        <>
+                          <Film className="h-3 w-3 mr-2" />
+                          Save to Universe Timeline
+                        </>
+                      )}
+                    </Button>
+                    
+                    {contractSaved && (
+                      <div className="p-2 bg-green-50 border border-green-200 rounded text-xs">
+                        <div className="text-green-700 font-medium">
+                          ✅ Successfully saved to blockchain!
+                        </div>
+                        <div className="text-green-600 mt-1">
+                          Your scene is now part of the universe timeline and will be visible to all users.
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               
