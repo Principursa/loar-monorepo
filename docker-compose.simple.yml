@@ -36,7 +36,6 @@ services:
       - loar-network
     labels:
       caddy: loartech.xyz
-      caddy.reverse_proxy: "{{upstreams 3000}}"
       caddy.handle_path: "/api/*"
       caddy.handle_path.0_reverse_proxy: "{{upstreams 3000}}"
       caddy.tls: "internal"
