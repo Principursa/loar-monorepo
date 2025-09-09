@@ -8,8 +8,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - caddy_data:/data
-    environment:
-      - CADDY_INGRESS_NETWORKS=loar-monorepo_loar-network
     restart: unless-stopped
     networks:
       - loar-network
@@ -36,9 +34,9 @@ services:
       - loar-network
     labels:
       caddy: loartech.xyz
+      caddy.reverse_proxy: "{{upstreams 3000}}"
       caddy.handle_path: "/api/*"
       caddy.handle_path.0_reverse_proxy: "{{upstreams 3000}}"
-      caddy.tls: "internal"
 
   app-web:
     image: nginx:alpine
@@ -51,7 +49,6 @@ services:
     labels:
       caddy: loartech.xyz
       caddy.reverse_proxy: "{{upstreams 80}}"
-      caddy.tls: "internal"
 
   postgres:
     image: postgres:15
