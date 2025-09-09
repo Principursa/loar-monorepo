@@ -1,18 +1,15 @@
 version: '3.8'
 
 services:
-  nginx:
-    image: nginx:alpine
-    container_name: loar-nginx
+  caddy:
+    image: lucaslorentz/caddy-docker-proxy:ci-alpine
+    container_name: loar-caddy
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - app-server
-      - app-web
+      - /var/run/docker.sock:/var/run/docker.sock
+      - caddy_data:/data
     restart: unless-stopped
     networks:
       - loar-network
@@ -25,14 +22,19 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
-      - CORS_ORIGIN=http://localhost
+      - CORS_ORIGIN=https://localhost
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - BETTER_AUTH_URL=http://localhost
+      - BETTER_AUTH_URL=https://localhost
     depends_on:
       - postgres
     restart: unless-stopped
     networks:
       - loar-network
+    labels:
+      caddy: localhost
+      caddy.reverse_proxy: "{{upstreams 3000}}"
+      caddy.handle_path: "/api/*"
+      caddy.handle_path.0_reverse_proxy: "{{upstreams 3000}}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
@@ -46,10 +48,13 @@ services:
     container_name: loar-web
     environment:
       - NODE_ENV=production
-      - VITE_SERVER_URL=http://localhost
+      - VITE_SERVER_URL=https://localhost
     restart: unless-stopped
     networks:
       - loar-network
+    labels:
+      caddy: localhost
+      caddy.reverse_proxy: "{{upstreams 3001}}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001"]
       interval: 30s
@@ -81,6 +86,7 @@ services:
 volumes:
   postgres_data:
     driver: local
+  caddy_data:
 
 networks:
   loar-network:

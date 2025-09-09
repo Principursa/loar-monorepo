@@ -1,14 +1,13 @@
 services:
-  nginx:
-    image: nginx:alpine
-    container_name: loar-nginx
+  caddy:
+    image: lucaslorentz/caddy-docker-proxy:ci-alpine
+    container_name: loar-caddy
     ports:
       - "80:80"
+      - "443:443"
     volumes:
-      - ./nginx.simple.conf:/etc/nginx/nginx.conf:ro
-      - ./apps/web/dist:/usr/share/nginx/html:ro
-    depends_on:
-      - app-server
+      - /var/run/docker.sock:/var/run/docker.sock
+      - caddy_data:/data
     restart: unless-stopped
     networks:
       - loar-network
@@ -28,14 +27,28 @@ services:
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-defaultsecret}
       - BETTER_AUTH_URL=https://loartech.xyz
     command: ["sh", "-c", "apk add --no-cache curl && bun run apps/server/dist/index.js"]
-
     depends_on:
       - postgres
     restart: unless-stopped
     networks:
       - loar-network
-    ports:
-      - "3000:3000"
+    labels:
+      caddy: loartech.xyz
+      caddy.reverse_proxy: "{{upstreams 3000}}"
+      caddy.handle_path: "/api/*"
+      caddy.handle_path.0_reverse_proxy: "{{upstreams 3000}}"
+
+  app-web:
+    image: nginx:alpine
+    container_name: loar-web
+    volumes:
+      - ./apps/web/dist:/usr/share/nginx/html:ro
+    restart: unless-stopped
+    networks:
+      - loar-network
+    labels:
+      caddy: loartech.xyz
+      caddy.reverse_proxy: "{{upstreams 80}}"
 
   postgres:
     image: postgres:15
@@ -54,6 +67,7 @@ services:
 
 volumes:
   postgres_data:
+  caddy_data:
 
 networks:
   loar-network:
