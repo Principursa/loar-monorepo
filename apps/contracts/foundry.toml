@@ -1,7 +1,7 @@
 [profile.default]
 src = "src"
 out = "out"
-libs = ["lib"]
+libs = ["lib", "dependencies"]
 
 solc_version="0.8.30"
 optimizer=true
@@ -18,6 +18,11 @@ via_ir=true
 line_length = 100
 
 [etherscan]
+
+[dependencies]
+forge-std = "1.10.0"
+"@openzeppelin-contracts" = "5.0.2"
+solady = "0.1.26"
 # Chain-specific API keys using standardized environment variables
 # Format: VERIFICATION_KEY_{chainId}
 # mainnet = { key = "${VERIFICATION_KEY_1}" }
