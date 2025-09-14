@@ -43,3 +43,4 @@ export class SynapseService {
   }
 
 }
+//export const snyapseService = new SynapseService();
