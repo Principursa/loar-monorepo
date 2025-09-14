@@ -21,6 +21,7 @@
     "@fal-ai/serverless-client": "^0.15.0",
     "@filoz/synapse-sdk": "^0.24.11",
     "@fal-ai/serverless-client": "^0.15.0",
+    "@filoz/synapse-sdk": "^0.24.11",
     "@hono/trpc-server": "^0.4.0",
     "@trpc/client": "^11.4.2",
     "@trpc/server": "^11.4.2",
