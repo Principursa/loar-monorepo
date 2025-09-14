@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { universes } from "@/data/universes";
 import { ArrowRight, Play } from "lucide-react";
 import { TimelineFlowWithData } from "@/components/flow/TimelineFlowWithData";
+import { useQuery } from "@tanstack/react-query";
 
 // Simple tab components to avoid import errors
 const Tabs = ({ defaultValue, className, children }: { defaultValue: string, className?: string, children: React.ReactNode }) => (
@@ -33,8 +34,50 @@ function TimelinePage() {
   const search = useSearch({ from: "/timeline" }) as TimelineSearch;
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   
-  const universe = universes.find(u => u.id === search.universe);
-  const timeline = universe?.timelines.find(t => t.id === search.timeline);
+  // Try to get universe data from localStorage for blockchain universes
+  const { data: localUniverses } = useQuery({
+    queryKey: ['local-universes'],
+    queryFn: async () => {
+      try {
+        const stored = localStorage.getItem('createdUniverses');
+        return stored ? JSON.parse(stored) : [];
+      } catch (error) {
+        console.log('localStorage not available');
+        return [];
+      }
+    },
+    enabled: true,
+    retry: 1
+  });
+
+  // Check if this is a blockchain universe (contract address format)
+  const isBlockchainUniverse = search.universe?.startsWith('0x');
+  
+  let universe, timeline;
+  
+  if (isBlockchainUniverse) {
+    // Look for universe in localStorage
+    const localUniverse = localUniverses?.find((u: any) => u.id === search.universe);
+    
+    // For blockchain universes, create universe object from localStorage + contract address
+    universe = {
+      id: search.universe,
+      name: localUniverse?.name || `Universe ${search.universe?.slice(0, 8)}...`,
+      description: localUniverse?.description || 'Blockchain-based cinematic universe',
+      imageUrl: localUniverse?.imageUrl || '',
+      timelines: [{
+        id: 'main',
+        name: 'Main Timeline',
+        description: 'Blockchain-based narrative timeline',
+        nodes: [] // Will be loaded from contract
+      }]
+    };
+    timeline = universe.timelines[0];
+  } else {
+    // Use static data for demo universes
+    universe = universes.find(u => u.id === search.universe);
+    timeline = universe?.timelines.find(t => t.id === search.timeline);
+  }
 
   if (!universe || !timeline) {
     return (
@@ -92,6 +135,7 @@ function TimelinePage() {
             rootNodeId={0} // You would get this from the blockchain
             isCreateDialogOpen={isCreateDialogOpen}
             setIsCreateDialogOpen={setIsCreateDialogOpen}
+            timelineAddress={isBlockchainUniverse ? search.universe : undefined}
           />
         </TabsContent>
         

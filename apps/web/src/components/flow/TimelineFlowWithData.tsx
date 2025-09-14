@@ -12,13 +12,15 @@ export function TimelineFlowWithData({
   timelineId, 
   rootNodeId = 1,
   isCreateDialogOpen = false,
-  setIsCreateDialogOpen = () => {}
+  setIsCreateDialogOpen = () => {},
+  timelineAddress
 }: {
   universeId: string;
   timelineId: string;
   rootNodeId?: number;
   isCreateDialogOpen?: boolean;
   setIsCreateDialogOpen?: (open: boolean) => void;
+  timelineAddress?: string;
 }) {
   const [initialNodes, setInitialNodes] = useState<Node<TimelineNodeData>[]>([]);
   const [initialEdges, setInitialEdges] = useState<Edge[]>([]);
@@ -26,7 +28,10 @@ export function TimelineFlowWithData({
   const { isConnected } = useAccount();
   
   // Use the hook to get the full graph data from the blockchain
-  const { data: graphData, isLoading: isLoadingGraph, isError } = useGetFullGraph();
+  // Pass the timeline address if it's a blockchain universe
+  const { data: graphData, isLoading: isLoadingGraph, isError } = useGetFullGraph(
+    universeId?.startsWith('0x') ? universeId : timelineAddress
+  );
   
   // Process the graph data from the blockchain into ReactFlow nodes and edges
   useEffect(() => {

@@ -16,33 +16,22 @@ export const DynamicProvider = ({ children }: { children: React.ReactNode }) => 
         overrides: {
           evmNetworks: [
             {
-              blockExplorerUrls: ['https://etherscan.io/'],
-              chainId: 1,
-              chainName: 'Ethereum Mainnet',
-              iconUrls: ['https://app.dynamic.xyz/assets/networks/eth.svg'],
-              name: 'Ethereum',
-              nativeCurrency: {
-                decimals: 18,
-                name: 'Ether',
-                symbol: 'ETH',
-              },
-              networkId: 1,
-              rpcUrls: ['https://cloudflare-eth.com/'],
-              vanityName: 'Ethereum',
-            },
-            {
               blockExplorerUrls: ['https://sepolia.etherscan.io/'],
               chainId: 11155111,
-              chainName: 'Sepolia',
+              chainName: 'Sepolia Testnet',
               iconUrls: ['https://app.dynamic.xyz/assets/networks/eth.svg'],
               name: 'Sepolia',
               nativeCurrency: {
                 decimals: 18,
                 name: 'Sepolia Ether',
-                symbol: 'SEP',
+                symbol: 'ETH',
               },
               networkId: 11155111,
-              rpcUrls: ['https://sepolia.infura.io/v3/'],
+              rpcUrls: [
+                'https://rpc.sepolia.org',
+                'https://ethereum-sepolia.blockpi.network/v1/rpc/public',
+                'https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161'
+              ],
               vanityName: 'Sepolia',
             },
           ],

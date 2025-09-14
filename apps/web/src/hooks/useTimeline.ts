@@ -58,13 +58,19 @@ export function useGetCanonChain() {
   })
 }
 
-export function useGetFullGraph() {
+export function useGetFullGraph(timelineAddress?: string) {
   const chainId = useChainId()
+  
+  // Use provided address or fall back to default
+  const address = timelineAddress || TIMELINE_ADDRESSES[chainId as SupportedChainId]
   
   return useReadContract({
     abi: timelineAbi,
-    address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
-    functionName: 'getFullGraph'
+    address: address as Address,
+    functionName: 'getFullGraph',
+    query: {
+      enabled: !!address
+    }
   })
 }
 
