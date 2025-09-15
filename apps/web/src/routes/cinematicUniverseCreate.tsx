@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { trpc, trpcClient } from "@/utils/trpc";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
+import { trpcClient } from "@/utils/trpc";
 import { governanceErc20Abi, timelineAbi, universeGovernorAbi } from "@/generated";
 import governanceERC20Artifact from "../abis/GovernanceERC20.json"
 import universeGovernorArtifact from "../abis/UniverseGovernor.json"
@@ -20,7 +20,7 @@ const timelineBytecode = timelineArtifact.bytecode.object
 // Log contract sizes
 console.log("Contract bytecode sizes:");
 console.log("GovernanceERC20:", Math.floor(governanceERC20Bytecode.length / 2), "bytes");
-console.log("UniverseGovernor:", Math.floor(universeGovernanceBytecode.length / 2), "bytes"); 
+console.log("UniverseGovernor:", Math.floor(universeGovernanceBytecode.length / 2), "bytes");
 console.log("Timeline:", Math.floor(timelineBytecode.length / 2), "bytes");
 console.log("Size limit: 24576 bytes");
 
@@ -30,7 +30,6 @@ export const Route = createFileRoute("/cinematicUniverseCreate")({
 
 function CinematicUniverseCreate() {
   const { address, isConnected } = useAccount();
-  const { user } = useDynamicContext();
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
   const { signMessage } = useSignMessage();
@@ -40,6 +39,50 @@ function CinematicUniverseCreate() {
   const [description, setDescription] = useState("");
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentStep, setDeploymentStep] = useState<string>("");
+  const [universeSaved, setUniverseSaved] = useState(false);
+
+  // Database mutation for universe storage
+  const createCinematicUniverse = useMutation({
+    mutationFn: async (variables: {
+      address: string;
+      creator: string;
+      tokenAddress: string;
+      governanceAddress: string;
+      imageUrl: string;
+      description: string;
+    }) => {
+      console.log("Saving universe to database:", variables);
+
+      // Create message for wallet signature
+      const message = `Create Cinematic Universe\nCreator: ${variables.creator}\nTimeline: ${variables.address}\nTimestamp: ${Date.now()}`;
+
+      // Sign the message with wallet
+      const signature = await new Promise<string>((resolve, reject) => {
+        signMessage(
+          { message },
+          {
+            onSuccess: (sig) => resolve(sig),
+            onError: (error) => reject(error)
+          }
+        );
+      });
+
+      console.log("Signed message for database:", { message, signature });
+
+      // Call tRPC with signature
+      return trpcClient.cinematicUniverses.createcu.mutate({
+        ...variables,
+        signature,
+        message
+      });
+    },
+    onSuccess: (data) => {
+      console.log("Universe saved to database successfully:", data);
+    },
+    onError: (error) => {
+      console.error("Database save failed (continuing with localStorage only):", error);
+    },
+  });
 
   const { deployContract: deployToken, data: tokenTxHash } = useDeployContract();
   const { deployContract: deployGovernor, data: governorTxHash } = useDeployContract();
@@ -85,7 +128,8 @@ function CinematicUniverseCreate() {
         abi: universeGovernorAbi,
         args: [tokenAddress!],
         bytecode: universeGovernanceBytecode as `0x${string}`,
-        gas: 5000000n,
+        gas: 8000000n, // Increased gas limit for large contract
+        chainId: 11155111, // Force Sepolia
       });
       return 'triggered';
     },
@@ -103,6 +147,8 @@ function CinematicUniverseCreate() {
         abi: timelineAbi,
         args: [governorAddress!],
         bytecode: timelineBytecode as `0x${string}`,
+        gas: 3500000n, // Increased gas limit
+        chainId: 11155111, // Force Sepolia
       });
       return 'triggered';
     },
@@ -111,69 +157,58 @@ function CinematicUniverseCreate() {
     refetchOnWindowFocus: false
   });
 
-  // Create cinematic universe when all contracts are deployed
-  const createCinematicUniverse = useMutation({
-    mutationFn: async (variables: {
-      address: string;
-      creator: string; 
-      tokenAddress: string;
-      governanceAddress: string;
-      imageUrl: string;
-      description: string;
-    }) => {
-      console.log("Creating universe with variables:", variables);
-      
-      // Create message for wallet signature
-      const message = `Create Cinematic Universe\nCreator: ${variables.creator}\nTimeline: ${variables.address}\nTimestamp: ${Date.now()}`;
-      
-      // Sign the message with wallet
-      const signature = await new Promise<string>((resolve, reject) => {
-        signMessage(
-          { message },
-          {
-            onSuccess: (sig) => resolve(sig),
-            onError: (error) => reject(error)
-          }
-        );
-      });
-      
-      console.log("Signed message:", { message, signature });
-      
-      // Call tRPC with signature
-      return trpcClient.cinematicUniverses.createcu.mutate({
-        ...variables,
-        signature,
-        message
-      });
-    },
-    onSuccess: (data) => {
-      console.log("Cinematic Universe created:", data);
-      setDeploymentStep("Cinematic Universe created successfully!");
-      setIsDeploying(false);
-    },
-    onError: (error) => {
-      console.error("Failed to create cinematic universe:", error);
-      setDeploymentStep(`Error: ${error.message}`);
-      setIsDeploying(false);
-    },
-  });
 
   // Auto-create universe record when all addresses are ready
   useQuery({
     queryKey: ['create-universe-record', timelineAddress, tokenAddress, governorAddress],
     queryFn: async () => {
-      setDeploymentStep("Timeline deployed! Creating cinematic universe record...");
-      createCinematicUniverse.mutate({
+      setDeploymentStep("Timeline deployed! Saving cinematic universe...");
+      
+      // Save to localStorage for universes page (backup/cache)
+      const universeData = {
+        id: timelineAddress!,
+        name: tokenName,
+        description: description,
         address: timelineAddress!,
-        creator: address!,
         tokenAddress: tokenAddress!,
         governanceAddress: governorAddress!,
-        imageUrl,
-        description,
-      });
+        creator: address!,
+        createdAt: new Date().toISOString(),
+        imageUrl: imageUrl
+      };
+
+      // Save to localStorage (backup)
+      const existing = localStorage.getItem('createdUniverses');
+      const universes = existing ? JSON.parse(existing) : [];
+      const existingIndex = universes.findIndex((u: any) => u.id === timelineAddress);
+      if (existingIndex === -1) {
+        universes.push(universeData);
+        localStorage.setItem('createdUniverses', JSON.stringify(universes));
+      }
+
+      console.log("Universe saved to localStorage:", universeData);
+
+      // Save to database (primary storage)
+      try {
+        await createCinematicUniverse.mutateAsync({
+          address: timelineAddress!,
+          creator: address!,
+          tokenAddress: tokenAddress!,
+          governanceAddress: governorAddress!,
+          imageUrl,
+          description,
+        });
+        console.log("Universe saved to database successfully");
+      } catch (error) {
+        console.log("Database save failed, but localStorage backup is available:", error);
+      }
+
+      setDeploymentStep("Cinematic Universe created successfully! Check the Universes page.");
+      setIsDeploying(false);
+      setUniverseSaved(true);
       return 'triggered';
     },
-    enabled: !!timelineAddress && !!tokenAddress && !!governorAddress && !createCinematicUniverse.isSuccess,
+    enabled: !!timelineAddress && !!tokenAddress && !!governorAddress && !universeSaved,
     refetchOnMount: false,
     refetchOnWindowFocus: false
   });
@@ -181,6 +216,12 @@ function CinematicUniverseCreate() {
   const handleDeploy = async () => {
     if (!isConnected || !address) {
       alert("Please connect your wallet first");
+      return;
+    }
+
+    // Check if we're on Sepolia testnet
+    if (chainId !== 11155111) {
+      alert(`⚠️ Wrong Network!\n\nYou're on Chain ID: ${chainId}\nPlease switch to Sepolia Testnet (Chain ID: 11155111)\n\nHow to switch:\n1. Open your wallet\n2. Click on network selector\n3. Choose "Sepolia Testnet"\n\nIf Sepolia isn't visible, refresh the page after connecting.`);
       return;
     }
 
@@ -194,15 +235,16 @@ function CinematicUniverseCreate() {
 
     try {
       console.log("Deploying token with:", { tokenName, tokenSymbol, address, chainId });
-      console.log("Balance:", balance?.formatted, balance?.symbol);
+      console.log("Balance:", balance?.value, balance?.symbol);
       console.log("Bytecode length:", governanceERC20Bytecode.length);
-      
+
       // Step 1: Deploy GovernanceERC20 token
       deployToken({
         abi: governanceErc20Abi,
         bytecode: governanceERC20Bytecode as `0x${string}`,
         args: [tokenName, tokenSymbol],
-        gas: 3000000n, // Add explicit gas limit
+        gas: 3000000n, // Increased gas limit
+        chainId: 11155111, // Force Sepolia
       });
     } catch (error) {
       console.error("Token deployment failed:", error);
@@ -217,6 +259,17 @@ function CinematicUniverseCreate() {
       <Card>
         <CardHeader>
           <CardTitle>Create Cinematic Universe</CardTitle>
+          {/* Network indicator */}
+          {isConnected && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Network:</span>
+              {chainId === 11155111 ? (
+                <span className="text-green-600 font-medium">✅ Sepolia Testnet</span>
+              ) : (
+                <span className="text-red-600 font-medium">❌ Wrong Network (Chain ID: {chainId})</span>
+              )}
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           {!isConnected ? (
@@ -270,8 +323,8 @@ function CinematicUniverseCreate() {
                 />
               </div>
 
-              <Button 
-                onClick={handleDeploy} 
+              <Button
+                onClick={handleDeploy}
                 disabled={isDeploying || !tokenName || !tokenSymbol || !imageUrl || !description}
                 className="w-full"
               >

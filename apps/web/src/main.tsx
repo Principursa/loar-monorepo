@@ -34,6 +34,30 @@ const router = createRouter({
           walletConnectors: [
             EthereumWalletConnectors, // Only include the connectors we need
           ],
+          overrides: {
+            evmNetworks: [
+              // ONLY Sepolia - no mainnet!
+              {
+                blockExplorerUrls: ['https://sepolia.etherscan.io/'],
+                chainId: 11155111,
+                chainName: 'Sepolia Testnet',
+                iconUrls: ['https://app.dynamic.xyz/assets/networks/eth.svg'],
+                name: 'Sepolia',
+                nativeCurrency: {
+                  decimals: 18,
+                  name: 'Sepolia Ether',
+                  symbol: 'ETH',
+                },
+                networkId: 11155111,
+                rpcUrls: [
+                  'https://rpc.sepolia.org',
+                  'https://ethereum-sepolia.blockpi.network/v1/rpc/public',
+                  'https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161'
+                ],
+                vanityName: 'Sepolia',
+              },
+            ],
+          },
           // Basic settings for local development
           debugError: true
         }}

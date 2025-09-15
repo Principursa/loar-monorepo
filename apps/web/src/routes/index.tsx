@@ -28,7 +28,7 @@ function HomeComponent() {
             </a>
             {user ? (
               <Button asChild size="sm">
-                <a href="/dashboard">Dashboard</a>
+                <a href="/universes">Universes</a>
               </Button>
             ) : (
               <>
@@ -61,7 +61,7 @@ function HomeComponent() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
             {user ? (
               <Button size="lg" className="text-lg px-8 py-6" asChild>
-                <a href="/flow">
+                <a href="/universes">
                   <Play className="w-5 h-5 mr-2" />
                   Start Creating
                 </a>

@@ -1,475 +1,295 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useCreateNode, useGetNode, useGetTimeline, useGetLeaves, useGetMedia, useGetCanonChain, useGetFullGraph, useSetMedia, useSetCanon } from "@/hooks/useTimeline";
-import { trpc, trpcClient } from "@/utils/trpc";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus, Database } from "lucide-react";
+import { useQuery } from '@tanstack/react-query';
+import { useChainId, useReadContract } from 'wagmi';
+import { timelineAbi } from '@/generated';
+import { createPublicClient, http, parseEventLogs } from 'viem';
+import { sepolia } from 'viem/chains';
 
-function UniversesPage() {
-  // Define our single blockchain universe
-  const blockchainUniverse = {
-    id: 'blockchain-universe',
-    name: 'Cyberpunk City',
-    description: 'A decentralized narrative universe powered by blockchain technology',
-    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=800&h=400&fit=crop'
-  };
+export const Route = createFileRoute("/universes")({
+  component: RouteComponent,
+});
 
-  // Timeline contract interaction states
-  const [nodeLink, setNodeLink] = useState('');
-  const [nodePlot, setNodePlot] = useState('');
-  const [previousNode, setPreviousNode] = useState(0);
-  const [queryNodeId, setQueryNodeId] = useState(1);
-  const [mediaNodeId, setMediaNodeId] = useState(1);
-  const [isCreating, setIsCreating] = useState(false);
-
-  // New function states
-  const [updateMediaNodeId, setUpdateMediaNodeId] = useState(1);
-  const [updateMediaLink, setUpdateMediaLink] = useState('');
-  const [canonNodeId, setCanonNodeId] = useState(1);
-  const [isSettingMedia, setIsSettingMedia] = useState(false);
-  const [isSettingCanon, setIsSettingCanon] = useState(false);
-
-  // Video generation states
-  const [videoPrompt, setVideoPrompt] = useState('');
-  const [generatedVideoId, setGeneratedVideoId] = useState<string | null>(null);
-  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
-
-  // Walrus upload states
-  const [walrusBlobId, setWalrusBlobId] = useState<string | null>(null);
-  const [walrusVideoUrl, setWalrusVideoUrl] = useState<string | null>(null);
-  const [isUploadingToWalrus, setIsUploadingToWalrus] = useState(false);
-  const [walrusUploadUrl, setWalrusUploadUrl] = useState('');
-
-  // Expanded universe states
-  const [expandedUniverses, setExpandedUniverses] = useState<Record<string, boolean>>({});
-
-  const toggleUniverseExpansion = (universeId: string) => {
-    setExpandedUniverses(prev => ({
-      ...prev,
-      [universeId]: !prev[universeId]
-    }));
-  };
-
-  const { writeAsync: createNode } = useCreateNode(nodeLink, nodePlot, previousNode);
-  const { writeAsync: setMediaAsync } = useSetMedia(updateMediaNodeId, updateMediaLink);
-  const { writeAsync: setCanonAsync } = useSetCanon(canonNodeId);
-  const { data: nodeData, isLoading: isLoadingNode, refetch: refetchNode } = useGetNode(queryNodeId);
-  const { data: timelineData, isLoading: isLoadingTimeline, refetch: refetchTimeline } = useGetTimeline(0);
-  const { data: leavesData, isLoading: isLoadingLeaves, refetch: refetchLeaves } = useGetLeaves();
-  const { data: mediaData, isLoading: isLoadingMedia, refetch: refetchMedia } = useGetMedia(mediaNodeId);
-  const { data: canonChainData, isLoading: isLoadingCanonChain, refetch: refetchCanonChain } = useGetCanonChain();
-  const { data: fullGraphData, isLoading: isLoadingFullGraph, refetch: refetchFullGraph } = useGetFullGraph();
-
-  // Fetch all created cinematic universes
-  const { data: cinematicUniverses, isLoading: isLoadingUniverses, refetch: refetchUniverses } = useQuery({
-    queryKey: ['cinematicUniverses'],
-    queryFn: () => trpcClient.cinematicUniverses.getAll.query(),
+// Component to display Universe info with contract data
+function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
+  // Read contract data for Timeline contract with better error handling
+  const { data: nodeCount, isLoading: nodeCountLoading, error: nodeCountError } = useReadContract({
+    abi: timelineAbi,
+    address: universe.address as `0x${string}`,
+    functionName: 'latestNodeId',
+    query: {
+      enabled: !!universe.address && universe.address.startsWith('0x'),
+      select: (data) => data ? Number(data) : 0, // Convert BigInt to number immediately
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
   });
 
-  // Video generation hooks
-  const generateVideoMutation = useMutation({
-    mutationFn: (input: { prompt: string; model?: 'ray-flash-2' | 'ray-2' | 'ray-1-6'; resolution?: '540p' | '720p' | '1080p' | '4k'; duration?: '5s' | '10s' }) =>
-      trpcClient.video.generate.mutate(input),
+  const { data: owner, isLoading: ownerLoading, error: ownerError } = useReadContract({
+    abi: timelineAbi,
+    address: universe.address as `0x${string}`,
+    functionName: 'owner',
+    query: {
+      enabled: !!universe.address && universe.address.startsWith('0x'),
+      select: (data) => data?.toString() || '', // Convert address to string
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
   });
 
-  const { data: videoStatus, refetch: refetchVideoStatus } = useQuery({
-    ...trpc.video.status.queryOptions({ id: generatedVideoId! }),
-    enabled: !!generatedVideoId,
-  });
-
-  // Walrus upload hooks
-  const uploadToWalrusMutation = useMutation({
-    mutationFn: (input: { url: string }) =>
-      trpcClient.walrus.uploadFromUrl.mutate(input),
-  });
-
-  // Fetch individual nodes (IDs 0-4) for timeline building
-  const { data: node0 } = useGetNode(0);
-  const { data: node1 } = useGetNode(1);
-  const { data: node2 } = useGetNode(2);
-  const { data: node3 } = useGetNode(3);
-  const { data: node4 } = useGetNode(4);
-
-  const nodeDataArray = [node0, node1, node2, node3, node4];
-  const availableNodeCount = nodeDataArray.filter(Boolean).length;
-
-  // Calculate timeline count from leaves
-  const timelineCount = leavesData && Array.isArray(leavesData) ? leavesData.length : 0;
-
-  // Calculate total nodes from full graph
-  const totalNodesFromGraph = fullGraphData && Array.isArray(fullGraphData) ? fullGraphData.length : availableNodeCount;
-
-  const handleCreateNode = async () => {
-    if (!nodeLink || !nodePlot) return;
-
-    try {
-      setIsCreating(true);
-      await createNode(nodeLink, nodePlot, previousNode);
-      // Reset form
-      setNodeLink('');
-      setNodePlot('');
-      setPreviousNode(0);
-      alert('Node created successfully!');
-    } catch (error) {
-      console.error('Error creating node:', error);
-      alert('Error creating node: ' + error);
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  const handleQueryNode = () => {
-    refetchNode();
-  };
-
-  const handleSetMedia = async () => {
-    if (!updateMediaLink) return;
-
-    try {
-      setIsSettingMedia(true);
-      await setMediaAsync(updateMediaNodeId, updateMediaLink);
-      setUpdateMediaLink('');
-      setUpdateMediaNodeId(1);
-      alert('Media set successfully!');
-    } catch (error) {
-      console.error('Error setting media:', error);
-      alert('Error setting media: ' + error);
-    } finally {
-      setIsSettingMedia(false);
-    }
-  };
-
-  const handleSetCanon = async () => {
-    try {
-      setIsSettingCanon(true);
-      await setCanonAsync(canonNodeId);
-      setCanonNodeId(1);
-      alert('Canon set successfully!');
-    } catch (error) {
-      console.error('Error setting canon:', error);
-      alert('Error setting canon: ' + error);
-    } finally {
-      setIsSettingCanon(false);
-    }
-  };
-
-  const handleGenerateVideo = async () => {
-    if (!videoPrompt.trim()) return;
-
-    try {
-      const result = await generateVideoMutation.mutateAsync({
-        prompt: videoPrompt,
-        model: 'ray-flash-2',
-        resolution: '720p',
-        duration: '5s'
-      }) as { id: string; status: string };
-
-      setGeneratedVideoId(result.id);
-      setGeneratedVideoUrl(null);
-      alert(`Video generation started! ID: ${result.id}`);
-
-      // Start polling for status
-      const pollStatus = setInterval(async () => {
-        const status = await refetchVideoStatus();
-        if (status.data?.status === 'completed') {
-          setGeneratedVideoUrl(status.data.videoUrl || null);
-          clearInterval(pollStatus);
-          alert('Video generation completed!');
-        } else if (status.data?.status === 'failed') {
-          clearInterval(pollStatus);
-          alert(`Video generation failed: ${status.data.failureReason}`);
-        }
-      }, 3000);
-
-    } catch (error) {
-      console.error('Error generating video:', error);
-      alert('Error generating video: ' + error);
-    }
-  };
-
-  const handleUploadToWalrus = async () => {
-    if (!walrusUploadUrl.trim()) return;
-
-    try {
-      setIsUploadingToWalrus(true);
-      const walrusResult = await uploadToWalrusMutation.mutateAsync({
-        url: walrusUploadUrl.trim()
-      }) as { blobId: string; url: string };
-
-      setWalrusBlobId(walrusResult.blobId);
-      setWalrusVideoUrl(walrusResult.url);
-      alert(`Video uploaded to Walrus! Blob ID: ${walrusResult.blobId}`);
-    } catch (error) {
-      console.error('Error uploading to Walrus:', error);
-      alert('Walrus upload failed: ' + error);
-    } finally {
-      setIsUploadingToWalrus(false);
-    }
-  };
+  const nodeCountNumber = nodeCountError ? '?' : (nodeCountLoading ? '...' : (nodeCount || 0));
+  
+  // Log any contract call errors for debugging
+  if (nodeCountError) console.error('Node count error:', nodeCountError);
+  if (ownerError) console.error('Owner error:', ownerError);
 
   return (
-    <div className="container mx-auto p-6">
-      {/* Blockchain Timeline Actions */}
-
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-4">Cinematic Universes</h1>
-        <p className="text-lg text-muted-foreground">
-          Explore decentralized narrative universes with blockchain-powered timelines
-        </p>
-      </div>
-
-      {/* Created Cinematic Universes */}
-      {cinematicUniverses?.data && cinematicUniverses.data.length > 0 && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-semibold">Created Universes ({cinematicUniverses.total})</h2>
-            <Button onClick={() => refetchUniverses()} disabled={isLoadingUniverses}>
-              {isLoadingUniverses ? 'Loading...' : 'Refresh'}
+    <Card 
+      className="cursor-pointer hover:shadow-lg transition-all duration-300 group overflow-hidden"
+      onClick={() => onSelect(universe.id)}
+    >
+      <CardContent className="p-0">
+        {/* Universe Thumbnail/Header */}
+        <div className="h-32 bg-gradient-to-br from-indigo-500 to-purple-600 relative">
+          <div className="absolute inset-0 bg-black/20" />
+          <div className="absolute top-2 right-2 flex gap-2">
+            {universe.address && (
+              <Badge variant="secondary" className="bg-white/20 text-white border-0">
+                <Database className="h-3 w-3 mr-1" />
+                {nodeCountNumber} nodes
+              </Badge>
+            )}
+          </div>
+          <div className="absolute bottom-2 left-2">
+            <div className="text-white text-xs bg-black/40 px-2 py-1 rounded">
+              {universe.address ? 'On-chain Timeline' : 'Off-chain'}
+            </div>
+          </div>
+        </div>
+        
+        {/* Universe Info */}
+        <div className="p-4">
+          <h3 className="font-semibold truncate group-hover:text-primary transition-colors">
+            {universe.name}
+          </h3>
+          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+            {universe.description || "Explore this narrative universe"}
+          </p>
+          
+          {/* Contract Addresses */}
+          {universe.address && (
+            <div className="mt-3 space-y-1">
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground">Timeline:</span>
+                <code className="text-xs bg-muted px-1 rounded truncate flex-1">
+                  {universe.address.slice(0, 6)}...{universe.address.slice(-4)}
+                </code>
+              </div>
+              {universe.tokenAddress && (
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground">Token:</span>
+                  <code className="text-xs bg-muted px-1 rounded truncate flex-1">
+                    {universe.tokenAddress.slice(0, 6)}...{universe.tokenAddress.slice(-4)}
+                  </code>
+                </div>
+              )}
+              {universe.governanceAddress && (
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground">Governor:</span>
+                  <code className="text-xs bg-muted px-1 rounded truncate flex-1">
+                    {universe.governanceAddress.slice(0, 6)}...{universe.governanceAddress.slice(-4)}
+                  </code>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <div className="flex items-center justify-between mt-3">
+            <span className="text-xs text-muted-foreground">
+              Created {new Date(universe.createdAt).toLocaleDateString()}
+            </span>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(universe.id);
+              }}
+            >
+              <Play className="h-3 w-3" />
             </Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {cinematicUniverses.data.map((universe: any) => (
-              <Card key={universe.id} className="transition-all hover:shadow-lg">
-                <div className="relative">
-                  <img
-                    src={universe.image_url}
-                    alt={`Universe ${universe.id}`}
-                    className="w-full h-48 object-cover rounded-t-lg"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=800&h=400&fit=crop';
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-black/20 rounded-t-lg" />
-                  <div className="absolute bottom-4 left-4 text-white">
-                    <h3 className="font-bold text-xl">Universe #{universe.id}</h3>
-                  </div>
-                </div>
-                <CardContent className="p-4">
-                  <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
-                    {universe.description}
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="bg-purple-50 text-xs">
-                        Timeline Contract
-                      </Badge>
-                      <Badge variant="outline" className="bg-green-50 text-xs">
-                        Active
-                      </Badge>
-                    </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
-                    <div className="text-xs text-muted-foreground">
-                      <p><strong>Creator:</strong> {universe.creator.slice(0, 6)}...{universe.creator.slice(-4)}</p>
-                      <p><strong>Timeline:</strong> {universe.address.slice(0, 6)}...{universe.address.slice(-4)}</p>
-                    </div>
+// Create a public client for reading contract events
+const publicClient = createPublicClient({
+  chain: sepolia,
+  transport: http()
+});
 
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <Button size="sm" className="flex-1" asChild>
-                          <Link to="/flow" search={{
-                            universeId: universe.id,
-                            timelineAddress: universe.address,
-                            description: universe.description
-                          }}>
-                            Flow Editor
-                          </Link>
-                        </Button>
-                        <Button size="sm" variant="outline" className="flex-1" asChild>
-                          <Link to="/universe/$id" params={{ id: universe.id }}>
-                            Timeline Graph
-                          </Link>
-                        </Button>
-                      </div>
+function RouteComponent() {
+  const { user } = useDynamicContext();
+  const navigate = Route.useNavigate();
+  const chainId = useChainId();
 
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="w-full text-xs"
-                        onClick={() => toggleUniverseExpansion(universe.id)}
-                      >
-                        {expandedUniverses[universe.id] ? (
-                          <>
-                            <ChevronUp className="w-3 h-3 mr-1" />
-                            Hide Timeline Actions
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="w-3 h-3 mr-1" />
-                            Show Timeline Actions
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
+  // Fetch universes from database first, fallback to localStorage
+  const { data: universesData, isLoading, error } = useQuery({
+    queryKey: ['blockchain-universes'],
+    queryFn: async () => {
+      try {
+        // Get universes directly from localStorage (no database dependency)
+        console.log('Fetching universes from localStorage...');
+        
+        const stored = localStorage.getItem('createdUniverses');
+        const localUniverses = stored ? JSON.parse(stored) : [];
+        
+        console.log('📦 Found', localUniverses.length, 'universes in localStorage:', localUniverses);
+        return localUniverses;
+        
+      } catch (error) {
+        console.error('localStorage fetch failed:', error);
+        return [];
+      }
+    },
+    enabled: true,
+    retry: 1
+  });
 
-                {/* Expanded Timeline Actions */}
-                {expandedUniverses[universe.id] && (
-                  <CardContent className="pt-0 border-t bg-muted/20">
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-sm text-muted-foreground">Timeline Actions for {universe.id.slice(0, 8)}...</h4>
+  useEffect(() => {
+    if (!user) {
+      navigate({
+        to: "/",
+      });
+    }
+  }, [user, navigate]);
 
-                      {/* Video Generation Section */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2 p-3 bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 rounded-lg">
-                          <h5 className="font-medium text-pink-700 text-sm">🎬 Video Generation</h5>
-                          <div className="space-y-2">
-                            <input
-                              type="text"
-                              placeholder="Video prompt for this universe..."
-                              value={videoPrompt}
-                              onChange={(e) => setVideoPrompt(e.target.value)}
-                              className="w-full px-2 py-1 text-sm border border-pink-300 rounded focus:outline-none focus:ring-1 focus:ring-pink-500"
-                            />
-                            <button
-                              onClick={handleGenerateVideo}
-                              disabled={!videoPrompt.trim() || generateVideoMutation.isPending}
-                              className="w-full px-3 py-1 text-sm bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded hover:from-pink-600 hover:to-purple-600 disabled:bg-gray-400"
-                            >
-                              {generateVideoMutation.isPending ? 'Generating...' : 'Generate Video'}
-                            </button>
-                          </div>
-                        </div>
+  const selectUniverse = (universeId: string) => {
+    navigate({
+      to: "/universe/$id",
+      params: { id: universeId },
+    });
+  };
 
-                        {/* Walrus Upload Section */}
-                        <div className="space-y-2 p-3 bg-gradient-to-r from-blue-50 to-teal-50 border border-blue-200 rounded-lg">
-                          <h5 className="font-medium text-blue-700 text-sm">🐙 Upload to Walrus</h5>
-                          <div className="space-y-2">
-                            <input
-                              type="text"
-                              placeholder="Video URL to upload..."
-                              value={walrusUploadUrl}
-                              onChange={(e) => setWalrusUploadUrl(e.target.value)}
-                              className="w-full px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
-                            <button
-                              onClick={handleUploadToWalrus}
-                              disabled={!walrusUploadUrl.trim() || isUploadingToWalrus}
-                              className="w-full px-3 py-1 text-sm bg-gradient-to-r from-blue-500 to-teal-500 text-white rounded hover:from-blue-600 hover:to-teal-600 disabled:bg-gray-400"
-                            >
-                              {isUploadingToWalrus ? 'Uploading...' : 'Upload to Walrus'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+  const createNewUniverse = () => {
+    navigate({
+      to: "/cinematicUniverseCreate",
+    });
+  };
 
-                      {/* Quick Timeline Info */}
-                      <div className="text-xs text-muted-foreground bg-white/50 p-2 rounded border">
-                        <p><strong>Timeline Contract:</strong> {universe.address}</p>
-                        <p><strong>Token:</strong> {universe.tokenAddress}</p>
-                        <p><strong>Governance:</strong> {universe.governanceAddress}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            ))}
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Connect Your Wallet</CardTitle>
+            <CardDescription>
+              Connect your wallet to access the universes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">Please connect your wallet to view created universes.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading universes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Use all universes from database
+  const universes = universesData || [];
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="border-b bg-card">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">LOAR Universes</h1>
+              <p className="text-muted-foreground">Select a narrative universe to explore</p>
+            </div>
+            <Button onClick={createNewUniverse} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Create Universe
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Error notification */}
+      {error && (
+        <div className="container mx-auto px-6 pt-4">
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              ⚠️ Unable to load universes. Make sure you're connected to Sepolia testnet.
+            </p>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Default Blockchain Universe Card */}
-        <div className="space-y-4">
-          <h2 className="text-2xl font-semibold">Default Universe</h2>
-          <Card className="transition-all hover:shadow-lg">
+      <div className="container mx-auto px-6 py-8">
+        {/* Featured Universe Section */}
+        {universes.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-xl font-semibold mb-6">Latest Universe</h2>
             <div className="relative">
-              <img
-                src={blockchainUniverse.imageUrl}
-                alt={blockchainUniverse.name}
-                className="w-full h-48 object-cover rounded-t-lg"
+              <UniverseCard 
+                universe={universes[0]} 
+                onSelect={selectUniverse}
               />
-              <div className="absolute inset-0 bg-black/20 rounded-t-lg" />
-              <div className="absolute bottom-4 left-4 text-white">
-                <h3 className="font-bold text-2xl">{blockchainUniverse.name}</h3>
-              </div>
             </div>
-            <CardContent className="p-6">
-              <p className="text-muted-foreground mb-4">
-                {blockchainUniverse.description}
-              </p>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-blue-50">
-                    Smart Contract Powered
-                  </Badge>
-                  <Badge variant="outline" className="bg-green-50">
-                    Live Data
-                  </Badge>
-                </div>
+          </section>
+        )}
 
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Total Nodes:</p>
-                    <p className="text-2xl font-bold">
-                      {totalNodesFromGraph}
-                    </p>
-                  </div>
-                  <Button asChild>
-                    <Link to="/universe/$id" params={{ id: blockchainUniverse.id }}>
-                      View Timeline Graph →
-                    </Link>
-                  </Button>
-                </div>
+        {/* All Universes Grid */}
+        <section>
+          <h2 className="text-xl font-semibold mb-6">Your Universes</h2>
+          {universes.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="mb-4">
+                <Users className="h-12 w-12 mx-auto text-muted-foreground" />
               </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Blockchain Data Display */}
-        <div className="space-y-4">
-          <h2 className="text-2xl font-semibold">Live Blockchain Data</h2>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Timeline Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Timeline Leaves:</span>
-                  <Badge variant="secondary">
-                    {timelineCount}
-                  </Badge>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Available Events:</span>
-                  <Badge variant="outline">
-                    {availableNodeCount}
-                  </Badge>
-                </div>
-
-                {leavesData && Array.isArray(leavesData) && leavesData.length > 0 && (
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Timeline Endpoints:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {leavesData.map((leafId, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          Leaf {typeof leafId === 'bigint' ? Number(leafId) : leafId}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-3 border-t">
-                  <p className="text-xs text-muted-foreground">
-                    Timelines traced from leaves using getLeaves() and getNode()
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              <h3 className="text-lg font-medium mb-2">No universes yet</h3>
+              <p className="text-muted-foreground mb-4">Create your first narrative universe to get started</p>
+              <Button onClick={createNewUniverse} className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Create Your First Universe
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {universes.map((universe: any) => (
+                <UniverseCard 
+                  key={universe.id}
+                  universe={universe}
+                  onSelect={selectUniverse}
+                />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
 }
-
-export const Route = createFileRoute("/universes")({
-  component: UniversesPage,
-});
