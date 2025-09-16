@@ -1,17 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useDynamicContext, useUserWallets } from "@dynamic-labs/sdk-react-core";
+import { usePorto } from "@/lib/porto-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Play, Sparkles, Video, Shield, Coins, ShoppingBag } from "lucide-react";
+import { PortoTest } from "@/components/porto-test";
+import { PortoAdvanced } from "@/components/porto-advanced";
+import { PortoDebug } from "@/components/porto-debug";
 
 export const Route = createFileRoute("/")({
   component: HomeComponent,
 });
 
 function HomeComponent() {
-  const { user, handleConnect } = useDynamicContext();
-  const userWallets = useUserWallets();
+  const { isConnected, address, connect } = usePorto();
 
   return (
     <div className="min-h-screen bg-background">
@@ -26,16 +28,16 @@ function HomeComponent() {
             <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
               Features
             </a>
-            {user ? (
+            {isConnected ? (
               <Button asChild size="sm">
                 <a href="/universes">Universes</a>
               </Button>
             ) : (
               <>
-                <Button variant="outline" size="sm" onClick={handleConnect}>
+                <Button variant="outline" size="sm" onClick={connect}>
                   Sign In
                 </Button>
-                <Button size="sm" onClick={handleConnect}>
+                <Button size="sm" onClick={connect}>
                   Get Started
                 </Button>
               </>
@@ -59,7 +61,7 @@ function HomeComponent() {
             required – just describe your vision and watch it come to life.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            {user ? (
+            {isConnected ? (
               <Button size="lg" className="text-lg px-8 py-6" asChild>
                 <a href="/universes">
                   <Play className="w-5 h-5 mr-2" />
@@ -67,7 +69,7 @@ function HomeComponent() {
                 </a>
               </Button>
             ) : (
-              <Button size="lg" className="text-lg px-8 py-6" onClick={handleConnect}>
+              <Button size="lg" className="text-lg px-8 py-6" onClick={connect}>
                 <Play className="w-5 h-5 mr-2" />
                 Start Creating
               </Button>
@@ -254,6 +256,23 @@ function HomeComponent() {
                 </CardDescription>
               </CardHeader>
             </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Porto Wallet Test Section */}
+      <section className="py-20 px-4 bg-muted/30">
+        <div className="container mx-auto max-w-4xl">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold mb-4">Porto Wallet Integration</h2>
+            <p className="text-muted-foreground">
+              Test the Porto wallet integration below
+            </p>
+          </div>
+          <div className="flex flex-col items-center gap-8">
+            <PortoDebug />
+            <PortoTest />
+            <PortoAdvanced />
           </div>
         </div>
       </section>

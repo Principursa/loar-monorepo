@@ -26,8 +26,6 @@
     "sc:test:integration": "turbo run sc:test:integration"
   },
   "dependencies": {
-    "@dynamic-labs/ethereum": "^4.26.0",
-    "@dynamic-labs/sdk-react-core": "^4.26.0",
     "@langchain/openai": "^0.6.7",
     "@modelcontextprotocol/sdk": "^1.17.3",
     "@openai/agents": "^0.0.17",

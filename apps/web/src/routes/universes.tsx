@@ -1,4 +1,4 @@
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { usePorto } from "@/lib/porto-provider";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -138,7 +138,7 @@ const publicClient = createPublicClient({
 });
 
 function RouteComponent() {
-  const { user } = useDynamicContext();
+  const { isConnected, address } = usePorto();
   const navigate = Route.useNavigate();
   const chainId = useChainId();
 

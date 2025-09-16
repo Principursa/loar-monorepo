@@ -1,4 +1,4 @@
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { usePorto } from "@/lib/porto-provider";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function RouteComponent() {
-  const { user, isConnecting, handleConnect } = useDynamicContext();
+  const { isConnected, address, connect } = usePorto();
   const navigate = Route.useNavigate();
 
   // Dummy data for testing
