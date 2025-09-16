@@ -1,4 +1,4 @@
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+// import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,10 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function RouteComponent() {
-  const { user, isConnecting, handleConnect } = useDynamicContext();
+  // const { user, isConnecting, handleConnect } = useDynamicContext();
+  const user = null;
+  const isConnecting = false;
+  const handleConnect = () => {};
   const navigate = Route.useNavigate();
 
   // Dummy data for testing

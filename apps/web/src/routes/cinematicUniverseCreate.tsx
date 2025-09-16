@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { useAccount, useDeployContract, useWaitForTransactionReceipt, useBalance, useChainId, useSignMessage } from "wagmi";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+// import { useAccount, useDeployContract, useWaitForTransactionReceipt, useBalance, useChainId, useSignMessage } from "wagmi";
+// import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,10 +29,15 @@ export const Route = createFileRoute("/cinematicUniverseCreate")({
 });
 
 function CinematicUniverseCreate() {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
-  const { data: balance } = useBalance({ address });
-  const { signMessage } = useSignMessage();
+  // const { address, isConnected } = useAccount();
+  // const chainId = useChainId();
+  const address = null;
+  const isConnected = false;
+  const chainId = 11155111; // Sepolia testnet
+  // const { data: balance } = useBalance({ address });
+  // const { signMessage } = useSignMessage();
+  const balance = null;
+  const signMessage = () => {};
   const [tokenName, setTokenName] = useState("");
   const [tokenSymbol, setTokenSymbol] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -84,21 +89,33 @@ function CinematicUniverseCreate() {
     },
   });
 
-  const { deployContract: deployToken, data: tokenTxHash } = useDeployContract();
-  const { deployContract: deployGovernor, data: governorTxHash } = useDeployContract();
-  const { deployContract: deployTimeline, data: timelineTxHash } = useDeployContract();
+  // const { deployContract: deployToken, data: tokenTxHash } = useDeployContract();
+  // const { deployContract: deployGovernor, data: governorTxHash } = useDeployContract();
+  // const { deployContract: deployTimeline, data: timelineTxHash } = useDeployContract();
+  const deployToken = () => {};
+  const deployGovernor = () => {};
+  const deployTimeline = () => {};
+  const tokenTxHash = null;
+  const governorTxHash = null;
+  const timelineTxHash = null;
 
-  const { isSuccess: tokenDeployed, data: tokenReceipt } = useWaitForTransactionReceipt({
-    hash: tokenTxHash,
-  });
+  // const { isSuccess: tokenDeployed, data: tokenReceipt } = useWaitForTransactionReceipt({
+  //   hash: tokenTxHash,
+  // });
 
-  const { isSuccess: governorDeployed, data: governorReceipt } = useWaitForTransactionReceipt({
-    hash: governorTxHash,
-  });
+  // const { isSuccess: governorDeployed, data: governorReceipt } = useWaitForTransactionReceipt({
+  //   hash: governorTxHash,
+  // });
 
-  const { isSuccess: timelineDeployed, data: timelineReceipt } = useWaitForTransactionReceipt({
-    hash: timelineTxHash,
-  });
+  // const { isSuccess: timelineDeployed, data: timelineReceipt } = useWaitForTransactionReceipt({
+  //   hash: timelineTxHash,
+  // });
+  const tokenDeployed = false;
+  const tokenReceipt = null;
+  const governorDeployed = false;
+  const governorReceipt = null;
+  const timelineDeployed = false;
+  const timelineReceipt = null;
 
   // TanStack Query for contract addresses
   const { data: tokenAddress } = useQuery({

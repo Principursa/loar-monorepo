@@ -1,4 +1,4 @@
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+// import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus, Database } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
-import { useChainId, useReadContract } from 'wagmi';
-import { timelineAbi } from '@/generated';
-import { createPublicClient, http, parseEventLogs } from 'viem';
-import { sepolia } from 'viem/chains';
+// import { useChainId, useReadContract } from 'wagmi';
+// import { timelineAbi } from '@/generated';
+// import { createPublicClient, http, parseEventLogs } from 'viem';
+// import { sepolia } from 'viem/chains';
 
 export const Route = createFileRoute("/universes")({
   component: RouteComponent,
@@ -132,15 +132,17 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
 }
 
 // Create a public client for reading contract events
-const publicClient = createPublicClient({
-  chain: sepolia,
-  transport: http()
-});
+// const publicClient = createPublicClient({
+//   chain: sepolia,
+//   transport: http()
+// });
 
 function RouteComponent() {
-  const { user } = useDynamicContext();
+  // const { user } = useDynamicContext();
+  const user = null;
   const navigate = Route.useNavigate();
-  const chainId = useChainId();
+  // const chainId = useChainId();
+  const chainId = 11155111; // Sepolia testnet
 
   // Fetch universes from database first, fallback to localStorage
   const { data: universesData, isLoading, error } = useQuery({
