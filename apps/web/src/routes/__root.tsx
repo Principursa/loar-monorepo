@@ -12,7 +12,7 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
+// import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
 import "../index.css";
 
 export interface RouterAppContext {
@@ -50,7 +50,7 @@ function RootComponent() {
   return (
     <>
       <HeadContent />
-      <DynamicWidget variant="modal" />
+      {/* <DynamicWidget variant="modal" /> */}
       <ThemeProvider
         attribute="class"
         defaultTheme="dark"

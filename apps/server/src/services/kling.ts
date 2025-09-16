@@ -43,11 +43,15 @@ export class KlingService {
   private baseUrl = 'https://api-singapore.klingai.com/v1';
 
   constructor() {
+    // Make API keys optional for frontend development
     if (!process.env.KLING_ACCESS_KEY || !process.env.KLING_SECRET_KEY) {
-      throw new Error('KLING_ACCESS_KEY and KLING_SECRET_KEY environment variables are required');
+      console.warn('KLING_ACCESS_KEY and KLING_SECRET_KEY not set - Kling video generation will be disabled');
+      this.accessKey = '';
+      this.secretKey = '';
+    } else {
+      this.accessKey = process.env.KLING_ACCESS_KEY;
+      this.secretKey = process.env.KLING_SECRET_KEY;
     }
-    this.accessKey = process.env.KLING_ACCESS_KEY;
-    this.secretKey = process.env.KLING_SECRET_KEY;
   }
 
   private generateJWTToken(): string {
@@ -90,6 +94,10 @@ export class KlingService {
   }
 
   async createMultiImageVideo(options: KlingMultiImageOptions): Promise<KlingTaskResponse> {
+    if (!this.accessKey || !this.secretKey) {
+      throw new Error('Kling API keys not configured - service disabled');
+    }
+    
     console.log('🎬 Starting Kling Multi-Image to Video Generation\n');
     
     if (!options.image_list || options.image_list.length === 0) {
@@ -159,6 +167,10 @@ export class KlingService {
   }
 
   async getTaskStatus(taskId: string): Promise<KlingTaskResponse> {
+    if (!this.accessKey || !this.secretKey) {
+      throw new Error('Kling API keys not configured - service disabled');
+    }
+    
     try {
       console.log(`🔄 Checking Kling status for task: ${taskId}...`);
       

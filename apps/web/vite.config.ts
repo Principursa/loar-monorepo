@@ -14,6 +14,9 @@ export default defineConfig({
     minify: 'esbuild',
     sourcemap: false,
     chunkSizeWarningLimit: 10000,
+    commonjsOptions: {
+      esmExternals: true,
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -24,14 +27,17 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['@dynamic-labs/sdk-react-core'],
-  },
-  ssr: {
-    noExternal: ['@dynamic-labs/sdk-react-core'],
+    force: true,
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+    },
+  },
+  server: {
+    port: 3001,
+    hmr: {
+      port: 3001,
     },
   },
 });
