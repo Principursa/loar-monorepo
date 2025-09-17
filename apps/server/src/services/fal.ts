@@ -72,10 +72,7 @@ export class FalService {
     try {
       const model = options.model || 'fal-ai/nano-banana';
 
-      const input: any = {
-        prompt: options.prompt
-      };
-
+      const input: any = { prompt: options.prompt };
       if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
       if (options.imageSize) input.image_size = options.imageSize;
       if (options.numInferenceSteps) input.num_inference_steps = options.numInferenceSteps;
@@ -90,43 +87,29 @@ export class FalService {
       const result = await fal.subscribe(model, {
         input,
         logs: true,
-        onQueueUpdate: (update) => {
-          console.log('📊 FAL Queue Update:', update);
-        }
+        onQueueUpdate: (update) => console.log('📊 FAL Queue Update:', update)
       });
 
-      console.log('📥 Raw FAL Response:', JSON.stringify(result, null, 2));
-
       const data = (result as any).data;
-      if (!data) {
-        throw new Error('No data in FAL response');
-      }
+      if (!data) throw new Error('No data in FAL response');
 
       let images: Array<{ url: string; width?: number; height?: number; content_type?: string }> = [];
-
-      if (data.images && Array.isArray(data.images)) {
-        images = data.images;
-      } else if (data.image) {
-        images = [{ url: data.image }];
-      } else if (typeof data === 'string') {
-        images = [{ url: data }];
-      } else if (data.url) {
-        images = [{ url: data.url }];
-      }
+      if (data.images && Array.isArray(data.images)) images = data.images;
+      else if (data.image) images = [{ url: data.image }];
+      else if (typeof data === 'string') images = [{ url: data }];
+      else if (data.url) images = [{ url: data.url }];
 
       if (images.length === 0 || !images[0]?.url) {
         throw new Error(`No image URLs found. Response keys: ${Object.keys(data).join(', ')}`);
       }
 
-      const result_data = {
+      return {
         id: (result as any).requestId || Date.now().toString(),
-        status: 'completed' as const,
+        status: 'completed',
         imageUrl: images[0].url,
-        images: images,
+        images,
         seed: data.seed
       };
-
-      return result_data;
     } catch (error) {
       console.error('❌ FAL Image Generation Failed:', error);
       return {
@@ -143,7 +126,6 @@ export class FalService {
 
     try {
       const model = 'fal-ai/nano-banana/edit';
-
       const input: any = {
         prompt: options.prompt,
         image_urls: options.imageUrls,
@@ -155,20 +137,13 @@ export class FalService {
       const result = await fal.subscribe(model, {
         input,
         logs: true,
-        onQueueUpdate: (update) => {
-          console.log('📊 FAL Edit Queue Update:', update);
-        }
+        onQueueUpdate: (update) => console.log('📊 FAL Edit Queue Update:', update)
       });
 
       let responseData: any;
-
-      if ((result as any).data) {
-        responseData = (result as any).data;
-      } else if ((result as any).images) {
-        responseData = result;
-      } else {
-        throw new Error(`Unexpected FAL response structure. Keys: ${Object.keys(result as any).join(', ')}`);
-      }
+      if ((result as any).data) responseData = (result as any).data;
+      else if ((result as any).images) responseData = result;
+      else throw new Error(`Unexpected FAL response structure. Keys: ${Object.keys(result as any).join(', ')}`);
 
       if (!responseData.images || !Array.isArray(responseData.images)) {
         throw new Error(`Expected 'images' array in response. Got keys: ${Object.keys(responseData).join(', ')}`);
@@ -181,9 +156,9 @@ export class FalService {
 
       return {
         id: (result as any).requestId || Date.now().toString(),
-        status: 'completed' as const,
+        status: 'completed',
         imageUrl: images[0].url,
-        images: images,
+        images,
         seed: responseData.seed
       };
     } catch (error) {
@@ -199,15 +174,10 @@ export class FalService {
   async generateVideo(options: FalVideoGenerationOptions): Promise<FalVideoGenerationResult> {
     try {
       const model = options.model || 'fal-ai/ltx-video';
-
-      const input: any = {
-        prompt: options.prompt
-      };
+      const input: any = { prompt: options.prompt };
 
       if (model === 'fal-ai/veo3/fast/image-to-video') {
-        if (!options.imageUrl) {
-          throw new Error('Image URL is required for Veo3 image-to-video model');
-        }
+        if (!options.imageUrl) throw new Error('Image URL is required for Veo3 image-to-video model');
         input.image_url = options.imageUrl;
         input.duration = options.duration || 5;
         input.aspect_ratio = options.aspectRatio || "16:9";
@@ -219,18 +189,16 @@ export class FalService {
         input.height = options.height || 512;
         input.guidance_scale = options.guidanceScale || 3;
         input.num_inference_steps = options.numInferenceSteps || 30;
-
-        if (options.imageUrl) {
-          input.image_url = options.imageUrl;
-        }
+        if (options.imageUrl) input.image_url = options.imageUrl;
       }
+
+      console.log(`Starting Fal AI video generation with model: ${model}`);
+      console.log('Input parameters:', JSON.stringify(input, null, 2));
 
       const result = await fal.subscribe(model, {
         input,
         logs: true,
-        onQueueUpdate: (update) => {
-          console.log('Fal AI queue update:', update);
-        }
+        onQueueUpdate: (update) => console.log('Fal AI queue update:', update)
       });
 
       if ((result as any).data) {
