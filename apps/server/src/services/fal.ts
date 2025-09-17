@@ -59,7 +59,7 @@ export class FalService {
     if (!process.env.FAL_KEY) {
       throw new Error('FAL_KEY environment variable is required');
     }
-    
+
     fal.config({
       credentials: process.env.FAL_KEY
     });
@@ -68,15 +68,14 @@ export class FalService {
   async generateImage(options: FalImageGenerationOptions): Promise<FalImageGenerationResult> {
     console.log('🎨 === FAL IMAGE GENERATION ===');
     console.log('Options:', JSON.stringify(options, null, 2));
-    
+
     try {
       const model = options.model || 'fal-ai/nano-banana';
-      
+
       const input: any = {
         prompt: options.prompt
       };
 
-      // Add optional parameters
       if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
       if (options.imageSize) input.image_size = options.imageSize;
       if (options.numInferenceSteps) input.num_inference_steps = options.numInferenceSteps;
@@ -98,15 +97,13 @@ export class FalService {
 
       console.log('📥 Raw FAL Response:', JSON.stringify(result, null, 2));
 
-      // Parse the response
       const data = (result as any).data;
       if (!data) {
         throw new Error('No data in FAL response');
       }
 
-      // Extract images from various possible response formats
       let images: Array<{ url: string; width?: number; height?: number; content_type?: string }> = [];
-      
+
       if (data.images && Array.isArray(data.images)) {
         images = data.images;
       } else if (data.image) {
@@ -117,11 +114,7 @@ export class FalService {
         images = [{ url: data.url }];
       }
 
-      console.log('🖼️ Extracted images:', images);
-
       if (images.length === 0 || !images[0]?.url) {
-        console.error('❌ No valid image URLs found');
-        console.error('Available data keys:', Object.keys(data));
         throw new Error(`No image URLs found. Response keys: ${Object.keys(data).join(', ')}`);
       }
 
@@ -133,9 +126,7 @@ export class FalService {
         seed: data.seed
       };
 
-      console.log('✅ SUCCESS - Image Generation Result:', result_data);
       return result_data;
-
     } catch (error) {
       console.error('❌ FAL Image Generation Failed:', error);
       return {
@@ -149,25 +140,17 @@ export class FalService {
   async editImage(options: FalImageEditOptions): Promise<FalImageGenerationResult> {
     console.log('✏️ === FAL IMAGE EDITING ===');
     console.log('Options:', JSON.stringify(options, null, 2));
-    console.log('Number of images provided:', options.imageUrls.length);
-    
+
     try {
       const model = 'fal-ai/nano-banana/edit';
-      
+
       const input: any = {
         prompt: options.prompt,
-        image_urls: options.imageUrls, // This already accepts multiple images
+        image_urls: options.imageUrls,
         num_images: options.numImages || 1,
         output_format: "png",
         sync_mode: false
       };
-
-      // Note: Nano Banana Edit API doesn't support these parameters based on docs
-      // Removing unsupported parameters: strength, negative_prompt, num_inference_steps, guidance_scale, seed, enable_safety_checker
-
-      console.log(`🚀 Calling FAL API: ${model}`);
-      console.log('Input:', JSON.stringify(input, null, 2));
-      console.log('Image URLs being sent:', options.imageUrls);
 
       const result = await fal.subscribe(model, {
         input,
@@ -177,53 +160,32 @@ export class FalService {
         }
       });
 
-      console.log('📥 Raw FAL Edit Response:', JSON.stringify(result, null, 2));
-
-      // For FAL subscribe, the response structure is: { data: { images: [...], ... }, requestId: "...", ... }
-      // Let's be more flexible with the response parsing
       let responseData: any;
-      
+
       if ((result as any).data) {
         responseData = (result as any).data;
-        console.log('📥 Found .data property in response');
       } else if ((result as any).images) {
         responseData = result;
-        console.log('📥 Found .images directly in response');
       } else {
-        console.error('❌ Unexpected response structure:', Object.keys(result as any));
-        console.error('Full response:', JSON.stringify(result, null, 2));
         throw new Error(`Unexpected FAL response structure. Keys: ${Object.keys(result as any).join(', ')}`);
       }
 
-      console.log('📥 Response data to parse:', JSON.stringify(responseData, null, 2));
-
-      // According to API docs, response has: { images: [{ url: "..." }], description: "..." }
       if (!responseData.images || !Array.isArray(responseData.images)) {
-        console.error('❌ No images array in response data');
-        console.error('Available response data keys:', Object.keys(responseData));
         throw new Error(`Expected 'images' array in response. Got keys: ${Object.keys(responseData).join(', ')}`);
       }
 
       const images = responseData.images;
-      console.log('🖼️ Extracted images from API:', images);
-
       if (images.length === 0 || !images[0]?.url) {
-        console.error('❌ No valid image URLs found');
-        console.error('Images:', images);
         throw new Error('Images array is empty or missing URLs');
       }
 
-      const result_data = {
+      return {
         id: (result as any).requestId || Date.now().toString(),
         status: 'completed' as const,
         imageUrl: images[0].url,
         images: images,
         seed: responseData.seed
       };
-
-      console.log('✅ SUCCESS - Image Edit Result:', result_data);
-      return result_data;
-
     } catch (error) {
       console.error('❌ FAL Image Edit Failed:', error);
       return {
@@ -237,12 +199,11 @@ export class FalService {
   async generateVideo(options: FalVideoGenerationOptions): Promise<FalVideoGenerationResult> {
     try {
       const model = options.model || 'fal-ai/ltx-video';
-      
+
       const input: any = {
         prompt: options.prompt
       };
 
-      // Configure input based on model type
       if (model === 'fal-ai/veo3/fast/image-to-video') {
         if (!options.imageUrl) {
           throw new Error('Image URL is required for Veo3 image-to-video model');
@@ -258,14 +219,11 @@ export class FalService {
         input.height = options.height || 512;
         input.guidance_scale = options.guidanceScale || 3;
         input.num_inference_steps = options.numInferenceSteps || 30;
-        
+
         if (options.imageUrl) {
           input.image_url = options.imageUrl;
         }
       }
-
-      console.log(`Starting Fal AI video generation with model: ${model}`);
-      console.log('Input parameters:', JSON.stringify(input, null, 2));
 
       const result = await fal.subscribe(model, {
         input,
@@ -297,7 +255,7 @@ export class FalService {
   async getGenerationStatus(id: string): Promise<FalVideoGenerationResult> {
     try {
       const result = await fal.queue.status(id, { requestId: id, logs: true });
-      
+
       return {
         id,
         status: this.mapStatus((result as any).status),
