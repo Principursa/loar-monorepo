@@ -42,8 +42,9 @@ export class VideoService {
           prompt: options.prompt
         });
         
-        // Use weserv.nl proxy for OpenSea images to make them accessible to LumaAI
+        // Handle different types of image URLs
         let proxyUrl = options.imageUrl;
+        
         if (options.imageUrl.includes('seadn.io') || options.imageUrl.includes('opensea.io')) {
           proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(options.imageUrl)}`;
           console.log('Using weserv proxy for OpenSea image:', proxyUrl);

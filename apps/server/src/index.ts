@@ -6,6 +6,7 @@ import { auth } from "./lib/auth";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { imageRouter } from "./routes/image";
 
 const app = new Hono();
 
@@ -22,6 +23,8 @@ app.use(
 
 app.on(["POST", "GET"], "/api/auth/**", (c) => auth.handler(c.req.raw));
 
+// Add image serving routes
+app.route("/images", imageRouter);
 
 app.use(
   "/trpc/*",
@@ -43,4 +46,12 @@ app.get("/health", (c) => {
   return c.json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
-export default app;
+const port = parseInt(process.env.PORT || "3000");
+
+console.log(`🚀 Starting server on port ${port}`);
+console.log(`🌍 CORS origin: ${process.env.CORS_ORIGIN || "not set"}`);
+
+export default {
+  port,
+  fetch: app.fetch,
+};
