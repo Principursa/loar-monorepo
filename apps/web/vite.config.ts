@@ -10,28 +10,9 @@ export default defineConfig({
     react(),
     tanstackRouter({}),
   ],
-  build: {
-    minify: 'esbuild',
-    sourcemap: false,
-    chunkSizeWarningLimit: 10000,
-    commonjsOptions: {
-      esmExternals: true,
-    },
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules/starknetkit')) return 'starknetkit';
-          // no local src/core chunks
-        },
-      },
-    },
-  },
-  optimizeDeps: {
-    force: true,
-  },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   server: {
