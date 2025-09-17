@@ -17,7 +17,7 @@ import { falService } from "../services/fal";
 import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverses.index";
 import { geminiRouter } from "./gemini/gemini.routes";
 import { falRouter } from "./fal/fal.routes";
-import { synapseService } from "@/services/synapse";
+import { synapseService } from "../services/synapse";
 
 
 export const appRouter = router({
