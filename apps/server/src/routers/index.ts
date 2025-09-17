@@ -14,6 +14,7 @@ import { walrusService } from "../services/walrus";
 import { klingService } from "../services/kling";
 
 import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverses.index";
+import { geminiRouter } from "./gemini/gemini.routes";
 
 
 export const appRouter = router({
@@ -27,6 +28,7 @@ export const appRouter = router({
     };
   }),
   cinematicUniverses: cinematicUniversesRouter,
+  gemini: geminiRouter,
   wiki: router({
     characters: publicProcedure.query(async () => {
       try {
@@ -227,6 +229,24 @@ export const appRouter = router({
         try {
           console.log(`🌐 Walrus upload request for: ${input.url}`);
           const result = await walrusService.uploadFromUrl(input.url);
+          console.log(`✅ Walrus upload success: ${result.blobId}`);
+          return result;
+        } catch (error) {
+          console.error('❌ Walrus upload error:', error);
+          throw error;
+        }
+      }),
+    uploadBase64: publicProcedure
+      .input(z.object({
+        base64Data: z.string().min(1, "Base64 data is required"),
+        filename: z.string().optional().default("generated-image.png")
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          console.log(`🌐 Walrus upload request for base64 data (${input.base64Data.length} chars)`);
+          // Convert base64 to buffer
+          const imageBuffer = Buffer.from(input.base64Data.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64');
+          const result = await walrusService.upload(imageBuffer);
           console.log(`✅ Walrus upload success: ${result.blobId}`);
           return result;
         } catch (error) {
