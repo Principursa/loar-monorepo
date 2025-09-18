@@ -5,6 +5,7 @@ import type { PieceCID } from "@filoz/synapse-sdk"
 
 
 export class SynapseService {
+  private static instance: SynapseService | null = null
   private constructor(private synapse: Synapse) {}
 
   static async init() {
@@ -14,6 +15,18 @@ export class SynapseService {
     })
     return new SynapseService(synapse)
   }
+
+  static async getInstance(): Promise<SynapseService> {
+    if (!this.instance) {
+      const synapse = await Synapse.create({
+        privateKey: `0x${process.env.PRIVATE_KEY}`,
+        rpcURL: RPC_URLS.calibration.http,
+      })
+      this.instance = new SynapseService(synapse)
+    }
+    return this.instance
+  }
+
 
   async upload(buffer: Buffer): Promise<any>
   async upload(path: string): Promise<any>
@@ -34,6 +47,10 @@ export class SynapseService {
     console.log(`Upload complete! PieceCID: ${uploadResult.pieceCid}`)
     return uploadResult.pieceCid
   }
+  async uploadFromUrl(input: string): Promise<PieceCID>{
+
+
+  }
 
 
   async download(pieceCid: PieceCID): Promise<any> {
@@ -43,4 +60,4 @@ export class SynapseService {
   }
 
 }
-//export const snyapseService = new SynapseService();
+export const snyapseService = SynapseService.init();
