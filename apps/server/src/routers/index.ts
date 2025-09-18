@@ -12,8 +12,11 @@ import { z } from "zod";
 import { videoService } from "../services/video";
 import { walrusService } from "../services/walrus";
 import { klingService } from "../services/kling";
+import { falService } from "../services/fal";
 
 import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverses.index";
+import { geminiRouter } from "./gemini/gemini.routes";
+import { falRouter } from "./fal/fal.routes";
 
 
 export const appRouter = router({
@@ -27,6 +30,8 @@ export const appRouter = router({
     };
   }),
   cinematicUniverses: cinematicUniversesRouter,
+  gemini: geminiRouter,
+  fal: falRouter,
   wiki: router({
     characters: publicProcedure.query(async () => {
       try {
@@ -160,7 +165,7 @@ export const appRouter = router({
     // Add provider selection for video generation
     generateWithProvider: publicProcedure
       .input(z.object({
-        provider: z.enum(['lumaai', 'kling']),
+        provider: z.enum(['lumaai', 'kling', 'fal']),
         prompt: z.string().min(1, "Prompt is required"),
         model: z.enum(['ray-flash-2', 'ray-2', 'ray-1-6']).optional(),
         resolution: z.enum(['540p', '720p', '1080p', '4k']).optional(),
@@ -178,7 +183,7 @@ export const appRouter = router({
             duration: input.duration,
             imageUrl: input.imageUrl
           });
-        } else {
+        } else if (input.provider === 'kling') {
           // Use Kling service for multi-image
           const imageUrls = input.imageUrls && input.imageUrls.length > 0 
             ? input.imageUrls 
@@ -215,6 +220,24 @@ export const appRouter = router({
                    result.data.task_status === 'processing' ? 'dreaming' : 
                    result.data.task_status === 'succeed' ? 'completed' : 'failed'
           };
+        } else {
+          // Use Fal AI service
+          const duration = input.duration === '10s' ? 10 : 5;
+          const result = await falService.generateVideo({
+            prompt: input.prompt,
+            imageUrl: input.imageUrl,
+            duration,
+            model: 'fal-ai/ltx-video' // Default to LTX Video for good speed/quality balance
+          });
+          
+          return {
+            id: result.id,
+            status: result.status === 'completed' ? 'completed' :
+                   result.status === 'in_progress' ? 'dreaming' :
+                   result.status === 'failed' ? 'failed' : 'pending',
+            videoUrl: result.videoUrl,
+            failureReason: result.error
+          };
         }
       }),
   }),
@@ -227,6 +250,24 @@ export const appRouter = router({
         try {
           console.log(`🌐 Walrus upload request for: ${input.url}`);
           const result = await walrusService.uploadFromUrl(input.url);
+          console.log(`✅ Walrus upload success: ${result.blobId}`);
+          return result;
+        } catch (error) {
+          console.error('❌ Walrus upload error:', error);
+          throw error;
+        }
+      }),
+    uploadBase64: publicProcedure
+      .input(z.object({
+        base64Data: z.string().min(1, "Base64 data is required"),
+        filename: z.string().optional().default("generated-image.png")
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          console.log(`🌐 Walrus upload request for base64 data (${input.base64Data.length} chars)`);
+          // Convert base64 to buffer
+          const imageBuffer = Buffer.from(input.base64Data.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64');
+          const result = await walrusService.upload(imageBuffer);
           console.log(`✅ Walrus upload success: ${result.blobId}`);
           return result;
         } catch (error) {
