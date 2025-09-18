@@ -17,6 +17,7 @@ import { falService } from "../services/fal";
 import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverses.index";
 import { geminiRouter } from "./gemini/gemini.routes";
 import { falRouter } from "./fal/fal.routes";
+import { synapseService } from "@/services/synapse";
 
 
 export const appRouter = router({
@@ -241,6 +242,28 @@ export const appRouter = router({
         }
       }),
   }),
+  synapse: router({
+    uploadFromUrl: publicProcedure
+      .input(z.object({
+        url: z.string().min(1, "URL is required")
+      }))
+      .mutation(async ({ input}) => {
+        try {
+          console.log(`Filecoin Synapse upload for ${input.url}`)
+          const result = await synapseService.uploadFromUrl(input.url)
+          console.log(`Filecoin Synapse sucessful: ${result}`)
+          return result;
+        } catch (error) {
+          console.error("Synapse upload error:", error)
+          throw error
+        }
+      }),
+    download: publicProcedure
+      .input(z.object({ pieceCid: z.string() }))
+      .query(async ({ input }) => {
+        return await synapseService.download(input.pieceCid);
+      }),
+  }),
   walrus: router({
     uploadFromUrl: publicProcedure
       .input(z.object({
@@ -267,7 +290,7 @@ export const appRouter = router({
           console.log(`🌐 Walrus upload request for base64 data (${input.base64Data.length} chars)`);
           // Convert base64 to buffer
           const imageBuffer = Buffer.from(input.base64Data.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64');
-          const result = await walrusService.upload(imageBuffer);
+          const result = await walrusService.uploadFile(imageBuffer);
           console.log(`✅ Walrus upload success: ${result.blobId}`);
           return result;
         } catch (error) {
