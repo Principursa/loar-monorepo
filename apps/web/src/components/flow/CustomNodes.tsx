@@ -1,6 +1,6 @@
 import { memo, useState, useCallback, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
-import { Loader2, Video } from 'lucide-react';
+import { Loader2, Video, Sparkles, Wand2 } from 'lucide-react';
 import { trpcClient } from '@/utils/trpc';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useWriteContract } from 'wagmi';
@@ -12,14 +12,56 @@ export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
   const [description, setDescription] = useState(data.description || '');
   const [selectedCharacterId, setSelectedCharacterId] = useState(data.selectedCharacterId || '');
   const [showCharacterSelector, setShowCharacterSelector] = useState(false);
+  const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+  const [generatingCharacter, setGeneratingCharacter] = useState(false);
+  const [characterName, setCharacterName] = useState('');
+  const [characterStyle, setCharacterStyle] = useState<'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'>('cute');
   const [currentPage, setCurrentPage] = useState(0);
   const charactersPerPage = 5;
 
   // Fetch available characters from database
-  const { data: charactersData, isLoading: isLoadingCharacters } = useQuery({
+  const { data: charactersData, isLoading: isLoadingCharacters, refetch: refetchCharacters } = useQuery({
     queryKey: ['characters'],
     queryFn: () => trpcClient.wiki.characters.query(),
   });
+
+  // Nano Banana character generation mutation
+  const generateCharacterMutation = useMutation({
+    mutationFn: (input: { name: string; description: string; style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk' }) =>
+      trpcClient.fal.generateCharacter.mutate(input),
+    onSuccess: async (result) => {
+      // Refetch characters to include the new one
+      await refetchCharacters();
+      
+      // Auto-select the new character if it has an ID
+      if (result.characterId) {
+        handleCharacterSelect(result.characterId);
+      }
+      
+      setShowGenerateDialog(false);
+      setGeneratingCharacter(false);
+    },
+    onError: (error) => {
+      console.error('Failed to generate character:', error);
+      alert('Failed to generate character. Please try again.');
+      setGeneratingCharacter(false);
+    }
+  });
+
+  // Handle AI character generation
+  const handleGenerateCharacter = useCallback(async () => {
+    if (!characterName.trim() || !description.trim()) {
+      alert('Please provide both a name and description for your character');
+      return;
+    }
+
+    setGeneratingCharacter(true);
+    await generateCharacterMutation.mutateAsync({
+      name: characterName,
+      description: description,
+      style: characterStyle
+    });
+  }, [characterName, description, characterStyle, generateCharacterMutation]);
 
   // Handle character selection
   const handleCharacterSelect = (characterId: string) => {
@@ -135,8 +177,8 @@ export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
         />
       </div>
 
-      {/* Character Selector */}
-      <div className="mt-2">
+      {/* Character Selector and Generation */}
+      <div className="mt-2 space-y-1">
         <button
           onClick={(e) => {
             onInteractionClick(e);
@@ -146,6 +188,20 @@ export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
           className="w-full py-1 px-2 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center"
         >
           {isLoadingCharacters ? 'Loading...' : selectedCharacter ? 'Change Character' : 'Select NFT Character'}
+        </button>
+        
+        {/* Generate with AI Button */}
+        <button
+          onClick={(e) => {
+            onInteractionClick(e);
+            setShowGenerateDialog(true);
+            setCharacterName('');
+            setCharacterStyle('cute');
+          }}
+          className="w-full py-1 px-2 text-xs rounded bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white flex items-center justify-center gap-1"
+        >
+          <Sparkles className="w-3 h-3" />
+          Generate with Nano Banana AI
         </button>
 
         {/* Character Dropdown with Pagination */}
@@ -216,6 +272,104 @@ export const CharacterNode = memo(({ data, isConnectable }: NodeProps) => {
           </div>
         )}
       </div>
+      
+      {/* AI Character Generation Dialog */}
+      {showGenerateDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => !generatingCharacter && setShowGenerateDialog(false)}>
+          <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <Wand2 className="w-4 h-4 text-purple-600" />
+              Generate Character with Nano Banana AI
+            </h3>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Character Name</label>
+                <input
+                  type="text"
+                  value={characterName}
+                  onChange={(e) => setCharacterName(e.target.value)}
+                  placeholder="Enter character name..."
+                  className="w-full p-2 border rounded text-sm dark:bg-slate-700"
+                  disabled={generatingCharacter}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Character Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Describe your character's appearance and personality..."
+                  className="w-full p-2 border rounded text-sm dark:bg-slate-700"
+                  rows={3}
+                  disabled={generatingCharacter}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Art Style</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['cute', 'realistic', 'anime', 'fantasy', 'cyberpunk'].map((style) => (
+                    <button
+                      key={style}
+                      onClick={() => setCharacterStyle(style as any)}
+                      disabled={generatingCharacter}
+                      className={`px-2 py-1 text-xs rounded capitalize ${
+                        characterStyle === style
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-200 dark:bg-slate-600 hover:bg-gray-300 dark:hover:bg-slate-500'
+                      } ${generatingCharacter ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      {style}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {generatingCharacter && (
+              <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded text-center">
+                <Loader2 className="w-6 h-6 animate-spin text-purple-600 mx-auto mb-2" />
+                <p className="text-sm text-purple-700 dark:text-purple-300">
+                  Generating your character with Nano Banana AI...
+                </p>
+                <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                  This may take a few moments
+                </p>
+              </div>
+            )}
+            
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={handleGenerateCharacter}
+                disabled={generatingCharacter || !characterName.trim() || !description.trim()}
+                className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-2 rounded text-sm hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+              >
+                {generatingCharacter ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3 h-3" />
+                    Generate Character
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setShowGenerateDialog(false)}
+                disabled={generatingCharacter}
+                className="px-3 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <Handle
         type="target"
         position={Position.Top}

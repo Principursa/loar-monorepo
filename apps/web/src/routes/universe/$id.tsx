@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Film, Plus, Settings, Clock, Users, Sparkles, Image, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Film, Plus, Settings, Clock, Users, Sparkles, Image, Loader2, RefreshCw, UserPlus, Wand2 } from "lucide-react";
 import ReactFlow, {
   Background,
   Controls,
@@ -70,6 +70,15 @@ function UniverseTimelineEditor() {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [showVideoStep, setShowVideoStep] = useState(false);
+  
+  // Character selection state
+  const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
+  const [showCharacterSelector, setShowCharacterSelector] = useState(false);
+  const [showCharacterGenerator, setShowCharacterGenerator] = useState(false);
+  const [characterName, setCharacterName] = useState('');
+  const [characterDescription, setCharacterDescription] = useState('');
+  const [characterStyle, setCharacterStyle] = useState<'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'>('cute');
+  const [isGeneratingCharacter, setIsGeneratingCharacter] = useState(false);
   
   // File upload state  
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
@@ -368,9 +377,95 @@ function UniverseTimelineEditor() {
     }
   }, [universe, id, isBlockchainUniverse]);
 
-  // Image generation mutation using tRPC
+  // Fetch available characters
+  const { data: charactersData, isLoading: isLoadingCharacters, refetch: refetchCharacters } = useQuery({
+    queryKey: ['characters'],
+    queryFn: () => trpcClient.wiki.characters.query(),
+  });
+
+  // Generate character mutation
+  const generateCharacterMutation = useMutation({
+    mutationFn: async (input: { name: string; description: string; style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk' }) => {
+      const result = await trpcClient.fal.generateCharacter.mutate(input);
+      return result;
+    },
+    onSuccess: async (data) => {
+      console.log('Character generated:', data);
+      setShowCharacterGenerator(false);
+      setIsGeneratingCharacter(false);
+      
+      // Add to selected characters
+      if (data.characterId) {
+        setSelectedCharacters(prev => [...prev, data.characterId!]);
+      }
+      
+      // Refetch characters to include the new one
+      await refetchCharacters();
+    },
+    onError: (error) => {
+      console.error('Character generation failed:', error);
+      alert("Failed to generate character. Please try again.");
+      setIsGeneratingCharacter(false);
+    }
+  });
+
+  // Image generation mutation with character support
   const generateImageMutation = useMutation({
     mutationFn: async (prompt: string) => {
+      // Check if we have selected characters to edit into the scene
+      if (selectedCharacters.length > 0 && charactersData?.characters) {
+        const selectedChars = charactersData.characters.filter((c: any) => selectedCharacters.includes(c.id));
+        
+        if (selectedChars.length > 0) {
+          // Use the first character's image as base for editing
+          const primaryCharacter = selectedChars[0];
+          const characterNames = selectedChars.map((c: any) => c.character_name).join(' and ');
+          
+          // Create edit prompt that places character in the scene
+          const editPrompt = `${characterNames} ${prompt}, cinematic scene, high quality, detailed environment`;
+          
+          console.log('Editing character into scene:', {
+            characterName: primaryCharacter.character_name,
+            characterImage: primaryCharacter.image_url,
+            scenePrompt: editPrompt
+          });
+          
+          try {
+            // Process character image URL through weserv.nl for better compatibility
+            const processedImageUrl = `https://images.weserv.nl/?url=${encodeURIComponent(primaryCharacter.image_url)}`;
+            
+            console.log('🎭 === CHARACTER SCENE EDITING ===');
+            console.log('Character name:', primaryCharacter.character_name);
+            console.log('Original image URL:', primaryCharacter.image_url);
+            console.log('Processed image URL:', processedImageUrl);
+            console.log('Scene prompt:', editPrompt);
+            console.log('🚀 Calling FAL editImage...');
+            
+            // Use Nano Banana image editing to place character in scene
+            const result = await trpcClient.fal.editImage.mutate({
+              prompt: editPrompt,
+              imageUrls: [processedImageUrl], // Now using array format as per FAL API
+              strength: 0.7, // Moderate transformation to keep character recognizable
+              negativePrompt: "blurry, low quality, distorted"
+            });
+            
+            console.log('✅ FAL editImage result:', result);
+            
+            if (result.status !== 'completed' || !result.imageUrl) {
+              throw new Error(result.error || 'Failed to edit character into scene');
+            }
+            
+            console.log('🎉 CHARACTER EDITING SUCCESSFUL!');
+            return { success: true, imageUrl: result.imageUrl };
+          } catch (editError) {
+            console.error('❌ CHARACTER EDITING FAILED:', editError);
+            throw editError; // No fallback - throw the actual error
+          }
+        }
+      }
+      
+      // Fallback to regular image generation for scenes without characters
+      console.log('Generating scene without characters using Gemini');
       const result = await trpcClient.gemini.generateImage.mutate({
         prompt
       });
@@ -390,7 +485,27 @@ function UniverseTimelineEditor() {
     },
     onError: (error) => {
       console.error("Error generating image:", error);
-      alert("Failed to generate image. Please try again.");
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        selectedCharacters,
+        charactersData: charactersData?.characters?.length
+      });
+      
+      // More specific error message
+      let errorMessage = "Failed to generate image. ";
+      if (selectedCharacters.length > 0) {
+        errorMessage += "Character image editing failed. ";
+      }
+      errorMessage += "Please try again.";
+      
+      if (error.message?.includes('FAL_KEY')) {
+        errorMessage = "FAL API key is missing. Please configure FAL_KEY in environment variables.";
+      } else if (error.message?.includes('nano-banana')) {
+        errorMessage = "Nano Banana model access issue. Falling back to regular generation.";
+      }
+      
+      alert(errorMessage);
     }
   });
 
@@ -1130,34 +1245,223 @@ function UniverseTimelineEditor() {
                 />
               </div>
 
+              {/* Character Selection Section */}
+              <div className="border rounded-lg p-4 bg-muted/20">
+                <div className="flex items-center justify-between mb-3">
+                  <Label className="text-sm font-medium">Characters in Scene</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowCharacterSelector(!showCharacterSelector)}
+                      disabled={isLoadingCharacters}
+                    >
+                      <UserPlus className="h-3 w-3 mr-1" />
+                      Select
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setShowCharacterGenerator(true);
+                        setCharacterName('');
+                        setCharacterDescription('');
+                        setCharacterStyle('cute');
+                      }}
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
+                    >
+                      <Wand2 className="h-3 w-3 mr-1" />
+                      Generate
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Selected Characters Display */}
+                {selectedCharacters.length > 0 && charactersData?.characters && (
+                  <div className="space-y-2 mb-2">
+                    {selectedCharacters.map(charId => {
+                      const char = charactersData.characters.find((c: any) => c.id === charId);
+                      if (!char) return null;
+                      return (
+                        <div key={charId} className="bg-background p-2 rounded-md border">
+                          <div className="flex items-center gap-2 mb-1">
+                            <img src={char.image_url} alt={char.character_name} className="w-8 h-8 rounded-full object-cover" />
+                            <div className="flex-1">
+                              <span className="text-sm font-medium">{char.character_name}</span>
+                              <div className="text-xs text-muted-foreground">{char.collection}</div>
+                            </div>
+                            <button
+                              onClick={() => setSelectedCharacters(prev => prev.filter(id => id !== charId))}
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              ×
+                            </button>
+                          </div>
+                          
+                          {/* Show Character Image URLs */}
+                          <div className="mt-1 p-1 bg-muted rounded text-xs space-y-1">
+                            <div>
+                              <div className="font-medium">Original URL:</div>
+                              <div className="font-mono text-xs break-all bg-background p-1 rounded">
+                                {char.image_url}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="font-medium">Processed URL (for AI):</div>
+                              <div className="font-mono text-xs break-all bg-background p-1 rounded">
+                                {`https://images.weserv.nl/?url=${encodeURIComponent(char.image_url)}`}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => navigator.clipboard.writeText(char.image_url)}
+                                className="text-blue-600 hover:underline text-xs"
+                              >
+                                Copy Original
+                              </button>
+                              <button
+                                onClick={() => navigator.clipboard.writeText(`https://images.weserv.nl/?url=${encodeURIComponent(char.image_url)}`)}
+                                className="text-green-600 hover:underline text-xs"
+                              >
+                                Copy Processed
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Character Selector Dropdown */}
+                {showCharacterSelector && charactersData?.characters && (
+                  <div className="mt-2 max-h-48 overflow-y-auto border rounded-md bg-background">
+                    {charactersData.characters.map((character: any) => (
+                      <div
+                        key={character.id}
+                        onClick={() => {
+                          if (!selectedCharacters.includes(character.id)) {
+                            setSelectedCharacters(prev => [...prev, character.id]);
+                          }
+                          setShowCharacterSelector(false);
+                        }}
+                        className="p-2 hover:bg-muted cursor-pointer flex items-center gap-2"
+                      >
+                        <img src={character.image_url} alt={character.character_name} className="w-8 h-8 rounded object-cover" />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium">{character.character_name}</div>
+                          <div className="text-xs text-muted-foreground">{character.collection}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {selectedCharacters.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Add characters to include them in the generated scene
+                  </p>
+                )}
+              </div>
+
               {/* Step 1: Generate Image */}
               {!generatedImageUrl && (
                 <div className="border rounded-lg p-4 bg-muted/20">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">1</span>
-                    <Label className="text-sm font-medium">Generate First Frame</Label>
+                    <Label className="text-sm font-medium">
+                      {selectedCharacters.length > 0 ? 'Edit Characters into Scene' : 'Generate First Frame'}
+                    </Label>
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
-                    Generate an image based on your scene description
+                    {selectedCharacters.length > 0 
+                      ? `Edit ${selectedCharacters.length} character(s) into the scene using Nano Banana AI`
+                      : 'Generate an image based on your scene description'
+                    }
                   </p>
-                  <Button
-                    onClick={handleGenerateEventImage}
-                    disabled={!videoDescription.trim() || isGeneratingImage}
-                    className="w-full"
-                    variant="secondary"
-                  >
-                    {isGeneratingImage ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating Image...
-                      </>
-                    ) : (
-                      <>
-                        <Image className="h-4 w-4 mr-2" />
-                        Generate First Frame
-                      </>
-                    )}
-                  </Button>
+                  <div className="space-y-2">
+                    <Button
+                      onClick={handleGenerateEventImage}
+                      disabled={!videoDescription.trim() || isGeneratingImage}
+                      className="w-full"
+                      variant="secondary"
+                    >
+                      {isGeneratingImage ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          {selectedCharacters.length > 0 ? 'Editing Characters...' : 'Generating Image...'}
+                        </>
+                      ) : (
+                        <>
+                          {selectedCharacters.length > 0 ? (
+                            <>
+                              <Wand2 className="h-4 w-4 mr-2" />
+                              Edit Characters into Scene
+                            </>
+                          ) : (
+                            <>
+                              <Image className="h-4 w-4 mr-2" />
+                              Generate First Frame
+                            </>
+                          )}
+                        </>
+                      )}
+                    </Button>
+                    
+                    <div className="flex gap-1">
+                      {/* Debug Button */}
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const result = await trpcClient.fal.testConnection.query();
+                            console.log('FAL Connection Test:', result);
+                            const message = 'message' in result ? result.message : result.error;
+                            const keyLength = 'keyLength' in result ? result.keyLength : 0;
+                            alert(`FAL Test: ${message}\nHas API Key: ${result.hasApiKey}\nKey Length: ${keyLength}`);
+                          } catch (error) {
+                            console.error('FAL test failed:', error);
+                            alert(`FAL Test Failed: ${error}`);
+                          }
+                        }}
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs"
+                      >
+                        🔧 Test FAL
+                      </Button>
+
+                      {/* Test Nano Banana Edit */}
+                      <Button
+                        onClick={async () => {
+                          try {
+                            console.log('🧪 Testing Nano Banana EDIT...');
+                            const testImageUrl = 'https://images.weserv.nl/?url=https%3A%2F%2Fi2.seadn.io%2Fbase%2F0x7e72abdf47bd21bf0ed6ea8cb8dad60579f3fb50%2F34234bf162d45933d645055a11c1b6%2Fa834234bf162d45933d645055a11c1b6.png';
+                            const result = await trpcClient.fal.editImage.mutate({
+                              prompt: "sitting in a coffee shop, cozy atmosphere",
+                              imageUrls: [testImageUrl],
+                              strength: 0.7
+                            });
+                            console.log('✅ Nano Banana EDIT test result:', result);
+                            if (result.status === 'completed' && result.imageUrl) {
+                              alert(`✅ Nano Banana Edit works!\nGenerated: ${result.imageUrl.substring(0, 50)}...`);
+                            } else {
+                              alert(`❌ Nano Banana Edit failed: ${result.error || 'Unknown error'}`);
+                            }
+                          } catch (error) {
+                            console.error('❌ Nano Banana Edit test failed:', error);
+                            alert(`❌ Nano Banana Edit test failed: ${error}`);
+                          }
+                        }}
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs"
+                      >
+                        ✏️ Test Edit
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1328,6 +1632,105 @@ function UniverseTimelineEditor() {
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Create Scene
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Character Generation Dialog */}
+      {showCharacterGenerator && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wand2 className="h-5 w-5 text-purple-600" />
+                Generate Character with Nano Banana AI
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="char-name">Character Name</Label>
+                <Input
+                  id="char-name"
+                  value={characterName}
+                  onChange={(e) => setCharacterName(e.target.value)}
+                  placeholder="Enter character name..."
+                  className="mt-1"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="char-desc">Character Description</Label>
+                <textarea
+                  id="char-desc"
+                  value={characterDescription}
+                  onChange={(e) => setCharacterDescription(e.target.value)}
+                  placeholder="Describe your character's appearance and personality..."
+                  rows={3}
+                  className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                />
+              </div>
+              
+              <div>
+                <Label>Art Style</Label>
+                <div className="grid grid-cols-3 gap-2 mt-1">
+                  {['cute', 'realistic', 'anime', 'fantasy', 'cyberpunk'].map((style) => (
+                    <Button
+                      key={style}
+                      type="button"
+                      size="sm"
+                      variant={characterStyle === style ? 'default' : 'outline'}
+                      onClick={() => setCharacterStyle(style as any)}
+                      className="capitalize"
+                    >
+                      {style}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCharacterGenerator(false)}
+                  disabled={isGeneratingCharacter}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!characterName.trim() || !characterDescription.trim()) {
+                      alert('Please provide both name and description');
+                      return;
+                    }
+                    setIsGeneratingCharacter(true);
+                    try {
+                      await generateCharacterMutation.mutateAsync({
+                        name: characterName,
+                        description: characterDescription,
+                        style: characterStyle
+                      });
+                    } catch (error) {
+                      console.error('Failed to generate character:', error);
+                    }
+                  }}
+                  disabled={isGeneratingCharacter || !characterName.trim() || !characterDescription.trim()}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
+                >
+                  {isGeneratingCharacter ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>
