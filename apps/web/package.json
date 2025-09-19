@@ -11,12 +11,10 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@coinbase/cdp-core": "^0.0.31",
-    "@coinbase/cdp-hooks": "^0.0.31",
-    "@coinbase/cdp-react": "^0.0.31",
     "@hookform/resolvers": "^5.1.1",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
+    "@rainbow-me/rainbowkit": "^2.2.8",
     "@tailwindcss/postcss": "^4.1.12",
     "@tailwindcss/vite": "^4.0.15",
     "@tanstack/react-form": "^1.12.3",

@@ -1,17 +1,12 @@
-import { createConfig, http } from 'wagmi'
+import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 import { mainnet, sepolia } from 'wagmi/chains'
 
 // Set Sepolia as the default chain
 export const defaultChain = sepolia
 
-declare module 'wagmi' {
-  interface Register {
-    config: typeof config
-  }
-}
-export const config = createConfig({
-  chains: [sepolia], // Only include Sepolia
-  transports: {
-    [sepolia.id]: http(),
-  },
+export const config = getDefaultConfig({
+  appName: 'LOAR - AI Video Generation',
+  projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'default-project-id',
+  chains: [sepolia, mainnet],
+  ssr: false,
 })
