@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-// import { useAccount, useDeployContract, useWaitForTransactionReceipt, useBalance, useChainId, useSignMessage } from "wagmi";
-// import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useAccount, useDeployContract, useWaitForTransactionReceipt, useBalance, useChainId, useSignMessage } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
 import { trpcClient } from "@/utils/trpc";
+import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { governanceErc20Abi, timelineAbi, universeGovernorAbi } from "@/generated";
 import governanceERC20Artifact from "../abis/GovernanceERC20.json"
 import universeGovernorArtifact from "../abis/UniverseGovernor.json"
@@ -29,15 +29,10 @@ export const Route = createFileRoute("/cinematicUniverseCreate")({
 });
 
 function CinematicUniverseCreate() {
-  // const { address, isConnected } = useAccount();
-  // const chainId = useChainId();
-  const address = null;
-  const isConnected = false;
-  const chainId = 11155111; // Sepolia testnet
-  // const { data: balance } = useBalance({ address });
-  // const { signMessage } = useSignMessage();
-  const balance = null;
-  const signMessage = () => {};
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { data: balance } = useBalance({ address });
+  const { signMessage } = useSignMessage();
   const [tokenName, setTokenName] = useState("");
   const [tokenSymbol, setTokenSymbol] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -89,33 +84,21 @@ function CinematicUniverseCreate() {
     },
   });
 
-  // const { deployContract: deployToken, data: tokenTxHash } = useDeployContract();
-  // const { deployContract: deployGovernor, data: governorTxHash } = useDeployContract();
-  // const { deployContract: deployTimeline, data: timelineTxHash } = useDeployContract();
-  const deployToken = () => {};
-  const deployGovernor = () => {};
-  const deployTimeline = () => {};
-  const tokenTxHash = null;
-  const governorTxHash = null;
-  const timelineTxHash = null;
+  const { deployContract: deployToken, data: tokenTxHash } = useDeployContract();
+  const { deployContract: deployGovernor, data: governorTxHash } = useDeployContract();
+  const { deployContract: deployTimeline, data: timelineTxHash } = useDeployContract();
 
-  // const { isSuccess: tokenDeployed, data: tokenReceipt } = useWaitForTransactionReceipt({
-  //   hash: tokenTxHash,
-  // });
+  const { isSuccess: tokenDeployed, data: tokenReceipt } = useWaitForTransactionReceipt({
+    hash: tokenTxHash,
+  });
 
-  // const { isSuccess: governorDeployed, data: governorReceipt } = useWaitForTransactionReceipt({
-  //   hash: governorTxHash,
-  // });
+  const { isSuccess: governorDeployed, data: governorReceipt } = useWaitForTransactionReceipt({
+    hash: governorTxHash,
+  });
 
-  // const { isSuccess: timelineDeployed, data: timelineReceipt } = useWaitForTransactionReceipt({
-  //   hash: timelineTxHash,
-  // });
-  const tokenDeployed = false;
-  const tokenReceipt = null;
-  const governorDeployed = false;
-  const governorReceipt = null;
-  const timelineDeployed = false;
-  const timelineReceipt = null;
+  const { isSuccess: timelineDeployed, data: timelineReceipt } = useWaitForTransactionReceipt({
+    hash: timelineTxHash,
+  });
 
   // TanStack Query for contract addresses
   const { data: tokenAddress } = useQuery({
@@ -292,6 +275,7 @@ function CinematicUniverseCreate() {
           {!isConnected ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground mb-4">Connect your wallet to create a cinematic universe</p>
+              <WalletConnectButton size="lg" />
             </div>
           ) : (
             <>

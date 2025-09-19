@@ -1,4 +1,3 @@
-// import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus, Database } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
-// import { useChainId, useReadContract } from 'wagmi';
-// import { timelineAbi } from '@/generated';
-// import { createPublicClient, http, parseEventLogs } from 'viem';
-// import { sepolia } from 'viem/chains';
+import { useChainId, useReadContract, useAccount } from 'wagmi';
+import { timelineAbi } from '@/generated';
+import { createPublicClient, http, parseEventLogs } from 'viem';
+import { sepolia } from 'viem/chains';
+import { WalletConnectButton } from "@/components/wallet-connect-button";
 
 export const Route = createFileRoute("/universes")({
   component: RouteComponent,
@@ -132,17 +132,15 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
 }
 
 // Create a public client for reading contract events
-// const publicClient = createPublicClient({
-//   chain: sepolia,
-//   transport: http()
-// });
+const publicClient = createPublicClient({
+  chain: sepolia,
+  transport: http()
+});
 
 function RouteComponent() {
-  // const { user } = useDynamicContext();
-  const user = null;
+  const { address, isConnected } = useAccount();
   const navigate = Route.useNavigate();
-  // const chainId = useChainId();
-  const chainId = 11155111; // Sepolia testnet
+  const chainId = useChainId();
 
   // Fetch universes from database first, fallback to localStorage
   const { data: universesData, isLoading, error } = useQuery({
@@ -168,12 +166,12 @@ function RouteComponent() {
   });
 
   useEffect(() => {
-    if (!user) {
+    if (!isConnected) {
       navigate({
         to: "/",
       });
     }
-  }, [user, navigate]);
+  }, [isConnected, navigate]);
 
   const selectUniverse = (universeId: string) => {
     navigate({
@@ -189,7 +187,7 @@ function RouteComponent() {
   };
 
 
-  if (!user) {
+  if (!isConnected) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Card className="w-full max-w-md">
@@ -199,8 +197,9 @@ function RouteComponent() {
               Connect your wallet to access the universes
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="text-center space-y-4">
             <p className="text-muted-foreground">Please connect your wallet to view created universes.</p>
+            <WalletConnectButton size="lg" />
           </CardContent>
         </Card>
       </div>
