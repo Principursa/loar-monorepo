@@ -3,15 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Play, Sparkles, Video, Shield, Coins, ShoppingBag } from "lucide-react";
-import { useCDPOfficial } from "@/lib/useCDPOfficial";
-import { CDPAuthButton } from "@/components/cdp-auth-button";
+import { useAccount } from "wagmi";
+import { WalletConnectButton } from "@/components/wallet-connect-button";
 
 export const Route = createFileRoute("/")({
   component: HomeComponent,
 });
 
 function HomeComponent() {
-  const { isInitialized, error, isAuthenticated, user, walletAddress, hooksReady } = useCDPOfficial();
+  const { address: walletAddress, isConnected: isAuthenticated } = useAccount();
 
 
   return (
@@ -20,27 +20,21 @@ function HomeComponent() {
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="LOAR Logo" className="h-10 w-10 object-contain" />
-            <span className="text-2xl font-bold text-foreground">LOAR</span>
+            <img src="/loarlogo.svg" alt="LOAR Logo" className="h-10 w-50 object-contain" />
           </div>
           <nav className="hidden md:flex items-center gap-6">
             <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
               Features
             </a>
-            {hooksReady && isAuthenticated ? (
+            {isAuthenticated ? (
               <div className="flex items-center gap-3">
-                {walletAddress && (
-                  <div className="px-3 py-1 rounded-md bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 text-xs font-mono">
-                    ...{walletAddress.slice(-8)}
-                  </div>
-                )}
                 <Button asChild size="sm">
-                  <a href="/universes">Universes</a>
+                  <a href="/universes" className="font-bold">Universes</a>
                 </Button>
-                <CDPAuthButton size="sm" />
+                <WalletConnectButton size="sm" />
               </div>
             ) : (
-              <CDPAuthButton size="sm" />
+              <WalletConnectButton size="sm" />
             )}
           </nav>
         </div>
@@ -49,33 +43,19 @@ function HomeComponent() {
       {/* Hero Section */}
       <section className="py-20 px-4 text-center bg-gradient-to-br from-primary/10 via-background to-accent/5">
         <div className="container mx-auto max-w-4xl">
-          <Badge variant="secondary" className="mb-6">
-            <Sparkles className="w-4 h-4 mr-2" />
-            AI-Powered Video Generation
-          </Badge>
           <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Create Stunning Videos in Minutes
+          Join the LOAR Revolution
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
-            Transform your ideas into professional videos with LOAR's advanced AI technology. No editing experience
-            required – just describe your vision and watch it come to life.
+          Create massive multiplayer narratives with friends. 
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            {hooksReady && isAuthenticated ? (
-              <Button size="lg" className="text-lg px-8 py-6" asChild>
-                <a href="/universes">
-                  <Play className="w-5 h-5 mr-2" />
-                  Start Creating
-                </a>
-              </Button>
-            ) : (
-              <Button size="lg" className="text-lg px-8 py-6" asChild>
-                <a href="/universes">
-                  <Play className="w-5 h-5 mr-2" />
-                  Start Creating
-                </a>
-              </Button>
-            )}
+            <Button size="lg" className="text-lg px-8 py-6" asChild>
+              <a href="/universes">
+                <Play className="w-5 h-5 mr-2" />
+                Start Creating
+              </a>
+            </Button>
             <Button variant="outline" size="lg" className="text-lg px-8 py-6 bg-transparent">
               <Video className="w-5 h-5 mr-2" />
               Watch Demo
@@ -83,64 +63,28 @@ function HomeComponent() {
           </div>
 
 
-          {/* CDP Status Section */}
-          {!isInitialized && (
-            <div className="mb-8 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <p className="text-yellow-800 dark:text-yellow-200 text-sm">
-                ⚠️ CDP Official SDK is loading... Please wait for initialization.
+          {/* Wallet Connection Status */}
+          {!isAuthenticated && (
+            <div className="mb-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-blue-800 dark:text-blue-200 text-sm">
+                💡 <strong>Connect Your Wallet:</strong> Connect any wallet supported by RainbowKit to start creating.
               </p>
             </div>
           )}
 
-              {/* Authentication Info Section */}
-              {isInitialized && !isAuthenticated && (
-                <div className="mb-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <p className="text-blue-800 dark:text-blue-200 text-sm">
-                    💡 <strong>Connect Your Wallet:</strong> Use the official Coinbase CDP authentication with support for email and SMS. 
-                    Both methods will create an embedded wallet for you automatically.
-                  </p>
-                  <p className="text-blue-700 dark:text-blue-300 text-xs mt-2">
-                    📱 <strong>Note:</strong> SMS authentication requires a US phone number (+1 country code).
-                  </p>
-                </div>
-              )}
-          
-          {error && (
-            <div className="mb-8 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-red-800 dark:text-red-200 text-sm">
-                ❌ {error}
-              </p>
-            </div>
-          )}
-
-          {hooksReady && isAuthenticated && user && (
+          {isAuthenticated && walletAddress && (
             <div className="mb-8 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
               <p className="text-green-800 dark:text-green-200 text-sm">
-                ✅ <strong>Successfully Authenticated!</strong> Welcome to LOAR!
+                ✅ <strong>Wallet Connected!</strong> Welcome to LOAR!
               </p>
-              {walletAddress && (
-                <div className="mt-2 p-2 bg-green-100 dark:bg-green-800/30 rounded border">
-                  <p className="text-green-800 dark:text-green-200 text-sm font-semibold">
-                    🪙 Embedded Wallet Address:
-                  </p>
-                  <p className="text-green-700 dark:text-green-300 text-xs mt-1 font-mono break-all">
-                    {walletAddress}
-                  </p>
-                  <p className="text-green-600 dark:text-green-400 text-xs mt-1">
-                    Last 10 characters: ...{walletAddress.slice(-10)}
-                  </p>
-                </div>
-              )}
-              {user.email && (
-                <p className="text-green-700 dark:text-green-300 text-xs mt-1">
-                  Email: {user.email}
+              <div className="mt-2 p-2 bg-green-100 dark:bg-green-800/30 rounded border">
+                <p className="text-green-800 dark:text-green-200 text-sm font-semibold">
+                  🪙 Wallet Address:
                 </p>
-              )}
-              {user.phoneNumber && (
-                <p className="text-green-700 dark:text-green-300 text-xs mt-1">
-                  Phone: {user.phoneNumber}
+                <p className="text-green-700 dark:text-green-300 text-xs mt-1 font-mono break-all">
+                  {walletAddress}
                 </p>
-              )}
+              </div>
             </div>
           )}
 
@@ -290,7 +234,7 @@ function HomeComponent() {
                 </div>
                 <CardTitle>Censorship Resistant</CardTitle>
                 <CardDescription>
-                  Your videos are stored on Walrus decentralized storage, ensuring permanent access and resistance to
+                  Your videos are stored on Filecoin's decentralized storage, ensuring permanent access and resistance to
                   censorship.
                 </CardDescription>
               </CardHeader>
@@ -303,8 +247,7 @@ function HomeComponent() {
                 </div>
                 <CardTitle>Community Governance</CardTitle>
                 <CardDescription>
-                  Participate in platform decisions through token incentives and earn rewards for contributing to the
-                  ecosystem.
+                  Participate in canon decision-making through token incentives and earn rewards for contributing to universes.
                 </CardDescription>
               </CardHeader>
             </Card>

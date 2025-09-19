@@ -6,7 +6,7 @@ import { routeTree } from "./routeTree.gen";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient, trpc } from "./utils/trpc";
 
-import { CDPOfficialProvider } from "./lib/cdp-official-provider";
+import { RainbowKitWrapper } from "./lib/rainbowkit-provider";
 
 const router = createRouter({
   routeTree,
@@ -15,11 +15,11 @@ const router = createRouter({
   context: { trpc, queryClient },
   Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {
     return (
-      <CDPOfficialProvider>
-        <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitWrapper>
           {children}
-        </QueryClientProvider>
-      </CDPOfficialProvider>
+        </RainbowKitWrapper>
+      </QueryClientProvider>
     );
   },
 });
