@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Play, Sparkles, Video, Shield, Coins, ShoppingBag } from "lucide-react";
 import { useAccount } from "wagmi";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
+import Header from "@/components/header";
 
 export const Route = createFileRoute("/")({
   component: HomeComponent,
@@ -16,30 +17,6 @@ function HomeComponent() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/loarlogo.svg" alt="LOAR Logo" className="h-10 w-50 object-contain" />
-          </div>
-          <nav className="hidden md:flex items-center gap-6">
-            <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
-              Features
-            </a>
-            {isAuthenticated ? (
-              <div className="flex items-center gap-3">
-                <Button asChild size="sm">
-                  <a href="/universes" className="font-bold">Universes</a>
-                </Button>
-                <WalletConnectButton size="sm" />
-              </div>
-            ) : (
-              <WalletConnectButton size="sm" />
-            )}
-          </nav>
-        </div>
-      </header>
-
       {/* Hero Section */}
       <section className="py-20 px-4 text-center bg-gradient-to-br from-primary/10 via-background to-accent/5">
         <div className="container mx-auto max-w-4xl">
