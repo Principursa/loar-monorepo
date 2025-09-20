@@ -35,7 +35,7 @@ export interface FalImageGenerationResult {
 
 export interface FalVideoGenerationOptions {
   prompt: string;
-  model?: 'fal-ai/hunyuan-video' | 'fal-ai/ltx-video' | 'fal-ai/cogvideox-5b' | 'fal-ai/runway-gen3' | 'fal-ai/veo3/fast/image-to-video';
+  model?: 'fal-ai/hunyuan-video' | 'fal-ai/ltx-video' | 'fal-ai/cogvideox-5b' | 'fal-ai/runway-gen3' | 'fal-ai/veo3/fast/image-to-video' | 'fal-ai/wan-pro/image-to-video' | 'fal-ai/kling-video/v2.1/standard/image-to-video';
   imageUrl?: string;
   duration?: number;
   fps?: number;
@@ -185,9 +185,22 @@ export class FalService {
       if (model === 'fal-ai/veo3/fast/image-to-video') {
         if (!options.imageUrl) throw new Error('Image URL is required for Veo3 image-to-video model');
         input.image_url = options.imageUrl;
+        // Veo3 only supports prompt and image_url according to docs
+        // No duration, aspect_ratio, or motion_strength parameters
+      } else if (model === 'fal-ai/wan-pro/image-to-video') {
+        if (!options.imageUrl) throw new Error('Image URL is required for Wan Pro model');
+        input.image_url = options.imageUrl;
         input.duration = options.duration || 5;
         input.aspect_ratio = options.aspectRatio || "16:9";
-        input.motion_strength = options.motionStrength || 127;
+        input.motion_strength = options.motionStrength || 0.8;
+        input.fps = options.fps || 25;
+      } else if (model === 'fal-ai/kling-video/v2.1/standard/image-to-video') {
+        if (!options.imageUrl) throw new Error('Image URL is required for Kling Video image-to-video model');
+        input.image_url = options.imageUrl;
+        input.prompt = options.prompt; // Kling requires a prompt
+        input.duration = String(options.duration || 5) as "5" | "10";
+        input.aspect_ratio = options.aspectRatio || "16:9";
+        input.cfg_scale = 0.5; // Default CFG scale for Kling
       } else {
         input.duration = options.duration || 5;
         input.fps = options.fps || 25;
@@ -198,28 +211,58 @@ export class FalService {
         if (options.imageUrl) input.image_url = options.imageUrl;
       }
 
-      console.log(`Starting Fal AI video generation with model: ${model}`);
-      console.log('Input parameters:', JSON.stringify(input, null, 2));
+      console.log(`🎬 Starting Fal AI video generation with model: ${model}`);
+      console.log('📝 Input parameters:', JSON.stringify(input, null, 2));
 
       const result = await fal.subscribe(model, {
         input,
         logs: true,
-        onQueueUpdate: (update) => console.log('Fal AI queue update:', update)
+        onQueueUpdate: (update) => console.log('📊 Fal AI queue update:', update)
       });
 
+      console.log('📥 Raw Fal AI video response:', JSON.stringify(result, null, 2));
+
+      let videoUrl: string | undefined;
+      
       if ((result as any).data) {
-        return {
-          id: (result as any).requestId || '',
-          status: 'completed',
-          videoUrl: ((result as any).data as any).video?.url
-        };
-      } else {
+        const data = (result as any).data;
+        videoUrl = data.video?.url || data.video_url || data.url;
+      } else if ((result as any).video) {
+        videoUrl = (result as any).video.url || (result as any).video;
+      } else if (typeof result === 'string') {
+        videoUrl = result;
+      }
+
+      if (!videoUrl) {
+        console.error('❌ No video URL found in response:', Object.keys(result as any));
         throw new Error('No video data returned from Fal AI');
       }
-    } catch (error) {
-      console.error('Fal AI video generation failed:', error);
+
       return {
-        id: '',
+        id: (result as any).requestId || Date.now().toString(),
+        status: 'completed',
+        videoUrl
+      };
+    } catch (error) {
+      console.error('❌ Fal AI video generation failed:', error);
+      
+      // Enhanced error logging for debugging
+      if (error && typeof error === 'object') {
+        const err = error as any;
+        console.error('Error details:', {
+          message: err.message,
+          status: err.status,
+          body: err.body,
+          stack: err.stack
+        });
+        
+        if (err.body && err.body.detail) {
+          console.error('Validation errors:', err.body.detail);
+        }
+      }
+      
+      return {
+        id: Date.now().toString(),
         status: 'failed',
         error: error instanceof Error ? error.message : 'Unknown error'
       };

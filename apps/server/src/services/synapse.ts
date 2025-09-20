@@ -13,8 +13,12 @@ export class SynapseService {
   private constructor(private synapse: Synapse) {}
 
   static async init() {
+    const privateKey = process.env.PRIVATE_KEY?.startsWith('0x')
+      ? process.env.PRIVATE_KEY
+      : `0x${process.env.PRIVATE_KEY}`;
+
     const synapse = await Synapse.create({
-      privateKey: `0x${process.env.PRIVATE_KEY}`,
+      privateKey,
       rpcURL: RPC_URLS.calibration.http
     })
     return new SynapseService(synapse)
@@ -22,8 +26,12 @@ export class SynapseService {
 
   static async getInstance(): Promise<SynapseService> {
     if (!this.instance) {
+      const privateKey = process.env.PRIVATE_KEY?.startsWith('0x')
+        ? process.env.PRIVATE_KEY
+        : `0x${process.env.PRIVATE_KEY}`;
+
       const synapse = await Synapse.create({
-        privateKey: `0x${process.env.PRIVATE_KEY}`,
+        privateKey,
         rpcURL: RPC_URLS.calibration.http,
       })
       this.instance = new SynapseService(synapse)
@@ -63,14 +71,19 @@ export class SynapseService {
   }
   async uploadFromUrl(input: string): Promise<string>{
     console.log(`Attempting to fetch URL: ${input}`)
-    
+
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch(input, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; FilecoinUploader/1.0)'
         },
-        timeout: 30000 // 30 second timeout
-      })
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)

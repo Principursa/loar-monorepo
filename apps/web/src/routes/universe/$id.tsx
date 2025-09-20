@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Film, Plus, Settings, Clock, Users, Sparkles, Image, Loader2, RefreshCw, UserPlus, Wand2 } from "lucide-react";
+import { VideoGenerationSelector } from "@/components/VideoGenerationSelector";
 import ReactFlow, {
   Background,
   Controls,
@@ -1703,37 +1704,37 @@ function UniverseTimelineEditor() {
                         </>
                       )}
                     </Button>
+                    
+                    {/* Button to enable video generation */}
+                    {!showVideoStep && (
+                      <Button
+                        onClick={() => setShowVideoStep(true)}
+                        className="w-full"
+                        size="sm"
+                      >
+                        <Film className="h-3 w-3 mr-2" />
+                        Create Video from Image
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* Step 2: Generate Video */}
-              {showVideoStep && !generatedVideoUrl && (
+              {/* Step 2: Generate Video with fal.ai models */}
+              {showVideoStep && !generatedVideoUrl && generatedImageUrl && (
                 <div className="border rounded-lg p-4 bg-muted/20">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-4">
                     <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">2</span>
-                    <Label className="text-sm font-medium">Generate Video with LumaAI</Label>
+                    <Label className="text-sm font-medium">Generate Video from Image</Label>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Create a video animation from the generated image
-                  </p>
-                  <Button
-                    onClick={handleGenerateVideo}
-                    disabled={isGeneratingVideo}
-                    className="w-full"
-                  >
-                    {isGeneratingVideo ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating Video...
-                      </>
-                    ) : (
-                      <>
-                        <Film className="h-4 w-4 mr-2" />
-                        Generate Video
-                      </>
-                    )}
-                  </Button>
+                  
+                  <VideoGenerationSelector 
+                    imageUrl={uploadedUrl || generatedImageUrl}
+                    onVideoGenerated={(videoUrl) => {
+                      setGeneratedVideoUrl(videoUrl);
+                      setShowVideoStep(false);
+                    }}
+                  />
                 </div>
               )}
 
@@ -1805,61 +1806,6 @@ function UniverseTimelineEditor() {
                         </div>
                       </div>
                     )}
-                  </div>
-                </div>
-              )}
-              
-              {/* Debug Section - only show in development */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="border-t pt-4 mt-4">
-                  <div className="text-xs text-muted-foreground mb-2">Debug Tools</div>
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={handleDebugFilecoin}
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-xs"
-                      >
-                        🔧 Setup Mock Video
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          // Use a smaller, faster test image instead
-                          const smallTestUrl = "https://httpbin.org/robots.txt";
-                          setGeneratedVideoUrl(smallTestUrl);
-                          setVideoTitle("Small File Test");
-                          setVideoDescription("Testing with small file");
-                          setShowVideoStep(true);
-                          console.log('Debug: Set up small test file:', smallTestUrl);
-                        }}
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-xs"
-                      >
-                        📄 Small Test File
-                      </Button>
-                    </div>
-                    <Button
-                      onClick={() => {
-                        // Clear all state
-                        setGeneratedVideoUrl(null);
-                        setVideoTitle("");
-                        setVideoDescription("");
-                        setShowVideoStep(false);
-                        setContractSaved(false);
-                        setFilecoinSaved(false);
-                        setPieceCid(null);
-                        setIsSavingToContract(false);
-                        setIsSavingToFilecoin(false);
-                        console.log('Debug: Cleared all state');
-                      }}
-                      variant="destructive"
-                      size="sm"
-                      className="w-full text-xs"
-                    >
-                      🗑️ Clear All State
-                    </Button>
                   </div>
                 </div>
               )}

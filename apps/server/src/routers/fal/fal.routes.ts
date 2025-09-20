@@ -287,6 +287,8 @@ export const falRouter = router({
             "fal-ai/cogvideox-5b",
             "fal-ai/runway-gen3",
             "fal-ai/veo3/fast/image-to-video",
+            "fal-ai/wan-pro/image-to-video",
+            "fal-ai/kling-video/v2.1/standard/image-to-video",
           ])
           .optional(),
         imageUrl: z.string().url().optional(),
@@ -298,6 +300,8 @@ export const falRouter = router({
         numInferenceSteps: z.number().min(10).max(50).optional(),
         aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional(),
         motionStrength: z.number().min(1).max(255).optional(),
+        effectsType: z.enum(["explosion", "fire", "water", "smoke", "lightning", "wind", "snow", "rain", "magic"]).optional(),
+        effectsIntensity: z.number().min(0.1).max(1.0).optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -330,10 +334,7 @@ export const falRouter = router({
     .input(
       z.object({
         prompt: z.string().min(1),
-        imageUrl: z.string().url(),
-        duration: z.union([z.literal(5), z.literal(10)]).optional().default(5),
-        aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional().default("16:9"),
-        motionStrength: z.number().min(1).max(255).optional().default(127),
+        imageUrl: z.string(),
       })
     )
     .mutation(async ({ input }) => {
@@ -341,9 +342,54 @@ export const falRouter = router({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
         model: "fal-ai/veo3/fast/image-to-video",
+      });
+    }),
+
+  // Wan Pro - professional image to video
+  wanProImageToVideo: publicProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1),
+        imageUrl: z.string(),
+        duration: z.number().min(1).max(10).optional().default(5),
+        aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional().default("16:9"),
+        motionStrength: z.number().min(0.1).max(1.0).optional().default(0.8),
+        fps: z.number().min(12).max(30).optional().default(25),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return await falService.generateVideo({
+        prompt: input.prompt,
+        imageUrl: input.imageUrl,
+        model: "fal-ai/wan-pro/image-to-video",
         duration: input.duration,
         aspectRatio: input.aspectRatio,
         motionStrength: input.motionStrength,
+        fps: input.fps,
+      });
+    }),
+
+  // Kling Video v2.1 - image to video
+  klingImageToVideo: publicProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1),
+        imageUrl: z.string(),
+        duration: z.number().min(1).max(10).optional().default(5),
+        aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional().default("16:9"),
+        motionStrength: z.number().min(0.1).max(1.0).optional().default(0.8),
+        fps: z.number().min(12).max(30).optional().default(25),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return await falService.generateVideo({
+        prompt: input.prompt,
+        imageUrl: input.imageUrl,
+        model: "fal-ai/kling-video/v2.1/standard/image-to-video",
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        motionStrength: input.motionStrength,
+        fps: input.fps,
       });
     }),
 });
