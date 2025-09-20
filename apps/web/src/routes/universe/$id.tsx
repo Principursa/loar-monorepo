@@ -912,7 +912,7 @@ function UniverseTimelineEditor() {
   return (
     <div className="flex h-screen bg-background">
       {/* Left Sidebar */}
-      <div className="w-80 border-r bg-card p-4 overflow-y-auto">
+      <div className="w-5 hover:w-80 border-r bg-card p-4 overflow-y-auto transition-all duration-300 overflow-hidden whitespace-nowrap">
         <div className="space-y-6">
           {/* Back Button */}
           <div>
@@ -1319,7 +1319,7 @@ function UniverseTimelineEditor() {
                   onClick={() => setShowVideoDialog(false)}
                   className="flex-1"
                 >
-                  Cancel
+                  Go Back
                 </Button>
                 <Button
                   onClick={handleCreateEvent}

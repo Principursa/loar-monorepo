@@ -1,9 +1,13 @@
 import { Link } from "@tanstack/react-router";
+import { useAccount } from "wagmi";
+import { WalletConnectButton } from "@/components/wallet-connect-button";
+import { Button } from "@/components/ui/button";
 
 import { ModeToggle } from "./mode-toggle";
-import { DynamicWalletButton } from "./dynamic-wallet-button";
+// import { DynamicWalletButton } from "./dynamic-wallet-button";
 
 export default function Header() {
+  const { address: walletAddress, isConnected: isAuthenticated } = useAccount();
   const links = [
     { to: "/", label: "Home" },
     { to: "/universes", label: "Universes" },
@@ -12,26 +16,60 @@ export default function Header() {
   ];
 
   return (
-    <div>
-      <div className="flex flex-row items-center justify-between px-2 py-1">
-        <nav className="flex gap-4 text-lg">
+    <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <div className="container mx-auto px-4 py-4">
+        <div className="flex items-center justify-between">
+          {/* Left side - Logo and Navigation */}
+          <div className="flex items-center gap-8">
+            <div className="flex items-center gap-3">
+              <img src="/loarlogo.svg" alt="LOAR Logo" className="h-10 w-auto object-contain" />
+            </div>
+            <nav className="hidden md:flex items-center gap-6">
+              {links.map(({ to, label }) => {
+                return (
+                  <Link
+                    key={to}
+                    to={to}
+                    className="text-muted-foreground hover:text-foreground transition-colors font-medium"
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Right side - Wallet and Theme Toggle */}
+          <div className="flex items-center gap-3">
+            {isAuthenticated ? (
+              <>
+                <Button asChild size="sm" variant="ghost">
+                  <Link to="/universes" className="font-medium">Dashboard</Link>
+                </Button>
+                <WalletConnectButton size="sm" />
+              </>
+            ) : (
+              <WalletConnectButton size="sm" />
+            )}
+            <ModeToggle />
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        <div className="md:hidden mt-4 flex flex-wrap gap-4">
           {links.map(({ to, label }) => {
             return (
               <Link
                 key={to}
                 to={to}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 {label}
               </Link>
             );
           })}
-        </nav>
-        <div className="flex items-center gap-2">
-          <ModeToggle />
-          <DynamicWalletButton />
         </div>
       </div>
-      <hr />
-    </div>
+    </header>
   );
 }
