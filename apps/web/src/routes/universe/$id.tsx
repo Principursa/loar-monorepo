@@ -1520,7 +1520,7 @@ function UniverseTimelineEditor() {
                   onClick={() => setShowVideoDialog(false)}
                   className="flex-1"
                 >
-                  Cancel
+                  Go Back
                 </Button>
                 <Button
                   onClick={handleCreateEvent}
