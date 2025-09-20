@@ -16,19 +16,25 @@ export interface VideoGenerationResult {
 }
 
 export class VideoService {
-  private client: LumaAI;
+  private client: LumaAI | null;
 
   constructor() {
+    // Make API key optional for frontend development
     if (!process.env.LUMAAI_API_KEY) {
-      throw new Error('LUMAAI_API_KEY environment variable is required');
+      console.warn('LUMAAI_API_KEY not set - video generation will be disabled');
+      this.client = null;
+    } else {
+      this.client = new LumaAI({
+        authToken: process.env.LUMAAI_API_KEY
+      });
     }
-    
-    this.client = new LumaAI({
-      authToken: process.env.LUMAAI_API_KEY
-    });
   }
 
   async generateVideo(options: VideoGenerationOptions): Promise<VideoGenerationResult> {
+    if (!this.client) {
+      throw new Error('LumaAI client not initialized - API key required');
+    }
+    
     try {
       const generationParams: any = {
         prompt: options.prompt,
@@ -79,6 +85,10 @@ export class VideoService {
   }
 
   async getGenerationStatus(id: string): Promise<VideoGenerationResult> {
+    if (!this.client) {
+      throw new Error('LumaAI client not initialized - API key required');
+    }
+    
     try {
       const generation = await this.client.generations.get(id);
       
@@ -95,6 +105,10 @@ export class VideoService {
   }
 
   async waitForCompletion(id: string, maxWaitTime = 300000): Promise<VideoGenerationResult> {
+    if (!this.client) {
+      throw new Error('LumaAI client not initialized - API key required');
+    }
+    
     const startTime = Date.now();
     
     while (Date.now() - startTime < maxWaitTime) {

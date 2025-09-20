@@ -5,6 +5,7 @@ import path from "node:path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  base: "./",
   plugins: [
     tailwindcss(),
     react(),
@@ -13,6 +14,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  server: {
+    port: 3001,
+    hmr: {
+      port: 3001,
     },
   },
 });

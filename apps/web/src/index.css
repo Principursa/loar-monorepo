@@ -122,3 +122,39 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Fix CDP modal z-index layering issues */
+@layer components {
+  /* Ensure CDP modals appear above everything */
+  [data-cdp-modal],
+  [data-cdp-overlay],
+  .cdp-modal,
+  .cdp-overlay,
+  /* Target common CDP modal selectors */
+  [class*="cdp-modal"],
+  [class*="cdp-overlay"],
+  [class*="modal"],
+  [class*="overlay"] {
+    z-index: 9999 !important;
+  }
+  
+  /* Fix any portal/overlay z-index issues */
+  [data-radix-portal],
+  [data-portal] {
+    z-index: 9999 !important;
+  }
+  
+  /* Ensure CDP components have proper stacking context */
+  .cdp-auth-button,
+  [data-cdp-auth-button],
+  [class*="cdp-auth"] {
+    position: relative;
+    z-index: 50;
+  }
+  
+  /* Fix any backdrop/overlay issues */
+  [data-backdrop],
+  [class*="backdrop"] {
+    z-index: 9998 !important;
+  }
+}

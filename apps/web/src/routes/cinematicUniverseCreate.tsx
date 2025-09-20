@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useAccount, useDeployContract, useWaitForTransactionReceipt, useBalance, useChainId, useSignMessage } from "wagmi";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
 import { trpcClient } from "@/utils/trpc";
+import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { governanceErc20Abi, timelineAbi, universeGovernorAbi } from "@/generated";
 import governanceERC20Artifact from "../abis/GovernanceERC20.json"
 import universeGovernorArtifact from "../abis/UniverseGovernor.json"
@@ -275,6 +275,7 @@ function CinematicUniverseCreate() {
           {!isConnected ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground mb-4">Connect your wallet to create a cinematic universe</p>
+              <WalletConnectButton size="lg" />
             </div>
           ) : (
             <>

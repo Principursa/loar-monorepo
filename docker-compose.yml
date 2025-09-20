@@ -34,10 +34,10 @@ services:
       - loar-network
     labels:
       caddy: loartech.xyz
-      caddy.reverse_proxy: "{{upstreams 3000}}"
-      caddy.handle_path: "/api/*"
-      caddy.handle_path.0_reverse_proxy: "{{upstreams 3000}}"
+      caddy.route: /api/*
+      caddy.route.reverse_proxy: "{{upstreams 3000}}"
 
+      
   app-web:
     image: nginx:alpine
     container_name: loar-web
@@ -48,7 +48,10 @@ services:
       - loar-network
     labels:
       caddy: loartech.xyz
-      caddy.reverse_proxy: "{{upstreams 80}}"
+      caddy.route: /*
+      caddy.route.reverse_proxy: "{{upstreams 80}}"
+
+
 
   postgres:
     image: postgres:15
