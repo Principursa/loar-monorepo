@@ -60,4 +60,4 @@ export class SynapseService {
   }
 
 }
-export const snyapseService = SynapseService.init();
+export const synapseService = SynapseService.init();
