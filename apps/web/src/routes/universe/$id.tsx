@@ -417,35 +417,32 @@ function UniverseTimelineEditor() {
         const selectedChars = charactersData.characters.filter((c: any) => selectedCharacters.includes(c.id));
         
         if (selectedChars.length > 0) {
-          // Use the first character's image as base for editing
-          const primaryCharacter = selectedChars[0];
+          // Process all selected character images
           const characterNames = selectedChars.map((c: any) => c.character_name).join(' and ');
           
-          // Create edit prompt that places character in the scene
+          // Create edit prompt that places characters in the scene
           const editPrompt = `${characterNames} ${prompt}, cinematic scene, high quality, detailed environment`;
           
-          console.log('Editing character into scene:', {
-            characterName: primaryCharacter.character_name,
-            characterImage: primaryCharacter.image_url,
-            scenePrompt: editPrompt
-          });
+          // Process all character image URLs through weserv.nl for better compatibility
+          const processedImageUrls = selectedChars.map((char: any) => 
+            `https://images.weserv.nl/?url=${encodeURIComponent(char.image_url)}`
+          );
+          
+          console.log('🎭 === CHARACTER SCENE EDITING ===');
+          console.log('Selected characters:', selectedChars.map((c: any) => c.character_name));
+          console.log('Number of characters:', selectedChars.length);
+          console.log('Original image URLs:', selectedChars.map((c: any) => c.image_url));
+          console.log('Processed image URLs:', processedImageUrls);
+          console.log('Scene prompt:', editPrompt);
+          console.log('🚀 Calling FAL editImage with multiple images...');
           
           try {
-            // Process character image URL through weserv.nl for better compatibility
-            const processedImageUrl = `https://images.weserv.nl/?url=${encodeURIComponent(primaryCharacter.image_url)}`;
-            
-            console.log('🎭 === CHARACTER SCENE EDITING ===');
-            console.log('Character name:', primaryCharacter.character_name);
-            console.log('Original image URL:', primaryCharacter.image_url);
-            console.log('Processed image URL:', processedImageUrl);
-            console.log('Scene prompt:', editPrompt);
-            console.log('🚀 Calling FAL editImage...');
-            
-            // Use Nano Banana image editing to place character in scene
+            // Use Nano Banana image editing to place all characters in scene
             const result = await trpcClient.fal.editImage.mutate({
               prompt: editPrompt,
-              imageUrls: [processedImageUrl], // Now using array format as per FAL API
-              strength: 0.7, // Moderate transformation to keep character recognizable
+              imageUrls: processedImageUrls, // Now passing ALL character images
+              numImages: 1, // Generate one composed image with all characters
+              strength: 0.7, // Moderate transformation to keep characters recognizable
               negativePrompt: "blurry, low quality, distorted"
             });
             

@@ -15,6 +15,7 @@ export interface FalImageGenerationOptions {
 export interface FalImageEditOptions {
   prompt: string;
   imageUrls: string[];
+  numImages?: number;
   strength?: number;
   negativePrompt?: string;
   numInferenceSteps?: number;
@@ -148,13 +149,14 @@ export class FalService {
   async editImage(options: FalImageEditOptions): Promise<FalImageGenerationResult> {
     console.log('✏️ === FAL IMAGE EDITING ===');
     console.log('Options:', JSON.stringify(options, null, 2));
+    console.log('Number of images provided:', options.imageUrls.length);
     
     try {
       const model = 'fal-ai/nano-banana/edit';
       
       const input: any = {
         prompt: options.prompt,
-        image_urls: options.imageUrls,
+        image_urls: options.imageUrls, // This already accepts multiple images
         num_images: options.numImages || 1,
         output_format: "png",
         sync_mode: false
@@ -165,6 +167,7 @@ export class FalService {
 
       console.log(`🚀 Calling FAL API: ${model}`);
       console.log('Input:', JSON.stringify(input, null, 2));
+      console.log('Image URLs being sent:', options.imageUrls);
 
       const result = await fal.subscribe(model, {
         input,
@@ -187,9 +190,9 @@ export class FalService {
         responseData = result;
         console.log('📥 Found .images directly in response');
       } else {
-        console.error('❌ Unexpected response structure:', Object.keys(result));
+        console.error('❌ Unexpected response structure:', Object.keys(result as any));
         console.error('Full response:', JSON.stringify(result, null, 2));
-        throw new Error(`Unexpected FAL response structure. Keys: ${Object.keys(result).join(', ')}`);
+        throw new Error(`Unexpected FAL response structure. Keys: ${Object.keys(result as any).join(', ')}`);
       }
 
       console.log('📥 Response data to parse:', JSON.stringify(responseData, null, 2));

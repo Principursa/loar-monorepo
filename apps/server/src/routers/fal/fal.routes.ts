@@ -48,6 +48,7 @@ export const falRouter = router({
     .input(z.object({
       prompt: z.string().min(1, "Edit prompt is required"),
       imageUrls: z.array(z.string().url()).min(1, "At least one image URL is required"),
+      numImages: z.number().min(1).max(4).optional(),
       strength: z.number().min(0.1).max(1.0).optional(),
       negativePrompt: z.string().optional(),
       numInferenceSteps: z.number().min(1).max(50).optional(),
