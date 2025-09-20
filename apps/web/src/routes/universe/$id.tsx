@@ -79,6 +79,13 @@ function UniverseTimelineEditor() {
   const [characterDescription, setCharacterDescription] = useState('');
   const [characterStyle, setCharacterStyle] = useState<'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'>('cute');
   const [isGeneratingCharacter, setIsGeneratingCharacter] = useState(false);
+  const [generatedCharacter, setGeneratedCharacter] = useState<{
+    name: string;
+    description: string;
+    style: string;
+    imageUrl: string;
+    characterId?: string;
+  } | null>(null);
   
   // File upload state  
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
@@ -383,29 +390,65 @@ function UniverseTimelineEditor() {
     queryFn: () => trpcClient.wiki.characters.query(),
   });
 
-  // Generate character mutation
+  // Generate character mutation (without saving to DB)
   const generateCharacterMutation = useMutation({
     mutationFn: async (input: { name: string; description: string; style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk' }) => {
-      const result = await trpcClient.fal.generateCharacter.mutate(input);
+      const result = await trpcClient.fal.generateCharacter.mutate({
+        ...input,
+        saveToDatabase: false // Don't save automatically
+      });
       return result;
     },
     onSuccess: async (data) => {
       console.log('Character generated:', data);
-      setShowCharacterGenerator(false);
       setIsGeneratingCharacter(false);
+      
+      // Store generated character for preview
+      setGeneratedCharacter({
+        name: characterName,
+        description: characterDescription,
+        style: characterStyle,
+        imageUrl: data.imageUrl
+      });
+    },
+    onError: (error) => {
+      console.error('Character generation failed:', error);
+      alert("Failed to generate character. Please try again.");
+      setIsGeneratingCharacter(false);
+    }
+  });
+
+  // Save character to database mutation
+  const saveCharacterMutation = useMutation({
+    mutationFn: async () => {
+      if (!generatedCharacter) throw new Error('No character to save');
+      
+      const result = await trpcClient.fal.generateCharacter.mutate({
+        name: generatedCharacter.name,
+        description: generatedCharacter.description,
+        style: generatedCharacter.style as any,
+        saveToDatabase: true
+      });
+      return result;
+    },
+    onSuccess: async (data) => {
+      console.log('Character saved to database:', data);
       
       // Add to selected characters
       if (data.characterId) {
         setSelectedCharacters(prev => [...prev, data.characterId!]);
       }
       
+      // Clear generated character and close dialog
+      setGeneratedCharacter(null);
+      setShowCharacterGenerator(false);
+      
       // Refetch characters to include the new one
       await refetchCharacters();
     },
     onError: (error) => {
-      console.error('Character generation failed:', error);
-      alert("Failed to generate character. Please try again.");
-      setIsGeneratingCharacter(false);
+      console.error('Failed to save character:', error);
+      alert("Failed to save character to database. Please try again.");
     }
   });
 
@@ -1539,7 +1582,7 @@ function UniverseTimelineEditor() {
       {/* Character Generation Dialog */}
       {showCharacterGenerator && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Wand2 className="h-5 w-5 text-purple-600" />
@@ -1587,49 +1630,134 @@ function UniverseTimelineEditor() {
                   ))}
                 </div>
               </div>
+
+              {/* Generated Character Preview */}
+              {generatedCharacter && (
+                <div className="border rounded-lg p-4 bg-muted/20">
+                  <Label className="text-sm font-medium mb-3 block">Generated Character Preview</Label>
+                  <div className="flex flex-col items-center space-y-4">
+                    {/* Large Character Image */}
+                    <img 
+                      src={generatedCharacter.imageUrl} 
+                      alt={generatedCharacter.name}
+                      className="w-64 h-64 object-cover rounded-lg border shadow-lg"
+                    />
+                    
+                    {/* Character Info */}
+                    <div className="text-center space-y-2">
+                      <h3 className="text-lg font-semibold">{generatedCharacter.name}</h3>
+                      <p className="text-sm text-muted-foreground max-w-sm">{generatedCharacter.description}</p>
+                      <div className="text-xs bg-muted px-2 py-1 rounded-full inline-block capitalize">
+                        {generatedCharacter.style} style
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3 w-full">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setGeneratedCharacter(null);
+                          setCharacterName('');
+                          setCharacterDescription('');
+                          setCharacterStyle('cute');
+                        }}
+                        className="flex-1"
+                      >
+                        Generate Another
+                      </Button>
+                      <Button
+                        onClick={() => saveCharacterMutation.mutate()}
+                        disabled={saveCharacterMutation.isPending}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                      >
+                        {saveCharacterMutation.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add to Database
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
               
-              <div className="flex gap-3 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCharacterGenerator(false)}
-                  disabled={isGeneratingCharacter}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={async () => {
-                    if (!characterName.trim() || !characterDescription.trim()) {
-                      alert('Please provide both name and description');
-                      return;
-                    }
-                    setIsGeneratingCharacter(true);
-                    try {
-                      await generateCharacterMutation.mutateAsync({
-                        name: characterName,
-                        description: characterDescription,
-                        style: characterStyle
-                      });
-                    } catch (error) {
-                      console.error('Failed to generate character:', error);
-                    }
-                  }}
-                  disabled={isGeneratingCharacter || !characterName.trim() || !characterDescription.trim()}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
-                >
-                  {isGeneratingCharacter ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Generate
-                    </>
-                  )}
-                </Button>
-              </div>
+              {/* Bottom Action Buttons - only show when no character is generated */}
+              {!generatedCharacter && (
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowCharacterGenerator(false);
+                      setGeneratedCharacter(null);
+                      setCharacterName('');
+                      setCharacterDescription('');
+                      setCharacterStyle('cute');
+                    }}
+                    disabled={isGeneratingCharacter}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (!characterName.trim() || !characterDescription.trim()) {
+                        alert('Please provide both name and description');
+                        return;
+                      }
+                      setIsGeneratingCharacter(true);
+                      try {
+                        await generateCharacterMutation.mutateAsync({
+                          name: characterName,
+                          description: characterDescription,
+                          style: characterStyle
+                        });
+                      } catch (error) {
+                        console.error('Failed to generate character:', error);
+                      }
+                    }}
+                    disabled={isGeneratingCharacter || !characterName.trim() || !characterDescription.trim()}
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
+                  >
+                    {isGeneratingCharacter ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate Character
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {/* Close button when character is showing */}
+              {generatedCharacter && (
+                <div className="pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowCharacterGenerator(false);
+                      setGeneratedCharacter(null);
+                      setCharacterName('');
+                      setCharacterDescription('');
+                      setCharacterStyle('cute');
+                    }}
+                    className="w-full"
+                  >
+                    Close
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

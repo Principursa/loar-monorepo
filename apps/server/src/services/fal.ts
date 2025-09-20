@@ -90,9 +90,15 @@ export class FalService {
         onQueueUpdate: (update) => console.log('📊 FAL Queue Update:', update)
       });
 
-      const data = (result as any).data;
-      if (!data) throw new Error('No data in FAL response');
+      console.log('📥 Raw FAL Response:', JSON.stringify(result, null, 2));
 
+      // Parse the response
+      let data: any;
+      if ((result as any).data) data = (result as any).data;
+      else if ((result as any).images || (result as any).image) data = result;
+      else throw new Error(`No data in FAL response. Available keys: ${Object.keys(result as any).join(', ')}`);
+
+      // Extract images
       let images: Array<{ url: string; width?: number; height?: number; content_type?: string }> = [];
       if (data.images && Array.isArray(data.images)) images = data.images;
       else if (data.image) images = [{ url: data.image }];

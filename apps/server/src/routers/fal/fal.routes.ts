@@ -76,7 +76,16 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return await falService.editImage(input);
+      console.log("🚨 === TRPC ROUTER: editImage called ===");
+      console.log("Input received:", JSON.stringify(input, null, 2));
+      try {
+        const result = await falService.editImage(input);
+        console.log("🚨 FAL service returned:", JSON.stringify(result, null, 2));
+        return result;
+      } catch (error) {
+        console.error("🚨 FAL service error:", error);
+        throw error;
+      }
     }),
 
   // Character Generation with Nano Banana + DB Save
@@ -99,7 +108,7 @@ export const falRouter = router({
       };
 
       const stylePrompt = input.style ? stylePrompts[input.style] : stylePrompts.cute;
-      const fullPrompt = `Character portrait of ${input.name}, ${input.description}, ${stylePrompt}, high quality digital art, detailed character design`;
+      const fullPrompt = `Character portrait of ${input.name}, ${input.description}, ${stylePrompt}, high quality digital art, detailed character design, clean uniform background, no text, no letters, no words, simple background, character focus`;
 
       const imageResult = await falService.generateImage({
         prompt: fullPrompt,
