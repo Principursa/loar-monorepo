@@ -71,7 +71,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
       
       <div className="relative group">
         <div 
-          className={`min-w-96 h-64 rounded-lg border-2 bg-card hover:bg-card/80 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${data.isRoot ? 'ring-2 ring-primary/50' : ''}`}
+          className={`w-96 h-64 rounded-lg border-2 bg-card hover:bg-card/80 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${data.isRoot ? 'ring-2 ring-primary/50' : ''}`}
           style={{ borderColor: data.timelineColor || '#10b981' }}
           onClick={handleClick}
         >
@@ -154,9 +154,10 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
           className="absolute -bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 w-8 h-8 p-0 border-2 border-dashed border-primary/60 hover:border-primary hover:bg-primary/10 rounded-full"
           onClick={(e) => {
             e.stopPropagation();
+            console.log('🔴 Branch button clicked for event:', data.eventId);
             data.onAddScene?.('branch', data.eventId);
           }}
-          title="Create new event"
+          title="Create branch event"
         >
           <Plus className="h-4 w-4 text-primary" />
         </Button>

@@ -504,12 +504,20 @@ function UniverseTimelineEditor() {
         }
       }
       
-      // Fallback to regular image generation for scenes without characters
-      console.log('Generating scene without characters using Gemini');
-      const result = await trpcClient.gemini.generateImage.mutate({
-        prompt
+      // Generate scene without characters using FAL Nano Banana
+      console.log('Generating scene without characters using FAL Nano Banana');
+      const result = await trpcClient.fal.generateImage.mutate({
+        prompt: `${prompt}, cinematic scene, high quality, detailed environment, clean uniform background, no text, no letters, no words`,
+        model: 'fal-ai/nano-banana',
+        imageSize: 'landscape_16_9', // Better for scenes
+        numImages: 1
       });
-      return result;
+      
+      if (result.status !== 'completed' || !result.imageUrl) {
+        throw new Error(result.error || 'Failed to generate scene image');
+      }
+      
+      return { success: true, imageUrl: result.imageUrl };
     },
     onSuccess: (data) => {
       if (data.imageUrl) {
@@ -669,14 +677,26 @@ function UniverseTimelineEditor() {
 
     setIsSavingToContract(true);
     try {
-      // Find the last node ID to use as previous
-      const lastNodeId = Math.max(...(graphData.nodeIds.map(id => Number(id)) || [0]), 0);
+      // Determine the previous node based on addition type
+      let previousNodeId: number;
+      
+      if (additionType === 'branch' && sourceNodeId) {
+        // For branches, use the source node as previous
+        previousNodeId = parseInt(sourceNodeId);
+        console.log('Creating branch from event:', sourceNodeId);
+      } else {
+        // For linear continuation, find the last node ID
+        previousNodeId = Math.max(...(graphData.nodeIds.map(id => Number(id)) || [0]), 0);
+        console.log('Creating linear continuation after event:', previousNodeId);
+      }
       
       console.log('Saving to contract:', {
         link: generatedVideoUrl,
         plot: videoDescription,
-        previous: lastNodeId,
-        title: videoTitle
+        previous: previousNodeId,
+        title: videoTitle,
+        additionType,
+        sourceNodeId
       });
 
       // Determine which contract address to use
@@ -691,7 +711,7 @@ function UniverseTimelineEditor() {
         abi: timelineAbi,
         address: contractAddressToUse,
         functionName: 'createNode',
-        args: [generatedVideoUrl, videoDescription, BigInt(lastNodeId)]
+        args: [generatedVideoUrl, videoDescription, BigInt(previousNodeId)]
       });
 
       console.log('Transaction submitted:', txHash);
@@ -736,7 +756,10 @@ function UniverseTimelineEditor() {
 
   // Handle showing video generation dialog
   const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
-    console.log('handleAddEvent called:', { type, nodeId });
+    console.log('🔵 handleAddEvent called:', { 
+      type, 
+      nodeId
+    });
     setAdditionType(type);
     setSourceNodeId(nodeId || null);
     setVideoTitle("");
@@ -754,9 +777,6 @@ function UniverseTimelineEditor() {
   const handleCreateEvent = useCallback(() => {
     if (!videoTitle.trim()) return;
 
-    const newEventId = `event-${Date.now()}`;
-    const newAddId = `add-${Date.now()}`;
-    
     // Find source node if specified
     const sourceNode = sourceNodeId 
       ? nodes.find(n => n.data.eventId === sourceNodeId)
@@ -764,9 +784,50 @@ function UniverseTimelineEditor() {
     const lastEventNode = nodes.filter((n: any) => n.data.nodeType === 'scene').pop();
     const referenceNode = sourceNode || lastEventNode;
     
+    // Generate appropriate event ID based on addition type
+    let newEventId: string;
+    let newAddId: string;
+    
+    if (additionType === 'branch' && sourceNodeId) {
+      // For branches, add a letter suffix to the source node ID
+      const sourceEventId = sourceNodeId;
+      
+      // Find all existing branches from this source node
+      const existingBranches = nodes.filter((n: any) => {
+        const eventId = n.data.eventId?.toString();
+        return eventId && eventId.startsWith(sourceEventId) && /[a-z]/.test(eventId);
+      });
+      
+      // Determine the next branch letter
+      const branchLetter = String.fromCharCode(98 + existingBranches.length); // 'b', 'c', 'd', etc.
+      newEventId = `${sourceEventId}${branchLetter}`;
+      newAddId = `add-${newEventId}`;
+      
+      console.log('Creating branch:', {
+        sourceEventId,
+        existingBranches: existingBranches.map(n => n.data.eventId),
+        newEventId
+      });
+    } else {
+      // For linear continuation, find the highest numeric event ID and increment
+      const sceneNodes = nodes.filter((n: any) => n.data.nodeType === 'scene');
+      const maxEventId = sceneNodes.reduce((max: number, node: any) => {
+        const eventId = node.data.eventId;
+        if (eventId) {
+          // Extract numeric part only (ignore branch suffixes like 'b', 'c')
+          const numericId = parseInt(eventId.toString().replace(/[a-z]/g, ''));
+          return !isNaN(numericId) ? Math.max(max, numericId) : max;
+        }
+        return max;
+      }, 0);
+      newEventId = String(maxEventId + 1);
+      newAddId = `add-${newEventId}`;
+    }
+    
     console.log('handleCreateEvent debug:', { 
       additionType, 
-      sourceNodeId, 
+      sourceNodeId,
+      newEventId,
       sourceNode: sourceNode ? { id: sourceNode.id, position: sourceNode.position, eventId: sourceNode.data.eventId } : null,
       referenceNode: referenceNode ? { id: referenceNode.id, position: referenceNode.position } : null
     });
@@ -777,14 +838,14 @@ function UniverseTimelineEditor() {
     
     if (additionType === 'branch' && sourceNode) {
       // Create branch: forward and below the source node
-      const branchY = sourceNode.position.y + 150;
-      newEventPosition = { x: sourceNode.position.x + 280, y: branchY };
-      newAddPosition = { x: sourceNode.position.x + 630, y: branchY };
+      const branchY = sourceNode.position.y + 220; // Increased from 150 to 220
+      newEventPosition = { x: sourceNode.position.x + 480, y: branchY }; // Increased from 280 to 480
+      newAddPosition = { x: sourceNode.position.x + 960, y: branchY }; // Increased from 630 to 960
     } else {
       // Linear addition to the right
       const rightmostX = nodes.length > 0 ? Math.max(...nodes.map((n: any) => n.position.x)) : 100;
-      newEventPosition = { x: rightmostX + 320, y: 200 };
-      newAddPosition = { x: rightmostX + 670, y: 200 };
+      newEventPosition = { x: rightmostX + 480, y: 200 }; // Increased from 320 to 480
+      newAddPosition = { x: rightmostX + 960, y: 200 }; // Increased from 670 to 960
     }
 
     // Create new event node
@@ -874,27 +935,94 @@ function UniverseTimelineEditor() {
 
     const blockchainNodes: Node<TimelineNodeData>[] = [];
     const blockchainEdges: Edge[] = [];
-    const horizontalSpacing = 320;
-    const verticalSpacing = 150;
+    const horizontalSpacing = 480; // Increased from 320 to 480 for more space between events
+    const verticalSpacing = 220;   // Increased from 150 to 220 for more space between branches
     const startY = 200;
 
     // Colors for different types
     const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
     
-    // Create nodes from blockchain data in left-to-right layout
+    // First pass: categorize nodes by their parent to detect branches
+    const nodesByParent = new Map<number, number[]>();
+    const nodePositions = new Map<number, { x: number; y: number }>();
+    
+    graphData.nodeIds.forEach((nodeIdStr, index) => {
+      const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
+      const previousNode = graphData.previousNodes[index] || '';
+      const parentId = (previousNode && String(previousNode) !== '0') 
+        ? (typeof previousNode === 'bigint' ? Number(previousNode) : parseInt(String(previousNode)))
+        : 0;
+      
+      if (!nodesByParent.has(parentId)) {
+        nodesByParent.set(parentId, []);
+      }
+      nodesByParent.get(parentId)!.push(nodeId);
+    });
+    
+    // Generate proper event labels based on branching structure
+    const getEventLabel = (nodeId: number, parentId: number): string => {
+      if (parentId === 0) return nodeId.toString(); // Root nodes keep numeric ID
+      
+      const siblings = nodesByParent.get(parentId) || [];
+      const siblingIndex = siblings.indexOf(nodeId);
+      
+      if (siblingIndex === 0) {
+        // First child continues the main timeline
+        return nodeId.toString();
+      } else {
+        // Additional children are branches with letter suffixes
+        const branchLetter = String.fromCharCode(97 + siblingIndex); // 'b', 'c', 'd', etc.
+        return `${parentId}${branchLetter}`;
+      }
+    };
+    
+    // Create nodes from blockchain data with proper branching layout
     graphData.nodeIds.forEach((nodeIdStr, index) => {
       const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
       const url = graphData.urls[index] || '';
       const description = graphData.descriptions[index] || '';
       const previousNode = graphData.previousNodes[index] || '';
       const isCanon = graphData.flags[index] || false;
+      const parentId = (previousNode && String(previousNode) !== '0') 
+        ? (typeof previousNode === 'bigint' ? Number(previousNode) : parseInt(String(previousNode)))
+        : 0;
+      
+      // Generate proper event label
+      const eventLabel = getEventLabel(nodeId, parentId);
+      
+      // Calculate position based on branching structure
+      let x: number, y: number;
+      
+      if (parentId === 0) {
+        // Root node
+        x = 100;
+        y = startY;
+      } else {
+        const siblings = nodesByParent.get(parentId) || [];
+        const siblingIndex = siblings.indexOf(nodeId);
+        const parentIndex = graphData.nodeIds.findIndex(id => 
+          (typeof id === 'bigint' ? Number(id) : parseInt(String(id))) === parentId
+        );
+        
+        if (siblingIndex === 0) {
+          // Main timeline continuation
+          x = 100 + ((parentIndex + 1) * horizontalSpacing);
+          y = startY;
+        } else {
+          // Branch
+          x = 100 + ((parentIndex + 1) * horizontalSpacing);
+          y = startY + (siblingIndex * verticalSpacing);
+        }
+      }
+      
+      nodePositions.set(nodeId, { x, y });
+      
+      const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
       
       // Debug: Log the node creation data
-      console.log(`Creating node ${nodeId}:`, { url, description, previousNode });
-      
-      const x = 100 + (index * horizontalSpacing);
-      const y = startY + (isCanon ? 0 : (index % 2) * verticalSpacing);
-      const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
+      console.log(`Creating node ${nodeId} (${eventLabel}):`, { 
+        url, description, previousNode, parentId, position: { x, y }
+      });
       
       blockchainNodes.push({
         id: `blockchain-node-${nodeId}`,
@@ -903,12 +1031,12 @@ function UniverseTimelineEditor() {
         data: {
           label: description && description.length > 0 && description !== `Timeline event ${nodeId}` 
             ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
-            : `Event ${nodeId}`,
-          description: description || `Timeline event ${nodeId}`,
+            : `Event ${eventLabel}`,
+          description: description || `Timeline event ${eventLabel}`,
           videoUrl: url,
           timelineColor: color,
           nodeType: 'scene',
-          eventId: nodeId.toString(),
+          eventId: eventLabel, // Use the proper event label (e.g., "2b" for branches)
           timelineId: `timeline-1`,
           universeId: finalUniverse?.id || id,
           isRoot: String(previousNode) === '0' || !previousNode,
@@ -969,7 +1097,7 @@ function UniverseTimelineEditor() {
     setNodes(blockchainNodes as any);
     setEdges(blockchainEdges);
     setEventCounter(graphData.nodeIds.length + 1);
-  }, [graphData, universe?.id, handleAddEvent]);
+  }, [graphData, universe?.id, id]);
 
   // Handle connections between nodes
   const onConnect = useCallback(
