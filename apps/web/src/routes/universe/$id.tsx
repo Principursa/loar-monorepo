@@ -1296,36 +1296,6 @@ function UniverseTimelineEditor() {
                               ×
                             </button>
                           </div>
-                          
-                          {/* Show Character Image URLs */}
-                          <div className="mt-1 p-1 bg-muted rounded text-xs space-y-1">
-                            <div>
-                              <div className="font-medium">Original URL:</div>
-                              <div className="font-mono text-xs break-all bg-background p-1 rounded">
-                                {char.image_url}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="font-medium">Processed URL (for AI):</div>
-                              <div className="font-mono text-xs break-all bg-background p-1 rounded">
-                                {`https://images.weserv.nl/?url=${encodeURIComponent(char.image_url)}`}
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => navigator.clipboard.writeText(char.image_url)}
-                                className="text-blue-600 hover:underline text-xs"
-                              >
-                                Copy Original
-                              </button>
-                              <button
-                                onClick={() => navigator.clipboard.writeText(`https://images.weserv.nl/?url=${encodeURIComponent(char.image_url)}`)}
-                                className="text-green-600 hover:underline text-xs"
-                              >
-                                Copy Processed
-                              </button>
-                            </div>
-                          </div>
                         </div>
                       );
                     })}
@@ -1406,58 +1376,6 @@ function UniverseTimelineEditor() {
                         </>
                       )}
                     </Button>
-                    
-                    <div className="flex gap-1">
-                      {/* Debug Button */}
-                      <Button
-                        onClick={async () => {
-                          try {
-                            const result = await trpcClient.fal.testConnection.query();
-                            console.log('FAL Connection Test:', result);
-                            const message = 'message' in result ? result.message : result.error;
-                            const keyLength = 'keyLength' in result ? result.keyLength : 0;
-                            alert(`FAL Test: ${message}\nHas API Key: ${result.hasApiKey}\nKey Length: ${keyLength}`);
-                          } catch (error) {
-                            console.error('FAL test failed:', error);
-                            alert(`FAL Test Failed: ${error}`);
-                          }
-                        }}
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 text-xs"
-                      >
-                        🔧 Test FAL
-                      </Button>
-
-                      {/* Test Nano Banana Edit */}
-                      <Button
-                        onClick={async () => {
-                          try {
-                            console.log('🧪 Testing Nano Banana EDIT...');
-                            const testImageUrl = 'https://images.weserv.nl/?url=https%3A%2F%2Fi2.seadn.io%2Fbase%2F0x7e72abdf47bd21bf0ed6ea8cb8dad60579f3fb50%2F34234bf162d45933d645055a11c1b6%2Fa834234bf162d45933d645055a11c1b6.png';
-                            const result = await trpcClient.fal.editImage.mutate({
-                              prompt: "sitting in a coffee shop, cozy atmosphere",
-                              imageUrls: [testImageUrl],
-                              strength: 0.7
-                            });
-                            console.log('✅ Nano Banana EDIT test result:', result);
-                            if (result.status === 'completed' && result.imageUrl) {
-                              alert(`✅ Nano Banana Edit works!\nGenerated: ${result.imageUrl.substring(0, 50)}...`);
-                            } else {
-                              alert(`❌ Nano Banana Edit failed: ${result.error || 'Unknown error'}`);
-                            }
-                          } catch (error) {
-                            console.error('❌ Nano Banana Edit test failed:', error);
-                            alert(`❌ Nano Banana Edit test failed: ${error}`);
-                          }
-                        }}
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 text-xs"
-                      >
-                        ✏️ Test Edit
-                      </Button>
-                    </div>
                   </div>
                 </div>
               )}
@@ -1496,24 +1414,6 @@ function UniverseTimelineEditor() {
                         </>
                       )}
                     </Button>
-                    
-                    {/* Show uploaded URL */}
-                    {uploadedUrl && (
-                      <div className="p-2 bg-muted rounded text-xs">
-                        <Label className="text-xs font-medium">Uploaded URL:</Label>
-                        <div className="mt-1 p-1 bg-background rounded font-mono text-xs break-all">
-                          {uploadedUrl}
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="mt-1 h-6 text-xs"
-                          onClick={() => navigator.clipboard.writeText(uploadedUrl)}
-                        >
-                          Copy URL
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
