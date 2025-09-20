@@ -3,7 +3,6 @@ import { z } from "zod";
 import { falService } from "../../services/fal";
 import { db } from "../../db";
 import { characters } from "../../db/schema/characters";
-import { walrusService } from "../../services/walrus";
 
 export const falRouter = router({
   // Test FAL connection
@@ -59,7 +58,7 @@ export const falRouter = router({
     .mutation(async ({ input }) => {
       console.log('🚨 === TRPC ROUTER: editImage called ===');
       console.log('Input received:', JSON.stringify(input, null, 2));
-      
+
       try {
         const result = await falService.editImage(input);
         console.log('🚨 FAL service returned:', JSON.stringify(result, null, 2));
@@ -88,36 +87,30 @@ export const falRouter = router({
           fantasy: 'fantasy art, magical, ethereal',
           cyberpunk: 'cyberpunk style, neon, futuristic'
         };
-        
-        const stylePrompt = input.style ? stylePrompts[input.style] : stylePrompts.cute;
-        const fullPrompt = `Character portrait of ${input.name}, ${input.description}, ${stylePrompt}, high quality digital art, detailed character design`;
 
-        // Generate image with Nano Banana
-        const imageResult = await falService.generateImage({
+        const stylePrompt = input.style ? stylePrompts[input.style] : stylePrompts.cute;
+        const fullPrompt = `Character portrait of ${input.name}, ${input.description}, ${stylePrompt}, high quality digital art, detailed character design, clean uniform background, no text, no letters, no words, simple background, character focus`;
+
+        // Generate image with Nano Banana (with fallback to Flux)
+        let imageResult;
+
+        console.log('🎨 Attempting character generation with Nano Banana...');
+        imageResult = await falService.generateImage({
           prompt: fullPrompt,
           model: 'fal-ai/nano-banana',
           imageSize: 'square_hd',
           numImages: 1
         });
 
+
         if (imageResult.status !== 'completed' || !imageResult.imageUrl) {
           throw new Error(imageResult.error || 'Failed to generate character image');
         }
 
         let characterId: string | undefined;
-        let walrusUrl: string | undefined;
 
         if (input.saveToDatabase) {
-          // Upload to Walrus for permanent storage
-          try {
-            const walrusResult = await walrusService.uploadFromUrl(imageResult.imageUrl);
-            walrusUrl = walrusResult.url;
-          } catch (error) {
-            console.error('Failed to upload to Walrus:', error);
-            walrusUrl = imageResult.imageUrl; // Fallback to FAL URL
-          }
-
-          // Save to database
+          // Save to database with FAL image URL directly
           characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
           await db.insert(characters).values({
             id: characterId,
@@ -131,7 +124,7 @@ export const falRouter = router({
             },
             rarity_rank: 0,
             rarity_percentage: null,
-            image_url: walrusUrl || imageResult.imageUrl,
+            image_url: imageResult.imageUrl, // Use FAL URL directly
             description: input.description,
             created_at: new Date(),
             updated_at: new Date()
@@ -143,7 +136,6 @@ export const falRouter = router({
           characterId,
           characterName: input.name,
           imageUrl: imageResult.imageUrl,
-          walrusUrl,
           seed: imageResult.seed,
           prompt: fullPrompt
         };
@@ -173,9 +165,9 @@ export const falRouter = router({
           fantasy: 'fantasy art, magical, ethereal',
           cyberpunk: 'cyberpunk style, neon, futuristic'
         };
-        
+
         const stylePrompt = input.characterStyle ? stylePrompts[input.characterStyle] : stylePrompts.cute;
-        const characterPrompt = `Character portrait of ${input.characterName}, ${input.characterDescription}, ${stylePrompt}, high quality digital art`;
+        const characterPrompt = `Character portrait of ${input.characterName}, ${input.characterDescription}, ${stylePrompt}, high quality digital art, detailed character design, clean uniform background, no text, no letters, no words, simple background, character focus`;
 
         console.log('🎨 Step 1: Generating character with Nano Banana...');
         const imageResult = await falService.generateImage({
@@ -193,14 +185,6 @@ export const falRouter = router({
 
         // Save character to database
         const characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        let walrusUrl: string | undefined;
-        
-        try {
-          const walrusResult = await walrusService.uploadFromUrl(imageResult.imageUrl);
-          walrusUrl = walrusResult.url;
-        } catch (error) {
-          console.error('Failed to upload to Walrus:', error);
-        }
 
         await db.insert(characters).values({
           id: characterId,
@@ -214,7 +198,7 @@ export const falRouter = router({
           },
           rarity_rank: 0,
           rarity_percentage: null,
-          image_url: walrusUrl || imageResult.imageUrl,
+          image_url: imageResult.imageUrl, // Use FAL URL directly
           description: input.characterDescription,
           created_at: new Date(),
           updated_at: new Date()
@@ -269,8 +253,7 @@ export const falRouter = router({
           character: {
             id: characterId,
             name: input.characterName,
-            imageUrl: imageResult.imageUrl,
-            walrusUrl
+            imageUrl: imageResult.imageUrl
           },
           video: {
             generationId: videoGenerationId,
@@ -290,7 +273,7 @@ export const falRouter = router({
       prompt: z.string().min(1, "Prompt is required"),
       model: z.enum([
         'fal-ai/hunyuan-video',
-        'fal-ai/ltx-video', 
+        'fal-ai/ltx-video',
         'fal-ai/cogvideox-5b',
         'fal-ai/runway-gen3',
         'fal-ai/veo3/fast/image-to-video'
@@ -310,8 +293,8 @@ export const falRouter = router({
     }),
 
   getStatus: publicProcedure
-    .input(z.object({ 
-      id: z.string().min(1, "ID is required") 
+    .input(z.object({
+      id: z.string().min(1, "ID is required")
     }))
     .query(async ({ input }) => {
       return await falService.getGenerationStatus(input.id);

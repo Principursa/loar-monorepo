@@ -98,23 +98,41 @@ export class FalService {
 
       console.log('📥 Raw FAL Response:', JSON.stringify(result, null, 2));
 
-      // Parse the response
-      const data = (result as any).data;
-      if (!data) {
-        throw new Error('No data in FAL response');
+      // Parse the response - handle both direct result and nested data
+      let data: any;
+      
+      if ((result as any).data) {
+        data = (result as any).data;
+        console.log('📥 Using .data property from response');
+      } else if ((result as any).images || (result as any).image) {
+        data = result;
+        console.log('📥 Using direct response (no .data wrapper)');
+      } else {
+        console.error('❌ No data or images found in response');
+        console.error('Available response keys:', Object.keys(result as any));
+        throw new Error(`No data in FAL response. Available keys: ${Object.keys(result as any).join(', ')}`);
       }
+
+      console.log('📥 Data to parse:', JSON.stringify(data, null, 2));
 
       // Extract images from various possible response formats
       let images: Array<{ url: string; width?: number; height?: number; content_type?: string }> = [];
       
       if (data.images && Array.isArray(data.images)) {
         images = data.images;
+        console.log('✅ Found images array:', images.length, 'images');
       } else if (data.image) {
         images = [{ url: data.image }];
+        console.log('✅ Found single image property');
       } else if (typeof data === 'string') {
         images = [{ url: data }];
+        console.log('✅ Data is string URL');
       } else if (data.url) {
         images = [{ url: data.url }];
+        console.log('✅ Found url property');
+      } else {
+        console.error('❌ No image data found in parsed data');
+        console.error('Data keys:', Object.keys(data));
       }
 
       console.log('🖼️ Extracted images:', images);
@@ -138,6 +156,12 @@ export class FalService {
 
     } catch (error) {
       console.error('❌ FAL Image Generation Failed:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined
+      });
+      
       return {
         id: Date.now().toString(),
         status: 'failed',
