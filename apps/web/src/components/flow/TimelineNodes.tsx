@@ -84,7 +84,8 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
           .catch((error) => {
             console.error('TimelineNode: Failed to create blob URL, falling back to HTTP gateway:', error);
             // Fallback: Use our HTTP gateway instead of blob URL
-            const fallbackUrl = `http://localhost:3000/api/filecoin/${data.videoUrl}`;
+            const baseUrl = import.meta.env.PROD ? 'https://loartech.xyz' : 'http://localhost:3000';
+            const fallbackUrl = `${baseUrl}/api/filecoin/${data.videoUrl}`;
             setDisplayVideoUrl(fallbackUrl);
             console.log('TimelineNode: Using HTTP gateway fallback for large file:', fallbackUrl);
           })
