@@ -95,8 +95,46 @@ function UniverseTimelineEditor() {
   const [isSavingToContract, setIsSavingToContract] = useState(false);
   const [contractSaved, setContractSaved] = useState(false);
   
+  // Filecoin integration state
+  const [isSavingToFilecoin, setIsSavingToFilecoin] = useState(false);
+  const [filecoinSaved, setFilecoinSaved] = useState(false);
+  const [pieceCid, setPieceCid] = useState<string | null>(null);
+  const [originalVideoUrl, setOriginalVideoUrl] = useState<string | null>(null); // Keep original URL for display
+  
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+
+  // Debug: Log when generatedVideoUrl changes
+  useEffect(() => {
+    console.log('generatedVideoUrl changed to:', generatedVideoUrl);
+    console.log('Stack trace:', new Error().stack);
+  }, [generatedVideoUrl]);
+
+  // Custom hook to create blob URL from Filecoin PieceCID
+  const createFilecoinBlobUrl = useCallback(async (pieceCid: string, filename: string = 'video.mp4') => {
+    try {
+      console.log('Creating blob URL for PieceCID:', pieceCid);
+      
+      // Download from Filecoin via tRPC
+      const result = await trpcClient.synapse.download.query({ pieceCid });
+      
+      // Convert base64 back to Uint8Array
+      const binaryData = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
+      
+      // Create blob with proper MIME type
+      const mimeType = filename.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream';
+      const blob = new Blob([binaryData], { type: mimeType });
+      
+      // Create URL for the blob
+      const blobUrl = URL.createObjectURL(blob);
+      console.log('Created blob URL:', blobUrl);
+      
+      return blobUrl;
+    } catch (error) {
+      console.error('Failed to create blob URL from Filecoin:', error);
+      throw error;
+    }
+  }, []);
 
   // Contract hooks - we'll use the write contract directly for universe-specific contracts
   const { writeContractAsync } = useWriteContract();
@@ -668,7 +706,7 @@ function UniverseTimelineEditor() {
     }
   }, [generatedImageUrl, uploadedUrl, videoDescription, generateVideoMutation]);
 
-  // Save to contract function
+  // Save to contract function (now includes Filecoin upload)
   const handleSaveToContract = useCallback(async () => {
     if (!generatedVideoUrl || !videoTitle || !videoDescription) {
       alert('Video, title, and description are required to save to contract');
@@ -676,8 +714,60 @@ function UniverseTimelineEditor() {
     }
 
     setIsSavingToContract(true);
+    setIsSavingToFilecoin(true);
+    
     try {
-      // Determine the previous node based on addition type
+      // Step 1: Upload to Filecoin first
+      console.log('Step 1: Uploading video to Filecoin via Synapse. URL being used:', generatedVideoUrl);
+      console.log('Current state - videoTitle:', videoTitle, 'videoDescription:', videoDescription);
+      
+      let filecoinPieceCid: string | null = null;
+      try {
+        const filecoinResult = await trpcClient.synapse.uploadFromUrl.mutate({
+          url: generatedVideoUrl
+        });
+        
+        console.log('Filecoin upload successful. PieceCID:', filecoinResult);
+        console.log('PieceCID type:', typeof filecoinResult);
+        console.log('PieceCID stringified:', JSON.stringify(filecoinResult));
+        
+        // Convert to string if it's an object
+        let pieceCidString: string;
+        if (typeof filecoinResult === 'string') {
+          pieceCidString = filecoinResult;
+        } else if (filecoinResult && typeof filecoinResult === 'object') {
+          // Try different ways to extract the string value from the PieceCID object
+          pieceCidString = filecoinResult.toString?.() || 
+                          filecoinResult.value || 
+                          filecoinResult.cid || 
+                          filecoinResult._baseValue || 
+                          JSON.stringify(filecoinResult);
+          console.log('Extracted PieceCID string:', pieceCidString);
+        } else {
+          pieceCidString = String(filecoinResult);
+        }
+        
+        filecoinPieceCid = pieceCidString;
+        setPieceCid(pieceCidString);
+        setFilecoinSaved(true);
+        
+        // Create blob URL from Filecoin for display
+        try {
+          const blobUrl = await createFilecoinBlobUrl(pieceCidString, 'video.mp4');
+          setGeneratedVideoUrl(blobUrl);
+          console.log('Updated video display to use Filecoin blob URL:', blobUrl);
+        } catch (blobError) {
+          console.error('Failed to create blob URL, keeping original URL:', blobError);
+          console.log('Keeping original URL for display:', generatedVideoUrl);
+        }
+      } catch (filecoinError) {
+        console.error('Filecoin upload failed, proceeding with original URL:', filecoinError);
+        // Continue with original URL if Filecoin fails
+      }
+      
+      setIsSavingToFilecoin(false);
+
+      // Step 2: Determine the previous node based on addition type
       let previousNodeId: number;
       
       if (additionType === 'branch' && sourceNodeId) {
@@ -690,8 +780,15 @@ function UniverseTimelineEditor() {
         console.log('Creating linear continuation after event:', previousNodeId);
       }
       
-      console.log('Saving to contract:', {
-        link: generatedVideoUrl,
+      // Step 3: Determine the video URL to store - prefer Filecoin PieceCID if available
+      const videoUrlForContract = filecoinPieceCid 
+        ? filecoinPieceCid // Store raw PieceCID 
+        : generatedVideoUrl;
+
+      console.log('Step 2: Saving to contract:', {
+        link: videoUrlForContract,
+        originalLink: generatedVideoUrl,
+        pieceCid: filecoinPieceCid,
         plot: videoDescription,
         previous: previousNodeId,
         title: videoTitle,
@@ -711,14 +808,17 @@ function UniverseTimelineEditor() {
         abi: timelineAbi,
         address: contractAddressToUse,
         functionName: 'createNode',
-        args: [generatedVideoUrl, videoDescription, BigInt(previousNodeId)]
+        args: [videoUrlForContract, videoDescription, BigInt(previousNodeId)]
       });
 
       console.log('Transaction submitted:', txHash);
       setContractSaved(true);
       
       // Show success message
-      alert('Successfully saved to blockchain! Transaction: ' + txHash);
+      const successMessage = filecoinPieceCid 
+        ? `Successfully saved to Filecoin and blockchain!\nPieceCID: ${filecoinPieceCid}\nTransaction: ${txHash}`
+        : `Successfully saved to blockchain! Transaction: ${txHash}`;
+      alert(successMessage);
       
       // Refresh the blockchain data to show the new node
       setTimeout(async () => {
@@ -738,8 +838,26 @@ function UniverseTimelineEditor() {
       alert('Failed to save to contract: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsSavingToContract(false);
+      setIsSavingToFilecoin(false);
     }
   }, [generatedVideoUrl, videoTitle, videoDescription, graphData.nodeIds, writeContractAsync, isBlockchainUniverse, id, chainId]);
+
+  // Debug function to test Filecoin functionality without generating video
+  const handleDebugFilecoin = useCallback(async () => {
+    // Use a 10-second, 1MB test video that should work reliably
+    const mockVideoUrl = "https://test-videos.co.uk/vids/bigbuckbunny/mp4/av1/360/Big_Buck_Bunny_360_10s_1MB.mp4";
+    const mockTitle = "Debug Test Video";
+    const mockDescription = "Testing Filecoin upload functionality";
+    
+    // Set the mock data
+    setGeneratedVideoUrl(mockVideoUrl);
+    setVideoTitle(mockTitle);
+    setVideoDescription(mockDescription);
+    setShowVideoStep(true);
+    
+    console.log('Debug: Set up mock video data for testing with URL:', mockVideoUrl);
+  }, []);
+
 
   // Manual refresh function
   const handleRefreshTimeline = useCallback(async () => {
@@ -1632,12 +1750,13 @@ function UniverseTimelineEditor() {
                     </div>
                   ) : (
                     <video 
-                      src={generatedVideoUrl} 
+                      key={generatedVideoUrl} // Force re-render when URL changes
+                      src={generatedVideoUrl}
                       controls 
                       className="w-full rounded-lg border"
                       onError={(e) => {
                         console.error("Video playback error:", e);
-                        // Fallback to placeholder if video can't be played
+                        console.error("Failed URL:", generatedVideoUrl);
                       }}
                     >
                       Your browser does not support the video tag.
@@ -1656,17 +1775,17 @@ function UniverseTimelineEditor() {
                       {isSavingToContract ? (
                         <>
                           <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                          Saving to Blockchain...
+                          {isSavingToFilecoin ? "Uploading to Filecoin..." : "Saving to Blockchain..."}
                         </>
                       ) : contractSaved ? (
                         <>
                           <span className="text-green-600">✓</span>
-                          <span className="ml-2">Saved to Blockchain</span>
+                          <span className="ml-2">Saved to Timeline & Filecoin</span>
                         </>
                       ) : (
                         <>
                           <Film className="h-3 w-3 mr-2" />
-                          Save to Universe Timeline
+                          Save to Timeline & Filecoin
                         </>
                       )}
                     </Button>
@@ -1674,13 +1793,73 @@ function UniverseTimelineEditor() {
                     {contractSaved && (
                       <div className="p-2 bg-green-50 border border-green-200 rounded text-xs">
                         <div className="text-green-700 font-medium">
-                          ✅ Successfully saved to blockchain!
+                          ✅ Successfully saved to universe timeline{filecoinSaved ? " and Filecoin" : ""}!
                         </div>
+                        {filecoinSaved && pieceCid && (
+                          <div className="text-blue-600 mt-1">
+                            Filecoin PieceCID: <code className="bg-blue-100 px-1 rounded text-xs">{pieceCid}</code>
+                          </div>
+                        )}
                         <div className="text-green-600 mt-1">
-                          Your scene is now part of the universe timeline and will be visible to all users.
+                          Your scene is now part of the universe timeline{filecoinSaved ? " with permanent decentralized storage" : ""} and will be visible to all users.
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Debug Section - only show in development */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="border-t pt-4 mt-4">
+                  <div className="text-xs text-muted-foreground mb-2">Debug Tools</div>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleDebugFilecoin}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-xs"
+                      >
+                        🔧 Setup Mock Video
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          // Use a smaller, faster test image instead
+                          const smallTestUrl = "https://httpbin.org/robots.txt";
+                          setGeneratedVideoUrl(smallTestUrl);
+                          setVideoTitle("Small File Test");
+                          setVideoDescription("Testing with small file");
+                          setShowVideoStep(true);
+                          console.log('Debug: Set up small test file:', smallTestUrl);
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-xs"
+                      >
+                        📄 Small Test File
+                      </Button>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        // Clear all state
+                        setGeneratedVideoUrl(null);
+                        setVideoTitle("");
+                        setVideoDescription("");
+                        setShowVideoStep(false);
+                        setContractSaved(false);
+                        setFilecoinSaved(false);
+                        setPieceCid(null);
+                        setIsSavingToContract(false);
+                        setIsSavingToFilecoin(false);
+                        console.log('Debug: Cleared all state');
+                      }}
+                      variant="destructive"
+                      size="sm"
+                      className="w-full text-xs"
+                    >
+                      🗑️ Clear All State
+                    </Button>
                   </div>
                 </div>
               )}

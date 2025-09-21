@@ -250,8 +250,11 @@ export const appRouter = router({
       .mutation(async ({ input}) => {
         try {
           console.log(`Filecoin Synapse upload for ${input.url}`)
-          const result = await synapseService.uploadFromUrl(input.url)
-          console.log(`Filecoin Synapse sucessful: ${result}`)
+          const service = await synapseService;
+          const result = await service.uploadFromUrl(input.url)
+          console.log(`Filecoin Synapse successful - result type:`, typeof result)
+          console.log(`Filecoin Synapse successful - result value:`, result)
+          console.log(`Filecoin Synapse successful - stringified:`, JSON.stringify(result))
           return result;
         } catch (error) {
           console.error("Synapse upload error:", error)
@@ -261,7 +264,58 @@ export const appRouter = router({
     download: publicProcedure
       .input(z.object({ pieceCid: z.string() }))
       .query(async ({ input }) => {
-        return await synapseService.download(input.pieceCid);
+        try {
+          console.log(`Starting download for PieceCID: ${input.pieceCid}`);
+          const service = await synapseService;
+          
+          console.log(`Service ready, attempting download...`);
+          const data = await service.download(input.pieceCid);
+          
+          console.log(`Downloaded ${data.length} bytes for PieceCID: ${input.pieceCid}`);
+          
+          // Check if data is too large (> 5MB for tRPC transport safety)
+          // Base64 encoding increases size by ~33%, so 5MB becomes ~6.7MB encoded
+          if (data.length > 5 * 1024 * 1024) {
+            console.error(`File too large for tRPC: ${Math.round(data.length / 1024 / 1024)}MB`);
+            throw new Error(`File too large for tRPC: ${Math.round(data.length / 1024 / 1024)}MB (max 5MB). Use HTTP gateway instead.`);
+          }
+          
+          try {
+            console.log(`🔄 Converting ${data.length} bytes to base64...`);
+            
+            // Memory-safe base64 conversion with error handling
+            const base64Data = Buffer.from(data).toString('base64');
+            
+            console.log(`✅ Base64 conversion successful, encoded length: ${base64Data.length}`);
+            
+            // Log memory usage after conversion
+            const memUsage = process.memoryUsage();
+            console.log(`📊 Memory after base64: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB heap`);
+            
+            return { 
+              data: base64Data,
+              pieceCid: input.pieceCid,
+              originalSize: data.length,
+              encodedSize: base64Data.length
+            };
+            
+          } catch (base64Error) {
+            console.error(`❌ Base64 conversion failed for ${input.pieceCid}:`, base64Error);
+            throw new Error(`Base64 encoding failed: File too large for memory. Use HTTP gateway instead.`);
+          }
+        } catch (error) {
+          console.error(`Failed to download PieceCID ${input.pieceCid}:`, error);
+          throw new Error(`Failed to download from Filecoin: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }),
+    getHttpUrl: publicProcedure
+      .input(z.object({ pieceCid: z.string() }))
+      .query(({ input }) => {
+        // Return an HTTP URL that can be used to access the Filecoin content
+        const baseUrl = process.env.NODE_ENV === 'production' 
+          ? 'https://your-domain.com' 
+          : 'http://localhost:3000';
+        return { url: `${baseUrl}/api/filecoin/${input.pieceCid}` };
       }),
   }),
   walrus: router({
