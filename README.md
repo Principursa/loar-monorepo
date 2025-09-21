@@ -17,12 +17,17 @@
 
 LOAR revolutionizes narrative creation by putting the power of storytelling in the hands of communities. Our platform enables collaborative cinematic universe development with decentralized governance, censorship-resistant content hosting, and blockchain-based ownership.
 
-Our current reference product would be something like Naver Webtoons mixed with TikTok. The average Webtoons user uses the app for 30 minutes a day. 
+Our current reference product would be something like Naver Webtoons mixed with TikTok. 
+The average Webtoons user uses the app for 30 minutes a day. 
 We believe that LOAR has the potential for even higher amounts of usage through a four pronged strategy.
-Consumption - Consuming AI generated video content.
-Production - Providing the best and most accessible tooling for creating AI generated videos, Using crypto markets to incentivize quality content creation.
-Discussion - Having the space to discuss over storylines and canons
-Speculation - trading with individual cinematic universe tokens which will control which nodes are 'official' in a given timeline.
+
+- **Consumption** - Consuming AI generated video content.
+
+- **Production** - Providing the best and most accessible tooling for creating AI generated videos, Using crypto markets to incentivize quality content creation.
+
+- **Discussion** - Having the space to discuss over storylines and canons
+
+- **Speculation** - trading with individual cinematic universe tokens which will control which nodes are 'official' in a given timeline.
 
 
 
