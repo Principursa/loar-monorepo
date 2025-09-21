@@ -7,12 +7,41 @@ import { useReadContract, useChainId } from 'wagmi';
 import { timelineAbi } from '@/generated';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
 import { type Address } from 'viem';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { trpcClient } from '@/utils/trpc';
 
 function EventPage() {
   const { universeId, eventId } = useParams({ from: "/event/$universeId/$eventId" });
   const chainId = useChainId();
   const [universe, setUniverse] = useState<any>(null);
+  const [displayVideoUrl, setDisplayVideoUrl] = useState<string | null>(null);
+  const [isLoadingFilecoin, setIsLoadingFilecoin] = useState(false);
+
+  // Custom function to create blob URL from Filecoin PieceCID
+  const createFilecoinBlobUrl = useCallback(async (pieceCid: string, filename: string = 'video.mp4') => {
+    try {
+      console.log('Creating blob URL for PieceCID:', pieceCid);
+      
+      // Download from Filecoin via tRPC
+      const result = await trpcClient.synapse.download.query({ pieceCid });
+      
+      // Convert base64 back to Uint8Array
+      const binaryData = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
+      
+      // Create blob with proper MIME type
+      const mimeType = filename.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream';
+      const blob = new Blob([binaryData], { type: mimeType });
+      
+      // Create URL for the blob
+      const blobUrl = URL.createObjectURL(blob);
+      console.log('Created blob URL:', blobUrl);
+      
+      return blobUrl;
+    } catch (error) {
+      console.error('Failed to create blob URL from Filecoin:', error);
+      throw error;
+    }
+  }, []);
   
   // Get universe data from localStorage
   useEffect(() => {
@@ -55,6 +84,53 @@ function EventPage() {
     }
   });
 
+  // Extract data from blockchain response for use in hooks
+  const videoUrl = nodeData && Array.isArray(nodeData) && nodeData.length >= 4 ? nodeData[1] : null;
+
+  console.log('Event page debug:', {
+    nodeData,
+    videoUrl,
+    displayVideoUrl,
+    isLoadingFilecoin
+  });
+
+  // Handle PieceCIDs by creating blob URLs - MUST be called at top level
+  useEffect(() => {
+    console.log('useEffect triggered with videoUrl:', videoUrl);
+    
+    if (videoUrl && videoUrl.startsWith('bafk')) {
+      // This looks like a raw PieceCID from Filecoin
+      console.log('Event page: Converting PieceCID to blob URL for:', videoUrl);
+      
+      setIsLoadingFilecoin(true);
+      createFilecoinBlobUrl(videoUrl)
+        .then((blobUrl) => {
+          setDisplayVideoUrl(blobUrl);
+          console.log('Event page: Successfully created blob URL:', blobUrl);
+        })
+        .catch((error) => {
+          console.error('Event page: Failed to create blob URL, falling back to HTTP gateway:', error);
+          // Fallback: Use our HTTP gateway instead of blob URL
+          const fallbackUrl = `http://localhost:3000/api/filecoin/${videoUrl}`;
+          setDisplayVideoUrl(fallbackUrl);
+          console.log('Event page: Using HTTP gateway fallback for large file:', fallbackUrl);
+        })
+        .finally(() => {
+          setIsLoadingFilecoin(false);
+        });
+    } else if (videoUrl) {
+      // Use the original URL for HTTP URLs
+      console.log('Event page: Using original URL:', videoUrl);
+      setDisplayVideoUrl(videoUrl);
+      setIsLoadingFilecoin(false);
+    } else {
+      // No video URL available
+      console.log('Event page: No video URL available');
+      setDisplayVideoUrl(null);
+      setIsLoadingFilecoin(false);
+    }
+  }, [videoUrl, createFilecoinBlobUrl]);
+
   if (isLoadingNode) {
     return (
       <div className="container mx-auto p-6">
@@ -93,10 +169,9 @@ function EventPage() {
   }
 
   // Extract data from blockchain response [id, url, desc, prev_node_id, array, bool]
-  const eventNodeId = nodeData[0];
-  const videoUrl = nodeData[1];
-  const description = nodeData[2];
-  const previousNodeId = nodeData[3];
+  const eventNodeId = nodeData?.[0];
+  const description = nodeData?.[2]; 
+  const previousNodeId = nodeData?.[3];
 
   return (
     <div className="container mx-auto p-6">
@@ -166,23 +241,31 @@ function EventPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {videoUrl ? (
+                {displayVideoUrl ? (
                   <>
                     <div className="space-y-4">
                       {/* Primary video player */}
                       <div className="relative">
                         <div className="w-full aspect-video bg-muted rounded-lg border relative overflow-hidden">
+                          {isLoadingFilecoin && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-muted/80 z-10">
+                              <div className="text-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                                <p className="text-sm text-muted-foreground">Loading from Filecoin...</p>
+                              </div>
+                            </div>
+                          )}
                           <video 
                             className="w-full h-full object-cover" 
                             controls
                             preload="metadata"
                             playsInline
-                            onLoadStart={() => console.log('Event video loading:', videoUrl)}
-                            onCanPlay={() => console.log('Event video can play:', videoUrl)}
+                            onLoadStart={() => console.log('Event video loading:', displayVideoUrl)}
+                            onCanPlay={() => console.log('Event video can play:', displayVideoUrl)}
                             onLoadedMetadata={() => console.log('Video metadata loaded')}
                             onError={(e) => {
                               console.error('Event video loading error:', e);
-                              console.error('Video URL causing error:', videoUrl);
+                              console.error('Video URL causing error:', displayVideoUrl);
                               const video = e.target as HTMLVideoElement;
                               console.error('Video error details:', {
                                 error: video.error,
@@ -191,8 +274,8 @@ function EventPage() {
                               });
                             }}
                           >
-                            <source src={videoUrl} type="video/mp4" />
-                            <source src={videoUrl} />
+                            <source src={displayVideoUrl} type="video/mp4" />
+                            <source src={displayVideoUrl} />
                             Your browser does not support the video tag.
                           </video>
                         </div>

@@ -53,7 +53,7 @@ services:
 
 
 
-  postgres:
+  postgres: 
     image: postgres:15
     container_name: loar-postgres
     environment:
@@ -67,6 +67,7 @@ services:
     restart: unless-stopped
     networks:
       - loar-network
+      #change this to extend from the apps/server/docker-compose.yml
 
 volumes:
   postgres_data:
