@@ -17,25 +17,26 @@
 
 LOAR revolutionizes narrative creation by putting the power of storytelling in the hands of communities. Our platform enables collaborative cinematic universe development with decentralized governance, censorship-resistant content hosting, and blockchain-based ownership.
 
+Our current reference product would be something like Naver Webtoons mixed with TikTok. The average Webtoons user uses the app for 30 minutes a day. 
+We believe that LOAR has the potential for even higher amounts of usage through a four pronged strategy.
+Consumption - Consuming AI generated video content.
+Production - Providing the best and most accessible tooling for creating AI generated videos, Using crypto markets to incentivize quality content creation.
+Discussion - Having the space to discuss over storylines and canons
+Speculation - trading with individual cinematic universe tokens which will control which nodes are 'official' in a given timeline.
+
+
+
+
 ## 🚀 Core Features
 
 ### 🧩 Narrative Flow Editor
 - **Interactive Graph-Based Editor** - Create and visualize complex narrative structures
 - **Character-Plot Connections** - Link characters to storylines with visual relationships
 - **Canonicity Management** - Track and vote on official universe canon
-- **NFT Integration** - Characters backed by NFT ownership
 
 ### 🛡️ Censorship-Resistant Content (Powered by Walrus Protocol)
 - **Decentralized Video Storage** - Content that can't be taken down or censored
-- **Blockchain Certification** - Videos certified on Sui blockchain
-- **Guaranteed Availability** - Content remains accessible regardless of platform pressure
 - **Trustless Distribution** - No central authority controls your narrative
-
-### 🖼️ NFT Character System (OpenSea Integration)
-- **Automatic Character Generation** - Create character profiles from NFT metadata
-- **MCP Server Integration** - Direct access to OpenSea's Multi-Chain Protocol
-- **Rarity-Based Attributes** - Character traits influenced by NFT rarity
-- **Dynamic Wikis** - Auto-generated character wikis from NFT collections
 
 ### 🏛️ Decentralized Governance
 - **Token-Based Voting** - Community decides on canonical content
@@ -52,7 +53,6 @@ Before you begin, ensure you have the following installed:
 - **PostgreSQL** - [Install here](https://www.postgresql.org/download/)
 - **Foundry** (for smart contracts) - [Install here](https://book.getfoundry.sh/getting-started/installation)
 - **Ethereum wallet** (MetaMask recommended)
-- **NFT holdings** (for full governance participation)
 
 ## 📦 Installation
 
@@ -62,7 +62,6 @@ Before you begin, ensure you have the following installed:
    cd Loar-Fullstack
    ```
 
-<<<<<<< HEAD
 2. **Install dependencies:**
    ```bash
    # Install dependencies for the entire monorepo
@@ -73,20 +72,17 @@ Before you begin, ensure you have the following installed:
    bun install
    bun add reactflow  # Required for the narrative flow editor
    ```
-
-3. **Set up Dynamic Wallet Authentication:**
-   - Go to [Dynamic Dashboard](https://app.dynamic.xyz/)
-   - Create a new project
-   - Copy your Environment ID
-   - Create `.env` file in `apps/web/`:
-     ```env
-     VITE_DYNAMIC_ENVIRONMENT_ID=your_environment_id_here
-     VITE_SERVER_URL=http://localhost:3000
      ```
-
-4. **Configure your environment:**
-   - Update `apps/server/.env` with your PostgreSQL and OpenSea API details
+3.  **Configure your environment:**
+   - Update `apps/server/.env`, refer to apps/server/.env.example
    - Copy `apps/web/.env.example` to `apps/web/.env` and update as needed
+
+4. **Building the application**
+```bash 
+    #in root directory
+    bun run build
+    docker compose up -d
+``` 
 
 5. **Set up the database:**
    ```bash
@@ -145,13 +141,7 @@ If you encounter dependency issues:
 - **Server:** http://localhost:3000
 - **API Documentation:** http://localhost:3000/trpc
 
-## 🔐 Dynamic Wallet Features
-
 - **Multi-Wallet Support** - MetaMask, WalletConnect, Coinbase Wallet, and more
-- **Embedded Wallets** - MPC-based wallet creation
-- **Smart Accounts** - Account abstraction support
-- **Multi-Chain** - Ethereum, Polygon, Base, and other EVM chains
-- **Mobile Support** - QR code scanning and mobile wallet integration
 
 ## 📁 Project Structure
 
@@ -190,7 +180,7 @@ Traditional media creation is centralized, controlled by studios and platforms t
 LOAR creates a decentralized ecosystem where:
 
 1. **Communities Own Their Narratives** - Not corporations or platforms
-2. **Content Cannot Be Censored** - Thanks to Walrus Protocol's decentralized storage
+2. **Content Cannot Be Censored** - Thanks to Filecoin Protocol's decentralized storage
 3. **Ownership Is Verifiable** - Through blockchain authentication and NFTs
 4. **Governance Is Democratic** - With on-chain voting and proposals
 5. **Creation Is Collaborative** - With our visual narrative flow editor
@@ -203,7 +193,6 @@ LOAR creates a decentralized ecosystem where:
 
 ### 📊 Technical Innovation
 1. **First-of-its-kind integration** between narrative creation tools and decentralized storage
-2. **Novel use of OpenSea MCP** for character generation from NFT metadata
 3. **Unique visual editor** for managing narrative canonicity with blockchain verification
 4. **Censorship-resistant media pipeline** from creation to distribution
 
@@ -219,7 +208,6 @@ graph TD
     E --> F[Narrative State Manager]
     F --> G[tRPC API Layer]
     
-    C --> H[OpenSea MCP Integration]
     H --> I[NFT Metadata Parser]
     I --> J[Character Generator]
     J --> G
@@ -229,12 +217,7 @@ graph TD
     L --> G
     
     G --> M[PostgreSQL Database]
-    G --> N[Walrus Protocol]
-    N --> O[Publisher Node]
-    N --> P[Aggregator Node]
-    O --> Q[Sui Blockchain]
     
-    R[Dynamic Auth] --> A
 ```
 
 ### Key Components
@@ -242,7 +225,6 @@ graph TD
 1. **Frontend Layer**
    - React 19 with TanStack Router
    - ReactFlow for narrative visualization
-   - Dynamic wallet authentication
 
 2. **API Layer**
    - tRPC for type-safe API calls
@@ -251,24 +233,10 @@ graph TD
 
 3. **Storage Layer**
    - PostgreSQL with Drizzle ORM for structured data
-   - Walrus Protocol for censorship-resistant media
 
 4. **Blockchain Layer**
    - Smart contracts for governance
-   - NFT integration for character ownership
-   - Multi-chain support via Dynamic
 
-## 🎨 Customization
-
-### Dynamic Configuration
-Edit `apps/web/src/lib/dynamic.ts` to customize:
-- Wallet connectors
-- Event callbacks
-- UI themes
-- Chain configurations
-
-### UI Components
-All UI components are in `apps/web/src/components/ui/` using shadcn/ui.
 
 ## 🔧 Development
 
@@ -287,26 +255,12 @@ All UI components are in `apps/web/src/components/ui/` using shadcn/ui.
 2. Write tests in `apps/contracts/test/`
 3. Deploy scripts in `apps/contracts/script/`
 
-## 🚀 Deployment
+## Filecoin Integration plan
+Currently we have our SynapseSDK/WarmStorage implementation in apps/server/src/services/synapse.ts.
 
-### Frontend (Vercel/Netlify)
-```bash
-cd apps/web
-bun run build
-```
+For the sake of the MVP deployments are currently being handled by a backend service that pays for uploads to filecoin.
 
-### Backend (Railway/Render)
-```bash
-cd apps/server
-bun run build
-```
-
-### Smart Contracts
-```bash
-cd apps/contracts
-forge build
-forge deploy
-```
+However in the future we will explore ways to make uploads to filecoin more economically feasible, using specific providers and CDNs to speed up U/Ds and implementing storage callback methods for better UX.
 
 ## 🔑 Key Technologies & Technical Implementation
 
@@ -317,28 +271,12 @@ forge deploy
 - **Tailwind & shadcn/ui** - Beautiful, responsive UI components
 - **Drizzle ORM** - Type-safe database access with PostgreSQL
 
-### 🌊 Walrus Protocol Integration
-- **Censorship-Resistant Storage** - Content stored across decentralized network
-- **Blockchain Certification** - All uploads certified on Sui blockchain
-- **Publisher/Aggregator Architecture** - Two-tier system for reliable content delivery
-- **Content Addressing** - Immutable content identifiers for all media
-- **Epoch-Based Storage** - Content guaranteed available for specified epochs
-- **Direct Upload API** - Seamless integration with our media pipeline
-
-### 🦑 OpenSea MCP Integration
-- **Multi-Chain Protocol Server** - Direct access to OpenSea's data across chains
-- **AI-Powered Character Generation** - Automatic character profiles from NFT metadata
-- **Trait Analysis** - Extract and normalize NFT traits for character attributes
-- **Rarity Ranking** - Character abilities influenced by NFT rarity
-- **Collection-Based Universes** - Group narratives by NFT collections
-- **Dynamic Character Wikis** - Auto-generated and community-expandable wikis
+### 🌊 Filecoin Integration
+- **Synapse SDK** uploads and downloads handled through funded synapse integration on backend
 
 ### 🔗 Blockchain Features
-- **Multi-Chain Support** - Ethereum, Polygon, Base, and other EVM chains
-- **Dynamic Wallet Authentication** - Connect with any major wallet
 - **Smart Contract Governance** - On-chain voting and proposal systems
 - **Token-Gated Access** - Exclusive features for token holders
-- **NFT Ownership Verification** - Prove character ownership through NFTs
 
 ## 🤝 Contributing
 
@@ -358,16 +296,6 @@ Our roadmap includes:
 - **Creator Monetization** - Direct revenue streams for contributors
 - **Expanded Blockchain Support** - Integration with more chains and L2s
 
-## 🏆 Hackathon Impact
-
-LOAR represents a paradigm shift in how stories are created, shared, and owned. By combining:
-
-- **Censorship-resistant storage** via Walrus Protocol
-- **Community ownership** through blockchain authentication
-- **Visual narrative tools** with our ReactFlow editor
-- **NFT utility** through OpenSea MCP integration
-
-We've created a platform that empowers creators while protecting their freedom of expression. Our technical innovations in decentralized media storage and community governance set new standards for Web3 applications.
 
 ## 📚 License
 
@@ -376,13 +304,6 @@ This project is licensed under the MIT License.
 ## 👨‍💻 Team
 
 LOAR was created by a team of passionate developers, designers, and storytellers who believe in the power of decentralized narrative creation.
-
-## 🆘 Resources
-
-- **Walrus Protocol:** [walrus.xyz](https://www.walrus.xyz/)
-- **OpenSea API:** [opensea.io](https://opensea.io/)
-- **Dynamic Auth:** [dynamic.xyz](https://www.dynamic.xyz/)
-- **ReactFlow:** [reactflow.dev](https://reactflow.dev/)
 
 ---
 
