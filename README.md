@@ -207,8 +207,6 @@ graph TD
     L --> G
     
     G --> M[PostgreSQL Database]
-    N --> O[Publisher Node]
-    N --> P[Aggregator Node]
     
 ```
 
