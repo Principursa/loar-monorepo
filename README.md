@@ -222,7 +222,7 @@ graph TD
     L --> G
     
     G --> M[PostgreSQL Database]
-    F --> P[Filecoin Storage Layer]
+    G --> N[Filecoin Storage Layer]
     
 ```
 
