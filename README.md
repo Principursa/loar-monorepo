@@ -198,7 +198,6 @@ graph TD
     E --> F[Narrative State Manager]
     F --> G[tRPC API Layer]
     
-    C --> H[OpenSea MCP Integration]
     H --> I[NFT Metadata Parser]
     I --> J[Character Generator]
     J --> G
@@ -208,12 +207,9 @@ graph TD
     L --> G
     
     G --> M[PostgreSQL Database]
-    G --> N[Walrus Protocol]
     N --> O[Publisher Node]
     N --> P[Aggregator Node]
-    O --> Q[Sui Blockchain]
     
-    R[Dynamic Auth] --> A
 ```
 
 ### Key Components
@@ -251,6 +247,11 @@ graph TD
 2. Write tests in `apps/contracts/test/`
 3. Deploy scripts in `apps/contracts/script/`
 
+## Filecoin Integration plan
+Currently we have our SynapseSDK/WarmStorage implementation in apps/server/src/services/synapse.ts
+For the sake of the MVP deployments are currently being handled by a backend service that pays for uploads to filecoin.
+However in the future we will explore ways to make uploads to filecoin more economically feasible, using specific providers and CDNs to speed up U/Ds and implementing storage callback methods for better UX.
+the two functions we use are synapse.storage.download and synapse.storage.upload.
 ```
 
 ## 🔑 Key Technologies & Technical Implementation
