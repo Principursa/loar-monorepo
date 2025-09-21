@@ -252,7 +252,6 @@ Currently we have our SynapseSDK/WarmStorage implementation in apps/server/src/s
 For the sake of the MVP deployments are currently being handled by a backend service that pays for uploads to filecoin.
 However in the future we will explore ways to make uploads to filecoin more economically feasible, using specific providers and CDNs to speed up U/Ds and implementing storage callback methods for better UX.
 the two functions we use are synapse.storage.download and synapse.storage.upload.
-```
 
 ## 🔑 Key Technologies & Technical Implementation
 
