@@ -2,6 +2,13 @@
     root * /srv
     file_server
 
+    # Add CORS headers for all responses
+    header {
+        Access-Control-Allow-Origin *
+        Access-Control-Allow-Methods GET, POST, OPTIONS
+        Access-Control-Allow-Headers *
+    }
+
     try_files {path} /index.html
 }
 
