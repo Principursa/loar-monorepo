@@ -50,10 +50,15 @@ services:
       - loar-network
     labels:
       caddy: loartech.xyz
-      caddy.route: /*
-      caddy.route.file_server: ""
-      caddy.route.file_server.root: "/srv"
-      caddy.route.try_files: "{path} {path}/ /index.html"
+      caddy.0_route: /trpc/*
+      caddy.0_route.reverse_proxy: "{{upstreams 3000}}"
+      caddy.1_route: /api/*
+      caddy.1_route.reverse_proxy: "{{upstreams 3000}}"  
+      caddy.2_route: /*
+      caddy.2_route.file_server: ""
+      caddy.2_route.file_server.root: "/srv"
+      caddy.2_route.try_files: "{path} {path}/ /index.html"
+      caddy.tls: "internal"
 
 
 
