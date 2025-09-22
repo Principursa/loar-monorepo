@@ -58,7 +58,7 @@ services:
       caddy.2_route.file_server: ""
       caddy.2_route.file_server.root: "/srv"
       caddy.2_route.try_files: "{path} {path}/ /index.html"
-      caddy.tls: "internal"
+      caddy.tls: "off"
 
 
 
