@@ -20,7 +20,8 @@ services:
       - .:/app
     env_file:
       - ./apps/server/.env
-    environment: - NODE_ENV=production
+    environment: 
+      - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
       - CORS_ORIGIN=https://loartech.xyz
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-defaultsecret}
