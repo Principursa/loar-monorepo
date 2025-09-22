@@ -1,4 +1,7 @@
+version: "3.9"
+
 services:
+  # Reverse proxy + TLS
   caddy:
     image: lucaslorentz/caddy-docker-proxy:ci-alpine
     container_name: loar-caddy
@@ -12,6 +15,7 @@ services:
     networks:
       - loar-network
 
+  # Backend API
   app-server:
     image: oven/bun:1.1.8-alpine
     container_name: loar-server
@@ -20,7 +24,7 @@ services:
       - .:/app
     env_file:
       - ./apps/server/.env
-    environment: 
+    environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
       - CORS_ORIGIN=https://loartech.xyz
@@ -39,23 +43,24 @@ services:
       caddy.1_route: /api/*
       caddy.1_route.reverse_proxy: "{{upstreams 3000}}"
 
-      
+  # Frontend (static assets)
   app-web:
-    image: caddy:alpine
+    image: caddy:2-alpine
     container_name: loar-web
     volumes:
       - ./apps/web/dist:/srv:ro
+      - ./apps/web/Caddyfile:/etc/caddy/Caddyfile:ro
     restart: unless-stopped
     networks:
       - loar-network
     labels:
       caddy: loartech.xyz
       caddy.route: /*
-      caddy.route.file_server: ""
+      caddy.route.reverse_proxy: "{{upstreams 3001}}"
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
 
-
-
-  postgres: 
+  # Database
+  postgres:
     image: postgres:15
     container_name: loar-postgres
     environment:
@@ -69,7 +74,6 @@ services:
     restart: unless-stopped
     networks:
       - loar-network
-      #change this to extend from the apps/server/docker-compose.yml
 
 volumes:
   postgres_data:
@@ -78,3 +82,4 @@ volumes:
 networks:
   loar-network:
     driver: bridge
+
