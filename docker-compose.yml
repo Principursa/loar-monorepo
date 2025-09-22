@@ -20,8 +20,7 @@ services:
       - .:/app
     env_file:
       - ./apps/server/.env
-    environment:
-      - NODE_ENV=production
+    environment: - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
       - CORS_ORIGIN=https://loartech.xyz
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-defaultsecret}
@@ -44,20 +43,14 @@ services:
     image: caddy:alpine
     container_name: loar-web
     volumes:
-      - ./apps/web/dist:/srv
+      - ./apps/web/dist:/srv:ro
     restart: unless-stopped
     networks:
       - loar-network
     labels:
-      caddy: loartech.xyz:80
-      caddy.0_route: /trpc/*
-      caddy.0_route.reverse_proxy: "{{upstreams 3000}}"
-      caddy.1_route: /api/*
-      caddy.1_route.reverse_proxy: "{{upstreams 3000}}"  
-      caddy.2_route: /*
-      caddy.2_route.file_server: ""
-      caddy.2_route.file_server.root: "/srv"
-      caddy.2_route.try_files: "{path} {path}/ /index.html"
+      caddy: loartech.xyz
+      caddy.route: /*
+      caddy.route.file_server: ""
 
 
 
