@@ -51,7 +51,7 @@ services:
     labels:
       caddy: loartech.xyz
       caddy.route: /*
-      caddy.route.file_server: "root /srv"
+      caddy.route.file_server: "/srv"
       caddy.route.try_files: "{path} {path}/ /index.html"
 
 
