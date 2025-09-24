@@ -1,7 +1,7 @@
 version: "3.9"
 
 services:
-  # Reverse proxy + TLS
+  # Reverse proxy + SPA file server
   caddy:
     image: lucaslorentz/caddy-docker-proxy:ci-alpine
     container_name: loar-caddy
@@ -11,9 +11,29 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - caddy_data:/data
+      - ./apps/web/dist:/srv:ro          # <-- Mount SPA files directly into Caddy
     restart: unless-stopped
     networks:
       - loar-network
+    labels:
+      # Domain
+      caddy: loartech.xyz
+        # Reverse proxy for backend first
+      caddy.0_route: /trpc/*
+      caddy.0_route.reverse_proxy: "{{upstreams 3000}}"
+      caddy.1_route: /api/*
+      caddy.1_route.reverse_proxy: "{{upstreams 3000}}"
+
+      # SPA file server last
+      caddy.root: "/srv"
+      caddy.file_server: ""
+      caddy.try_files: "{path} /index.html"
+
+      # CORS headers
+      caddy.header.Access-Control-Allow-Origin: "*"
+      caddy.header.Access-Control-Allow-Methods: "GET, POST, OPTIONS"
+      caddy.header.Access-Control-Allow-Headers: "*"
+
 
   # Backend API
   app-server:
@@ -36,28 +56,6 @@ services:
     restart: unless-stopped
     networks:
       - loar-network
-    labels:
-      caddy: loartech.xyz
-      caddy.0_route: /trpc/*
-      caddy.0_route.reverse_proxy: "{{upstreams 3000}}"
-      caddy.1_route: /api/*
-      caddy.1_route.reverse_proxy: "{{upstreams 3000}}"
-
-  # Frontend (static assets)
-  app-web:
-    image: caddy:2-alpine
-    container_name: loar-web
-    volumes:
-      - ./apps/web/dist:/srv:ro
-      - ./apps/web/Caddyfile:/etc/caddy/Caddyfile:ro
-    restart: unless-stopped
-    networks:
-      - loar-network
-    labels:
-      caddy: loartech.xyz loartech.fun
-      caddy.route: /*
-      caddy.route.reverse_proxy: "{{upstreams 3001}}"
-    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
 
   # Database
   postgres:
