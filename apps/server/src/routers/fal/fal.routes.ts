@@ -122,15 +122,11 @@ export const falRouter = router({
       }
 
       let characterId: string | undefined;
-      let walrusUrl: string | undefined;
+      let localImageUrl: string | undefined;
 
       if (input.saveToDatabase) {
-        try {
-          const walrusResult = await walrusService.uploadFromUrl(imageResult.imageUrl);
-          walrusUrl = walrusResult.url;
-        } catch {
-          walrusUrl = imageResult.imageUrl;
-        }
+        // Use the original FAL image URL directly instead of uploading to Walrus
+        localImageUrl = imageResult.imageUrl;
 
         characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         await db.insert(characters).values({
@@ -145,7 +141,7 @@ export const falRouter = router({
           },
           rarity_rank: 0,
           rarity_percentage: null,
-          image_url: walrusUrl || imageResult.imageUrl,
+          image_url: localImageUrl,
           description: input.description,
           created_at: new Date(),
           updated_at: new Date(),
@@ -157,7 +153,7 @@ export const falRouter = router({
         characterId,
         characterName: input.name,
         imageUrl: imageResult.imageUrl,
-        walrusUrl,
+        localImageUrl,
         seed: imageResult.seed,
         prompt: fullPrompt,
       };
@@ -199,11 +195,8 @@ export const falRouter = router({
       }
 
       const characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      let walrusUrl: string | undefined;
-      try {
-        const walrusResult = await walrusService.uploadFromUrl(imageResult.imageUrl);
-        walrusUrl = walrusResult.url;
-      } catch {}
+      // Use the original FAL image URL directly instead of uploading to Walrus
+      const localImageUrl = imageResult.imageUrl;
 
       await db.insert(characters).values({
         id: characterId,
@@ -217,7 +210,7 @@ export const falRouter = router({
         },
         rarity_rank: 0,
         rarity_percentage: null,
-        image_url: walrusUrl || imageResult.imageUrl,
+        image_url: localImageUrl,
         description: input.characterDescription,
         created_at: new Date(),
         updated_at: new Date(),
@@ -265,7 +258,7 @@ export const falRouter = router({
           id: characterId,
           name: input.characterName,
           imageUrl: imageResult.imageUrl,
-          walrusUrl,
+          localImageUrl,
         },
         video: {
           generationId: videoGenerationId,
