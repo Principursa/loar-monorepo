@@ -7,6 +7,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { imageRouter } from "./routes/image";
+import { db } from "./db";
 
 const app = new Hono();
 
