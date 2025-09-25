@@ -5,6 +5,9 @@ services:
     ports:
       - "80:80"
       - "443:443"
+
+    environment:
+      - CADDY_INGRESS_NETWORK=loar-network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - caddy_data:/data
@@ -50,9 +53,9 @@ services:
       - loar-network
     labels:
       caddy: loartech.xyz
-      caddy.2_root: "* /usr/share/caddy"
-      caddy.3_try_files: "{path} /index.html"
-      caddy.4_file_server: ""
+      caddy.2_route.1_root: "* /usr/share/caddy"
+      caddy.2_route.2_try_files: "{path} /index.html"
+      caddy.2_route.3_file_server: ""
 
 
 
