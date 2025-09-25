@@ -51,8 +51,8 @@ services:
       - loar-network
     labels:
       caddy: loartech.xyz
-      caddy.route: /*
-      caddy.route.reverse_proxy: "{{upstreams 80}}"
+      caddy.2_route: /*
+      caddy.2_route.reverse_proxy: "{{upstreams 80}}"
 
 
 
