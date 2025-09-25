@@ -45,6 +45,7 @@ services:
     container_name: loar-web
     volumes:
       - ./apps/web/dist:/usr/share/caddy:ro
+      - ./Caddyfile.web:/etc/caddy/Caddyfile:ro
     restart: unless-stopped
     networks:
       - loar-network
@@ -52,7 +53,6 @@ services:
       caddy: loartech.xyz
       caddy.route: /*
       caddy.route.file_server: ""
-      caddy.route.try_files: "{path} /index.html"
 
 
 
