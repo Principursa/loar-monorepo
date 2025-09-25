@@ -48,14 +48,14 @@ services:
     container_name: loar-web
     volumes:
       - ./apps/web/dist:/usr/share/caddy:ro
+      - ./apps/web/Caddyfile:/etc/caddy/Caddyfile:ro
     restart: unless-stopped
     networks:
       - loar-network
     labels:
       caddy: loartech.xyz
-      caddy.2_route.1_root: "* /usr/share/caddy"
-      caddy.2_route.2_try_files: "{path} /index.html"
-      caddy.2_route.3_file_server: ""
+      caddy.2_route: /*
+      caddy.2_route.reverse_proxy: "{{upstreams 80}}"
 
 
 
