@@ -41,17 +41,17 @@ services:
 
       
   app-web:
-    image: nginx:alpine
+    image: caddy:2-alpine
     container_name: loar-web
     volumes:
-      - ./apps/web/dist:/usr/share/nginx/html:ro
+      - ./apps/web/dist:/usr/share/caddy:ro
     restart: unless-stopped
     networks:
       - loar-network
     labels:
       caddy: loartech.xyz
       caddy.route: /*
-      caddy.route.reverse_proxy: "{{upstreams 80}}"
+      caddy.route.file_server: ""
 
 
 
