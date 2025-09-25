@@ -51,8 +51,8 @@ services:
     labels:
       caddy: loartech.xyz
       caddy.2_root: "* /usr/share/caddy"
-      caddy.2_try_files: "{path} /index.html"
-      caddy.2_file_server: ""
+      caddy.3_try_files: "{path} /index.html"
+      caddy.4_file_server: ""
 
 
 
