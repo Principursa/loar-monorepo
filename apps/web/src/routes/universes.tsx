@@ -10,6 +10,7 @@ import { timelineAbi } from '@/generated';
 import { createPublicClient, http, parseEventLogs } from 'viem';
 import { sepolia } from 'viem/chains';
 import { WalletConnectButton } from "@/components/wallet-connect-button";
+import { trpc } from "@/utils/trpc";
 
 export const Route = createFileRoute("/universes")({
   component: RouteComponent,
@@ -142,28 +143,8 @@ function RouteComponent() {
   const navigate = Route.useNavigate();
   const chainId = useChainId();
 
-  // Fetch universes from database first, fallback to localStorage
-  const { data: universesData, isLoading, error } = useQuery({
-    queryKey: ['blockchain-universes'],
-    queryFn: async () => {
-      try {
-        // Get universes directly from localStorage (no database dependency)
-        console.log('Fetching universes from localStorage...');
-        
-        const stored = localStorage.getItem('createdUniverses');
-        const localUniverses = stored ? JSON.parse(stored) : [];
-        
-        console.log('📦 Found', localUniverses.length, 'universes in localStorage:', localUniverses);
-        return localUniverses;
-        
-      } catch (error) {
-        console.error('localStorage fetch failed:', error);
-        return [];
-      }
-    },
-    enabled: true,
-    retry: 1
-  });
+  // Fetch all universes from database using TRPC
+  const { data: universesData, isLoading, error } = trpc.cinematicUniverses.getAll.useQuery();
 
   useEffect(() => {
     if (!isConnected) {
@@ -218,7 +199,7 @@ function RouteComponent() {
   }
 
   // Use all universes from database
-  const universes = universesData || [];
+  const universes = universesData?.data || [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -265,7 +246,7 @@ function RouteComponent() {
 
         {/* All Universes Grid */}
         <section>
-          <h2 className="text-xl font-semibold mb-6">Your Universes</h2>
+          <h2 className="text-xl font-semibold mb-6">All Universes</h2>
           {universes.length === 0 ? (
             <div className="text-center py-12">
               <div className="mb-4">
