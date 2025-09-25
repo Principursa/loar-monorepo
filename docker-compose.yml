@@ -52,6 +52,7 @@ services:
       caddy: loartech.xyz
       caddy.route: /*
       caddy.route.file_server: ""
+      caddy.route.try_files: "{path} /index.html"
 
 
 
@@ -77,4 +78,5 @@ volumes:
 
 networks:
   loar-network:
+    name: loar-network
     driver: bridge
