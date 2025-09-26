@@ -152,7 +152,14 @@ function RouteComponent() {
         throw new Error('Failed to fetch universes');
       }
       const result = await response.json();
-      return result.result.data; // Extract the data from TRPC response structure
+      
+      // Transform the data to match frontend expectations
+      const rawData = result.result.data.data || [];
+      return rawData.map((universe: any) => ({
+        ...universe,
+        name: `Universe ${universe.id.slice(0, 8)}`, // Generate name from ID since it's not in DB
+        createdAt: universe.created_at, // Map created_at to createdAt
+      }));
     },
     retry: 3,
     retryDelay: 1000,
