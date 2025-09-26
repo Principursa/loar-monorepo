@@ -144,7 +144,22 @@ function RouteComponent() {
   const chainId = useChainId();
 
   // Fetch all universes from database using TRPC
-  const { data: universesData, isLoading, error } = trpc.cinematicUniverses.getAll.useQuery();
+  const { data: universesData, isLoading, error } = trpc.cinematicUniverses.getAll.useQuery(
+    undefined, // no input needed for getAll
+    {
+      retry: 3,
+      retryDelay: 1000,
+      onError: (err) => {
+        console.error("TRPC getAll error:", err);
+      },
+      onSuccess: (data) => {
+        console.log("TRPC getAll success:", data);
+      }
+    }
+  );
+  
+  // Debug logging
+  console.log("Universe query state:", { universesData, isLoading, error });
 
   useEffect(() => {
     if (!isConnected) {
