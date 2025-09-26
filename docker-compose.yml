@@ -5,6 +5,9 @@ services:
     ports:
       - "80:80"
       - "443:443"
+
+    environment:
+      - CADDY_INGRESS_NETWORK=loar-network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - caddy_data:/data
@@ -41,17 +44,18 @@ services:
 
       
   app-web:
-    image: nginx:alpine
+    image: caddy:2-alpine
     container_name: loar-web
     volumes:
-      - ./apps/web/dist:/usr/share/nginx/html:ro
+      - ./apps/web/dist:/usr/share/caddy:ro
+      - ./apps/web/Caddyfile:/etc/caddy/Caddyfile:ro
     restart: unless-stopped
     networks:
       - loar-network
     labels:
       caddy: loartech.xyz
-      caddy.route: /*
-      caddy.route.reverse_proxy: "{{upstreams 80}}"
+      caddy.2_route: /*
+      caddy.2_route.reverse_proxy: "{{upstreams 80}}"
 
 
 
@@ -77,4 +81,5 @@ volumes:
 
 networks:
   loar-network:
+    name: loar-network
     driver: bridge

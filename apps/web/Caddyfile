@@ -1,0 +1,17 @@
+:80 {
+	root * /usr/share/caddy
+	
+	# Serve actual files (assets, etc.) directly
+	@files {
+		file {path}
+	}
+	handle @files {
+		file_server
+	}
+	
+	# Fallback to index.html for SPA routes
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}
