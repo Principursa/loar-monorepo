@@ -56,8 +56,24 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
     >
       <CardContent className="p-0">
         {/* Universe Thumbnail/Header */}
-        <div className="h-32 bg-gradient-to-br from-indigo-500 to-purple-600 relative">
-          <div className="absolute inset-0 bg-black/20" />
+        <div className="h-32 relative overflow-hidden">
+          {universe.image_url ? (
+            <>
+              <img 
+                src={universe.image_url} 
+                alt={universe.name}
+                className="w-full h-full object-cover"
+              />
+              {/* Fallback gradient (shown when image fails) */}
+              <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 -z-10" />
+              <div className="absolute inset-0 bg-black/20" />
+            </>
+          ) : (
+            <>
+              <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600" />
+              <div className="absolute inset-0 bg-black/20" />
+            </>
+          )}
           <div className="absolute top-2 right-2 flex gap-2">
             {universe.address && (
               <Badge variant="secondary" className="bg-white/20 text-white border-0">
@@ -143,27 +159,19 @@ function RouteComponent() {
   const navigate = Route.useNavigate();
   const chainId = useChainId();
 
-  // Fetch all universes using React Query directly for now
-  const { data: universesData, isLoading, error } = useQuery({
-    queryKey: ['all-universes'],
-    queryFn: async () => {
-      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'https://loartech.xyz'}/trpc/cinematicUniverses.getAll`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch universes');
-      }
-      const result = await response.json();
-      
-      // Transform the data to match frontend expectations
-      const rawData = result.result.data.data || [];
-      return rawData.map((universe: any) => ({
-        ...universe,
-        name: `Universe ${universe.id.slice(0, 8)}`, // Generate name from ID since it's not in DB
-        createdAt: universe.created_at, // Map created_at to createdAt
-      }));
-    },
-    retry: 3,
-    retryDelay: 1000,
-  });
+  // Fetch all universes from database using TRPC
+  const { data: universesResponse, isLoading, error } = useQuery(trpc.cinematicUniverses.getAll.queryOptions());
+  
+  // Transform the data to match frontend expectations
+  const universesData = useMemo(() => {
+    if (!universesResponse?.data) return [];
+    
+    return universesResponse.data.map((universe: any) => ({
+      ...universe,
+      name: `Universe ${universe.id.slice(0, 8)}`, // Generate name from ID since it's not in DB
+      createdAt: universe.created_at, // Map created_at to createdAt
+    }));
+  }, [universesResponse]);
 
   useEffect(() => {
     if (!isConnected) {
@@ -217,8 +225,8 @@ function RouteComponent() {
     );
   }
 
-  // Use all universes from database  
-  const universes = universesData || [];
+  // Use transformed universes data
+  const universes = universesData;
 
   return (
     <div className="min-h-screen bg-background">
