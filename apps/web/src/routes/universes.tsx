@@ -143,23 +143,20 @@ function RouteComponent() {
   const navigate = Route.useNavigate();
   const chainId = useChainId();
 
-  // Fetch all universes from database using TRPC
-  const { data: universesData, isLoading, error } = trpc.cinematicUniverses.getAll.useQuery(
-    undefined, // no input needed for getAll
-    {
-      retry: 3,
-      retryDelay: 1000,
-      onError: (err) => {
-        console.error("TRPC getAll error:", err);
-      },
-      onSuccess: (data) => {
-        console.log("TRPC getAll success:", data);
+  // Fetch all universes using React Query directly for now
+  const { data: universesData, isLoading, error } = useQuery({
+    queryKey: ['all-universes'],
+    queryFn: async () => {
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'https://loartech.xyz'}/trpc/cinematicUniverses.getAll`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch universes');
       }
-    }
-  );
-  
-  // Debug logging
-  console.log("Universe query state:", { universesData, isLoading, error });
+      const result = await response.json();
+      return result.result.data; // Extract the data from TRPC response structure
+    },
+    retry: 3,
+    retryDelay: 1000,
+  });
 
   useEffect(() => {
     if (!isConnected) {
@@ -213,8 +210,8 @@ function RouteComponent() {
     );
   }
 
-  // Use all universes from database
-  const universes = universesData?.data || [];
+  // Use all universes from database  
+  const universes = universesData || [];
 
   return (
     <div className="min-h-screen bg-background">
