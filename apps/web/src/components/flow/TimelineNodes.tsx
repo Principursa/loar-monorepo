@@ -15,6 +15,7 @@ export interface TimelineNodeData {
   timelineName?: string;
   isRoot?: boolean;
   eventId?: string;
+  displayName?: string; // User-friendly display name for UI
   timelineId?: string;
   universeId?: string;
   nodeType?: 'scene' | 'branch' | 'add';
@@ -191,7 +192,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                     
                     {/* Event ID overlay */}
                     <div className="absolute top-2 left-2 bg-black/75 text-white text-xs px-2 py-1 rounded">
-                      Event {data.eventId || '?'}
+                      {data.displayName || `Event ${data.eventId || '?'}`}
                     </div>
                   </>
                 ) : (
@@ -214,7 +215,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   }}
                 />
                 <span className="text-lg font-bold text-primary">
-                  Event {data.eventId || '?'}
+                  {data.displayName || `Event ${data.eventId || '?'}`}
                 </span>
                 {data.isRoot && <Badge variant="secondary" className="text-sm">Start</Badge>}
               </div>
