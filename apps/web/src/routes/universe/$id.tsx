@@ -966,11 +966,10 @@ function UniverseTimelineEditor() {
       newAddPosition = { x: rightmostX + 960, y: 200 }; // Increased from 670 to 960
     }
 
-    // Generate user-friendly display name based on position in timeline
-    const sceneCount = nodes.filter(n => n.data.nodeType === 'scene').length;
+    // Generate user-friendly display name showing UUID
     const displayName = additionType === 'branch' 
-      ? `Branch from ${sourceNode?.data.eventId || 'Unknown'}` 
-      : `Event ${sceneCount + 1}`;
+      ? `${newEventId}` 
+      : `${newEventId}`;
     
     // Create new event node
     const newEventNode: Node<TimelineNodeData> = {
@@ -1086,18 +1085,8 @@ function UniverseTimelineEditor() {
     
     // Generate meaningful display names for blockchain nodes
     const getDisplayName = (nodeId: number, parentId: number): string => {
-      if (parentId === 0) return `Event ${nodeId}`; // Root nodes
-      
-      const siblings = nodesByParent.get(parentId) || [];
-      const siblingIndex = siblings.indexOf(nodeId);
-      
-      if (siblingIndex === 0) {
-        // First child continues the main timeline
-        return `Event ${nodeId}`;
-      } else {
-        // Additional children are branches
-        return `Branch ${nodeId} from ${parentId}`;
-      }
+      // Just use the node ID for blockchain nodes
+      return nodeId.toString();
     };
     
     // Create nodes from blockchain data with proper branching layout
