@@ -1313,11 +1313,11 @@ function UniverseTimelineEditor() {
   return (
     <div className="flex h-screen bg-background">
       {/* Left Sidebar */}
-      <div className="w-5 hover:w-80 border-r bg-card p-4 overflow-y-auto transition-all duration-300 overflow-hidden whitespace-nowrap">
+      <div className="w-5 hover:w-80 border-r bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-sm p-4 overflow-y-auto transition-all duration-500 overflow-hidden whitespace-nowrap shadow-lg">
         <div className="space-y-6">
           {/* Back Button */}
           <div>
-            <Button variant="ghost" size="sm" asChild className="mb-4">
+            <Button variant="ghost" size="sm" asChild className="mb-4 hover:bg-primary/10 hover:text-primary transition-colors duration-300">
               <Link to="/universes">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Universes
@@ -1326,26 +1326,36 @@ function UniverseTimelineEditor() {
           </div>
 
           {/* Universe Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-4 w-4" />
+          <Card className="bg-gradient-to-br from-card/90 via-card to-card/95 border-border/50 shadow-md">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                <Users className="h-4 w-4 text-primary" />
                 Universe Info
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="universe-name">Name</Label>
-                <div className="text-sm font-medium">{finalUniverse?.name}</div>
+                <Label htmlFor="universe-name" className="text-xs font-medium text-muted-foreground">Name</Label>
+                <div className="text-sm font-semibold mt-1">{finalUniverse?.name}</div>
               </div>
               <div>
-                <Label htmlFor="universe-description">Description</Label>
-                <div className="text-sm text-muted-foreground">{finalUniverse?.description}</div>
+                <Label htmlFor="universe-description" className="text-xs font-medium text-muted-foreground">Description</Label>
+                <div className="text-sm text-muted-foreground leading-relaxed mt-1">{finalUniverse?.description}</div>
               </div>
               {!finalUniverse?.isDefault && (
-                <div className="text-xs text-muted-foreground">
-                  <div>Creator: {finalUniverse?.creator?.slice(0, 6)}...{finalUniverse?.creator?.slice(-4)}</div>
-                  <div>Contract: {finalUniverse?.address?.slice(0, 6)}...{finalUniverse?.address?.slice(-4)}</div>
+                <div className="space-y-2 pt-2 border-t border-border/50">
+                  <div className="text-xs">
+                    <span className="text-muted-foreground font-medium">Creator:</span>
+                    <code className="ml-2 bg-muted/50 px-1 py-0.5 rounded text-xs">
+                      {finalUniverse?.creator?.slice(0, 6)}...{finalUniverse?.creator?.slice(-4)}
+                    </code>
+                  </div>
+                  <div className="text-xs">
+                    <span className="text-muted-foreground font-medium">Contract:</span>
+                    <code className="ml-2 bg-muted/50 px-1 py-0.5 rounded text-xs">
+                      {finalUniverse?.address?.slice(0, 6)}...{finalUniverse?.address?.slice(-4)}
+                    </code>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -1353,15 +1363,18 @@ function UniverseTimelineEditor() {
 
 
           {/* Add Event */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Plus className="h-4 w-4" />
+          <Card className="bg-gradient-to-br from-card/90 via-card to-card/95 border-border/50 shadow-md">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                <Plus className="h-4 w-4 text-primary" />
                 Add Event
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <Button onClick={() => handleAddEvent('after')} className="w-full">
+            <CardContent className="space-y-3">
+              <Button 
+                onClick={() => handleAddEvent('after')} 
+                className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-md hover:shadow-lg transition-all duration-300"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add New Event
               </Button>
@@ -1369,7 +1382,7 @@ function UniverseTimelineEditor() {
                 onClick={handleRefreshTimeline} 
                 variant="outline" 
                 size="sm"
-                className="w-full"
+                className="w-full hover:bg-muted/50 transition-colors duration-300"
               >
                 <RefreshCw className="h-3 w-3 mr-2" />
                 Refresh Timeline
@@ -1380,35 +1393,39 @@ function UniverseTimelineEditor() {
 
           {/* Selected Event */}
           {selectedNode && selectedNode.data.nodeType === 'scene' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Film className="h-4 w-4" />
+            <Card className="bg-gradient-to-br from-primary/5 via-card to-card/95 border-primary/20 shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                  <Film className="h-4 w-4 text-primary" />
                   Edit Event
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="event-title">Event Title</Label>
+                  <Label htmlFor="event-title" className="text-xs font-medium text-muted-foreground">Event Title</Label>
                   <Input
                     id="event-title"
                     value={selectedEventTitle}
                     onChange={(e: any) => setSelectedEventTitle(e.target.value)}
                     placeholder="Enter event title"
+                    className="mt-1"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="event-description">Description</Label>
+                  <Label htmlFor="event-description" className="text-xs font-medium text-muted-foreground">Description</Label>
                   <textarea
                     id="event-description"
                     value={selectedEventDescription}
                     onChange={(e: any) => setSelectedEventDescription(e.target.value)}
                     placeholder="Describe this event"
                     rows={3}
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                    className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
                   />
                 </div>
-                <Button onClick={updateSelectedNode} className="w-full">
+                <Button 
+                  onClick={updateSelectedNode} 
+                  className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-md hover:shadow-lg transition-all duration-300"
+                >
                   Update Event
                 </Button>
               </CardContent>
@@ -1416,31 +1433,33 @@ function UniverseTimelineEditor() {
           )}
 
           {/* Timeline Stats */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Clock className="h-4 w-4" />
+          <Card className="bg-gradient-to-br from-card/90 via-card to-card/95 border-border/50 shadow-md">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                <Clock className="h-4 w-4 text-primary" />
                 Timeline Stats
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Total Events:</span>
-                <span className="text-sm font-medium">{nodes.filter((n: any) => n.data.nodeType === 'scene').length}</span>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center p-2 rounded-md bg-muted/30">
+                <span className="text-sm font-medium text-muted-foreground">Total Events:</span>
+                <span className="text-sm font-bold">{nodes.filter((n: any) => n.data.nodeType === 'scene').length}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Blockchain Nodes:</span>
-                <span className="text-sm font-medium">{graphData.nodeIds.length}</span>
+              <div className="flex justify-between items-center p-2 rounded-md bg-muted/30">
+                <span className="text-sm font-medium text-muted-foreground">Blockchain Nodes:</span>
+                <span className="text-sm font-bold">{graphData.nodeIds.length}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Universe ID:</span>
-                <span className="text-sm font-mono text-xs">{id}</span>
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">Universe ID:</span>
+                <code className="block text-xs font-mono bg-muted/50 px-2 py-1 rounded break-all">
+                  {id.length > 16 ? `${id.slice(0, 8)}...${id.slice(-8)}` : id}
+                </code>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Status:</span>
+              <div className="flex justify-between items-center p-2 rounded-md bg-muted/30">
+                <span className="text-sm font-medium text-muted-foreground">Status:</span>
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isLoadingAny ? 'bg-yellow-500' : nodes.length > 0 ? 'bg-green-500' : 'bg-gray-400'}`} />
-                  <span className="text-xs">
+                  <div className={`w-2 h-2 rounded-full ${isLoadingAny ? 'bg-yellow-500 animate-pulse' : nodes.length > 0 ? 'bg-green-500' : 'bg-gray-400'}`} />
+                  <span className="text-xs font-medium">
                     {isLoadingAny ? 'Loading...' : nodes.length > 0 ? 'Active' : 'Empty'}
                   </span>
                 </div>
@@ -1451,88 +1470,101 @@ function UniverseTimelineEditor() {
       </div>
 
       {/* Timeline Flow */}
-      <div className="flex-1">
-        <ReactFlowProvider>
-          <div ref={reactFlowWrapper} className="h-full w-full">
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onNodeClick={onNodeClick}
-              nodeTypes={nodeTypes}
-              fitView
-              fitViewOptions={{
-                padding: 0.2,
-                includeHiddenNodes: false,
-              }}
-              defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-              minZoom={0.3}
-              maxZoom={2}
-              snapToGrid={true}
-              snapGrid={[20, 20]}
-              connectionLineStyle={{ stroke: '#10b981', strokeWidth: 2 }}
-            >
-              <Background gap={20} size={1} color="#f1f5f9" />
-              <Controls />
-              
-              <Panel position="top-center" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
-                <h2 className="text-lg font-semibold">{timelineTitle}</h2>
-                <p className="text-sm text-muted-foreground">{timelineDescription}</p>
-              </Panel>
-
-              {isLoadingAny && (
-                <Panel position="top-right" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                    Loading blockchain data...
-                  </div>
+      <div className="flex-1 flex">
+        <div className="flex-1">
+          <ReactFlowProvider>
+            <div ref={reactFlowWrapper} className="h-full w-full">
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onNodeClick={onNodeClick}
+                nodeTypes={nodeTypes}
+                fitView
+                fitViewOptions={{
+                  padding: 0.2,
+                  includeHiddenNodes: false,
+                }}
+                defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+                minZoom={0.3}
+                maxZoom={2}
+                snapToGrid={true}
+                snapGrid={[20, 20]}
+                connectionLineStyle={{ stroke: '#10b981', strokeWidth: 2 }}
+              >
+                <Background gap={20} size={1} color="#f1f5f9" />
+                <Controls />
+                
+                <Panel position="top-center" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
+                  <h2 className="text-lg font-semibold">{timelineTitle}</h2>
+                  <p className="text-sm text-muted-foreground">{timelineDescription}</p>
                 </Panel>
-              )}
-            </ReactFlow>
-          </div>
-        </ReactFlowProvider>
-      </div>
 
-      {/* Event Creation Modal with Image and Video Generation */}
-      {showVideoDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <Card className="w-full max-w-lg mx-4 my-8 max-h-[90vh] overflow-y-auto">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Film className="h-5 w-5" />
-                Create Scene with AI Generation
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {additionType === 'branch' ? 'Create a new story branch' : 'Continue the timeline'}
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="video-title">Scene Title</Label>
-                <Input
-                  id="video-title"
-                  value={videoTitle}
-                  onChange={(e) => setVideoTitle(e.target.value)}
-                  placeholder="Enter scene title"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="video-description">Scene Description</Label>
-                <textarea
-                  id="video-description"
-                  value={videoDescription}
-                  onChange={(e) => setVideoDescription(e.target.value)}
-                  placeholder="Describe what happens in this scene in detail... This will be used to generate the first frame image."
-                  rows={4}
-                  className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                />
-              </div>
+                {isLoadingAny && (
+                  <Panel position="top-right" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                      Loading blockchain data...
+                    </div>
+                  </Panel>
+                )}
+              </ReactFlow>
+            </div>
+          </ReactFlowProvider>
+        </div>
 
-              {/* Character Selection Section */}
-              <div className="border rounded-lg p-4 bg-muted/20">
+        {/* Event Creation Sidebar */}
+        {showVideoDialog && (
+          <div className="w-[500px] border-l bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-sm flex flex-col h-full overflow-hidden shadow-xl">
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                      Create Scene with AI
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {additionType === 'branch' ? 'Create a new story branch' : 'Continue the timeline'}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowVideoDialog(false)}
+                    className="hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    ×
+                  </Button>
+                </div>
+
+                {/* Scene Title */}
+                <div>
+                  <Label htmlFor="video-title">Scene Title</Label>
+                  <Input
+                    id="video-title"
+                    value={videoTitle}
+                    onChange={(e) => setVideoTitle(e.target.value)}
+                    placeholder="Enter scene title"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="video-description">Scene Description</Label>
+                  <textarea
+                    id="video-description"
+                    value={videoDescription}
+                    onChange={(e) => setVideoDescription(e.target.value)}
+                    placeholder="Describe what happens in this scene in detail... This will be used to generate the first frame image."
+                    rows={4}
+                    className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                  />
+                </div>
+
+                {/* Character Selection Section */}
+                <div className="border rounded-lg p-4 bg-muted/20">
                 <div className="flex items-center justify-between mb-3">
                   <Label className="text-sm font-medium">Characters in Scene</Label>
                   <div className="flex gap-2">
@@ -1864,27 +1896,28 @@ function UniverseTimelineEditor() {
                 </div>
               )}
               
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowVideoDialog(false)}
-                  className="flex-1"
-                >
-                  Go Back
-                </Button>
-                <Button
-                  onClick={handleCreateEvent}
-                  disabled={!videoTitle.trim()}
-                  className="flex-1"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Scene
-                </Button>
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowVideoDialog(false)}
+                    className="flex-1"
+                  >
+                    Go Back
+                  </Button>
+                  <Button
+                    onClick={handleCreateEvent}
+                    disabled={!videoTitle.trim()}
+                    className="flex-1 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Scene
+                  </Button>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Character Generation Dialog */}
       {showCharacterGenerator && (
