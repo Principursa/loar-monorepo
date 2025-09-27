@@ -63,6 +63,8 @@ function UniverseTimelineEditor() {
   const [videoDescription, setVideoDescription] = useState("");
   const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
   const [additionType, setAdditionType] = useState<'after' | 'branch'>('after');
+  const [selectedVideoModel, setSelectedVideoModel] = useState<'lumaai' | 'fal-kling' | 'fal-wan25'>('lumaai');
+  const [negativePrompt, setNegativePrompt] = useState("");
   
   // Image generation state (now part of event creation)
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
@@ -610,21 +612,47 @@ function UniverseTimelineEditor() {
     }
   }, [videoDescription, generateImageMutation]);
 
-  // Handle video generation with LumaAI using existing video service
+  // Handle video generation with multiple models
   const generateVideoMutation = useMutation({
     mutationFn: async ({ imageUrl, prompt }: { imageUrl: string; prompt?: string }) => {
       console.log('Generating video with:', {
         imageUrl,
-        prompt: prompt || videoDescription
+        prompt: prompt || videoDescription,
+        model: selectedVideoModel
       });
       
-      const result = await trpcClient.video.generateAndWait.mutate({
-        prompt: prompt || videoDescription,
-        imageUrl, // Use the actual generated image
-        model: 'ray-flash-2', // Fast model like in Python test
-        duration: '5s'
-      });
-      return result;
+      if (selectedVideoModel === 'lumaai') {
+        const result = await trpcClient.video.generateAndWait.mutate({
+          prompt: prompt || videoDescription,
+          imageUrl, // Use the actual generated image
+          model: 'ray-flash-2', // Fast model like in Python test
+          duration: '5s'
+        });
+        return result;
+      } else if (selectedVideoModel === 'fal-kling') {
+        const result = await trpcClient.fal.klingVideo.mutate({
+          prompt: prompt || videoDescription,
+          imageUrl,
+          duration: 5,
+          aspectRatio: "16:9",
+          negativePrompt: negativePrompt || undefined,
+          cfgScale: 0.5
+        });
+        console.log('Kling video result:', result);
+        return { videoUrl: result.videoUrl }; // Use actual video URL
+      } else if (selectedVideoModel === 'fal-wan25') {
+        const result = await trpcClient.fal.wan25ImageToVideo.mutate({
+          prompt: prompt || videoDescription,
+          imageUrl,
+          duration: 5,
+          aspectRatio: "16:9",
+          negativePrompt: negativePrompt || undefined
+        });
+        console.log('Wan25 video result:', result);
+        return { videoUrl: result.videoUrl }; // Use actual video URL
+      }
+      
+      throw new Error('Invalid video model selected');
     },
     onSuccess: (data) => {
       if (data.videoUrl) {
@@ -888,6 +916,8 @@ function UniverseTimelineEditor() {
     setUploadedUrl(null);
     setContractSaved(false);
     setIsSavingToContract(false);
+    setSelectedVideoModel('lumaai'); // Reset to default
+    setNegativePrompt(""); // Reset negative prompt
     setShowVideoDialog(true);
   }, []);
 
@@ -927,18 +957,43 @@ function UniverseTimelineEditor() {
         newEventId
       });
     } else {
-      // For linear continuation, find the highest numeric event ID and increment
+      // For linear continuation, determine if we're continuing a branch or main timeline
       const sceneNodes = nodes.filter((n: any) => n.data.nodeType === 'scene');
-      const maxEventId = sceneNodes.reduce((max: number, node: any) => {
-        const eventId = node.data.eventId;
-        if (eventId) {
-          // Extract numeric part only (ignore branch suffixes like 'b', 'c')
-          const numericId = parseInt(eventId.toString().replace(/[a-z]/g, ''));
-          return !isNaN(numericId) ? Math.max(max, numericId) : max;
+      
+      if (sceneNodes.length === 0) {
+        // First event
+        newEventId = "1";
+      } else {
+        // Find the rightmost (last added) event to continue from
+        const lastNode = sceneNodes.reduce((latest: any, node: any) => {
+          if (!latest) return node;
+          // Compare positions to find the rightmost node
+          return node.position.x > latest.position.x ? node : latest;
+        }, null);
+        
+        const lastEventId = lastNode?.data.eventId?.toString();
+        console.log('Last event ID for continuation:', lastEventId);
+        
+        if (lastEventId && /[a-z]/.test(lastEventId)) {
+          // We're continuing a branch (e.g., from "1b" to "1c")
+          const baseNumber = lastEventId.replace(/[a-z]/g, '');
+          const lastLetter = lastEventId.match(/[a-z]/)?.[0] || 'a';
+          const nextLetter = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
+          newEventId = `${baseNumber}${nextLetter}`;
+        } else {
+          // We're continuing the main timeline (e.g., from "2" to "3")
+          const maxEventId = sceneNodes.reduce((max: number, node: any) => {
+            const eventId = node.data.eventId;
+            if (eventId) {
+              // Extract numeric part only (ignore branch suffixes like 'b', 'c')
+              const numericId = parseInt(eventId.toString().replace(/[a-z]/g, ''));
+              return !isNaN(numericId) ? Math.max(max, numericId) : max;
+            }
+            return max;
+          }, 0);
+          newEventId = String(maxEventId + 1);
         }
-        return max;
-      }, 0);
-      newEventId = String(maxEventId + 1);
+      }
       newAddId = `add-${newEventId}`;
     }
     
@@ -1744,11 +1799,80 @@ function UniverseTimelineEditor() {
                 <div className="border rounded-lg p-4 bg-muted/20">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">2</span>
-                    <Label className="text-sm font-medium">Generate Video with LumaAI</Label>
+                    <Label className="text-sm font-medium">Generate Video with AI</Label>
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
                     Create a video animation from the generated image
                   </p>
+                  
+                  {/* Model Selection */}
+                  <div className="mb-3">
+                    <Label className="text-xs font-medium text-muted-foreground">Video Generation Model</Label>
+                    <div className="grid grid-cols-1 gap-2 mt-1">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="lumaai"
+                          name="videoModel"
+                          value="lumaai"
+                          checked={selectedVideoModel === 'lumaai'}
+                          onChange={(e) => setSelectedVideoModel(e.target.value as any)}
+                          className="w-4 h-4 text-primary"
+                        />
+                        <label htmlFor="lumaai" className="text-sm">
+                          <span className="font-medium">LumaAI Ray Flash</span>
+                          <span className="text-muted-foreground ml-1">(Fast, reliable)</span>
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="fal-kling"
+                          name="videoModel"
+                          value="fal-kling"
+                          checked={selectedVideoModel === 'fal-kling'}
+                          onChange={(e) => setSelectedVideoModel(e.target.value as any)}
+                          className="w-4 h-4 text-primary"
+                        />
+                        <label htmlFor="fal-kling" className="text-sm">
+                          <span className="font-medium">Kling 2.5</span>
+                          <span className="text-muted-foreground ml-1">(High quality, slower)</span>
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="fal-wan25"
+                          name="videoModel"
+                          value="fal-wan25"
+                          checked={selectedVideoModel === 'fal-wan25'}
+                          onChange={(e) => setSelectedVideoModel(e.target.value as any)}
+                          className="w-4 h-4 text-primary"
+                        />
+                        <label htmlFor="fal-wan25" className="text-sm">
+                          <span className="font-medium">Wan 2.5</span>
+                          <span className="text-muted-foreground ml-1">(Premium, best quality)</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Negative Prompt for Kling and Wan25 */}
+                  {(selectedVideoModel === 'fal-wan25' || selectedVideoModel === 'fal-kling') && (
+                    <div className="mb-3">
+                      <Label htmlFor="negative-prompt" className="text-xs font-medium text-muted-foreground">
+                        Negative Prompt (optional)
+                      </Label>
+                      <Input
+                        id="negative-prompt"
+                        value={negativePrompt}
+                        onChange={(e) => setNegativePrompt(e.target.value)}
+                        placeholder="What to avoid in the video (e.g., low quality, blurry)"
+                        className="mt-1 text-sm"
+                      />
+                    </div>
+                  )}
+                  
                   <Button
                     onClick={handleGenerateVideo}
                     disabled={isGeneratingVideo}
@@ -1757,12 +1881,12 @@ function UniverseTimelineEditor() {
                     {isGeneratingVideo ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating Video...
+                        Generating with {selectedVideoModel === 'lumaai' ? 'LumaAI' : selectedVideoModel === 'fal-kling' ? 'Kling 2.5' : 'Wan 2.5'}...
                       </>
                     ) : (
                       <>
                         <Film className="h-4 w-4 mr-2" />
-                        Generate Video
+                        Generate Video with {selectedVideoModel === 'lumaai' ? 'LumaAI' : selectedVideoModel === 'fal-kling' ? 'Kling 2.5' : 'Wan 2.5'}
                       </>
                     )}
                   </Button>
@@ -1841,60 +1965,6 @@ function UniverseTimelineEditor() {
                 </div>
               )}
               
-              {/* Debug Section - only show in development */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="border-t pt-4 mt-4">
-                  <div className="text-xs text-muted-foreground mb-2">Debug Tools</div>
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={handleDebugFilecoin}
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-xs"
-                      >
-                        🔧 Setup Mock Video
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          // Use a smaller, faster test image instead
-                          const smallTestUrl = "https://httpbin.org/robots.txt";
-                          setGeneratedVideoUrl(smallTestUrl);
-                          setVideoTitle("Small File Test");
-                          setVideoDescription("Testing with small file");
-                          setShowVideoStep(true);
-                          console.log('Debug: Set up small test file:', smallTestUrl);
-                        }}
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-xs"
-                      >
-                        📄 Small Test File
-                      </Button>
-                    </div>
-                    <Button
-                      onClick={() => {
-                        // Clear all state
-                        setGeneratedVideoUrl(null);
-                        setVideoTitle("");
-                        setVideoDescription("");
-                        setShowVideoStep(false);
-                        setContractSaved(false);
-                        setFilecoinSaved(false);
-                        setPieceCid(null);
-                        setIsSavingToContract(false);
-                        setIsSavingToFilecoin(false);
-                        console.log('Debug: Cleared all state');
-                      }}
-                      variant="destructive"
-                      size="sm"
-                      className="w-full text-xs"
-                    >
-                      🗑️ Clear All State
-                    </Button>
-                  </div>
-                </div>
-              )}
               
                 <div className="flex gap-3 pt-4">
                   <Button

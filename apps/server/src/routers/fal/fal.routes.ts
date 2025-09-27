@@ -280,6 +280,8 @@ export const falRouter = router({
             "fal-ai/cogvideox-5b",
             "fal-ai/runway-gen3",
             "fal-ai/veo3/fast/image-to-video",
+            "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+            "fal-ai/wan-25-preview/image-to-video",
           ])
           .optional(),
         imageUrl: z.string().url().optional(),
@@ -291,6 +293,8 @@ export const falRouter = router({
         numInferenceSteps: z.number().min(10).max(50).optional(),
         aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional(),
         motionStrength: z.number().min(1).max(255).optional(),
+        negativePrompt: z.string().optional(),
+        cfgScale: z.number().min(0.1).max(2.0).optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -337,6 +341,50 @@ export const falRouter = router({
         duration: input.duration,
         aspectRatio: input.aspectRatio,
         motionStrength: input.motionStrength,
+      });
+    }),
+
+  klingVideo: publicProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1),
+        imageUrl: z.string().url(),
+        duration: z.union([z.literal(5), z.literal(10)]).optional().default(5),
+        aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional().default("16:9"),
+        negativePrompt: z.string().optional(),
+        cfgScale: z.number().min(0.1).max(2.0).optional().default(0.5),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return await falService.generateVideo({
+        prompt: input.prompt,
+        imageUrl: input.imageUrl,
+        model: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        negativePrompt: input.negativePrompt,
+        cfgScale: input.cfgScale,
+      });
+    }),
+
+  wan25ImageToVideo: publicProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1),
+        imageUrl: z.string().url(),
+        duration: z.union([z.literal(5), z.literal(10)]).optional().default(5),
+        aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional().default("16:9"),
+        negativePrompt: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return await falService.generateVideo({
+        prompt: input.prompt,
+        imageUrl: input.imageUrl,
+        model: "fal-ai/wan-25-preview/image-to-video",
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        negativePrompt: input.negativePrompt,
       });
     }),
 });

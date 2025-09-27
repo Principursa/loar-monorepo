@@ -35,7 +35,7 @@ export interface FalImageGenerationResult {
 
 export interface FalVideoGenerationOptions {
   prompt: string;
-  model?: 'fal-ai/hunyuan-video' | 'fal-ai/ltx-video' | 'fal-ai/cogvideox-5b' | 'fal-ai/runway-gen3' | 'fal-ai/veo3/fast/image-to-video';
+  model?: 'fal-ai/hunyuan-video' | 'fal-ai/ltx-video' | 'fal-ai/cogvideox-5b' | 'fal-ai/runway-gen3' | 'fal-ai/veo3/fast/image-to-video' | 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video' | 'fal-ai/wan-25-preview/image-to-video';
   imageUrl?: string;
   duration?: number;
   fps?: number;
@@ -45,6 +45,8 @@ export interface FalVideoGenerationOptions {
   numInferenceSteps?: number;
   aspectRatio?: string;
   motionStrength?: number;
+  negativePrompt?: string;
+  cfgScale?: number;
 }
 
 export interface FalVideoGenerationResult {
@@ -188,6 +190,19 @@ export class FalService {
         input.duration = options.duration || 5;
         input.aspect_ratio = options.aspectRatio || "16:9";
         input.motion_strength = options.motionStrength || 127;
+      } else if (model === 'fal-ai/wan-25-preview/image-to-video') {
+        if (!options.imageUrl) throw new Error('Image URL is required for wan25 image-to-video model');
+        input.image_url = options.imageUrl;
+        input.duration = String(options.duration || 5);
+        input.aspect_ratio = options.aspectRatio || "16:9";
+        if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+      } else if (model === 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video') {
+        if (!options.imageUrl) throw new Error('Image URL is required for kling v2.5 turbo model');
+        input.image_url = options.imageUrl;
+        input.duration = String(options.duration || 5);
+        input.aspect_ratio = options.aspectRatio || "16:9";
+        if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+        if (options.cfgScale !== undefined) input.cfg_scale = options.cfgScale;
       } else {
         input.duration = options.duration || 5;
         input.fps = options.fps || 25;
@@ -207,15 +222,35 @@ export class FalService {
         onQueueUpdate: (update) => console.log('Fal AI queue update:', update)
       });
 
+      console.log('📥 Raw FAL Video Response:', JSON.stringify(result, null, 2));
+
+      // Handle different response structures
+      let data: any;
+      let videoUrl: string | undefined;
+      
       if ((result as any).data) {
-        return {
-          id: (result as any).requestId || '',
-          status: 'completed',
-          videoUrl: ((result as any).data as any).video?.url
-        };
-      } else {
-        throw new Error('No video data returned from Fal AI');
+        data = (result as any).data;
+        // Try different possible video URL locations
+        videoUrl = data.video?.url || data.video_url || data.url;
+      } else if ((result as any).video) {
+        videoUrl = (result as any).video.url || (result as any).video;
+      } else if ((result as any).url) {
+        videoUrl = (result as any).url;
       }
+
+      if (!videoUrl) {
+        console.error('No video URL found in response. Available keys:', Object.keys(result as any));
+        if (data) {
+          console.error('Data keys:', Object.keys(data));
+        }
+        throw new Error('No video URL found in FAL response');
+      }
+
+      return {
+        id: (result as any).requestId || Date.now().toString(),
+        status: 'completed',
+        videoUrl: videoUrl
+      };
     } catch (error) {
       console.error('Fal AI video generation failed:', error);
       return {
