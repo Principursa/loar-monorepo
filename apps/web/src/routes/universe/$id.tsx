@@ -897,50 +897,50 @@ function UniverseTimelineEditor() {
 
     // Find source node if specified
     const sourceNode = sourceNodeId 
-      ? nodes.find(n => n.data.eventId === sourceNodeId)
+      ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
       : null;
     const lastEventNode = nodes.filter((n: any) => n.data.nodeType === 'scene').pop();
     const referenceNode = sourceNode || lastEventNode;
     
-    // Generate appropriate event ID based on addition type
+    // Debug: Log what we found for the source node
+    console.log('handleCreateEvent sourceNode lookup:', {
+      sourceNodeId,
+      foundSourceNode: sourceNode ? {
+        id: sourceNode.id,
+        eventId: sourceNode.data.eventId,
+        position: sourceNode.position
+      } : null,
+      allSceneNodes: nodes.filter(n => n.data.nodeType === 'scene').map(n => ({
+        id: n.id,
+        eventId: n.data.eventId
+      }))
+    });
+    
+    // Generate UUID-based event ID for better protocol compatibility
+    const generateEventId = () => {
+      // Generate a short UUID-like identifier (8 characters)
+      return Math.random().toString(36).substr(2, 8).toUpperCase();
+    };
+    
     let newEventId: string;
     let newAddId: string;
     
-    if (additionType === 'branch' && sourceNodeId) {
-      // For branches, add a letter suffix to the source node ID
-      const sourceEventId = sourceNodeId;
-      
-      // Find all existing branches from this source node
-      const existingBranches = nodes.filter((n: any) => {
-        const eventId = n.data.eventId?.toString();
-        return eventId && eventId.startsWith(sourceEventId) && /[a-z]/.test(eventId);
-      });
-      
-      // Determine the next branch letter
-      const branchLetter = String.fromCharCode(98 + existingBranches.length); // 'b', 'c', 'd', etc.
-      newEventId = `${sourceEventId}${branchLetter}`;
-      newAddId = `add-${newEventId}`;
-      
-      console.log('Creating branch:', {
-        sourceEventId,
-        existingBranches: existingBranches.map(n => n.data.eventId),
-        newEventId
-      });
-    } else {
-      // For linear continuation, find the highest numeric event ID and increment
-      const sceneNodes = nodes.filter((n: any) => n.data.nodeType === 'scene');
-      const maxEventId = sceneNodes.reduce((max: number, node: any) => {
-        const eventId = node.data.eventId;
-        if (eventId) {
-          // Extract numeric part only (ignore branch suffixes like 'b', 'c')
-          const numericId = parseInt(eventId.toString().replace(/[a-z]/g, ''));
-          return !isNaN(numericId) ? Math.max(max, numericId) : max;
-        }
-        return max;
-      }, 0);
-      newEventId = String(maxEventId + 1);
+    // Always generate a unique ID regardless of addition type
+    newEventId = generateEventId();
+    newAddId = `add-${newEventId}`;
+    
+    // Ensure uniqueness by checking existing IDs
+    while (nodes.some(n => n.data.eventId === newEventId || n.id === newEventId)) {
+      newEventId = generateEventId();
       newAddId = `add-${newEventId}`;
     }
+    
+    console.log('Generated new event ID:', {
+      newEventId,
+      additionType,
+      sourceNodeId,
+      isUnique: !nodes.some(n => n.data.eventId === newEventId || n.id === newEventId)
+    });
     
     console.log('handleCreateEvent debug:', { 
       additionType, 
@@ -966,6 +966,11 @@ function UniverseTimelineEditor() {
       newAddPosition = { x: rightmostX + 960, y: 200 }; // Increased from 670 to 960
     }
 
+    // Generate user-friendly display name showing UUID
+    const displayName = additionType === 'branch' 
+      ? `${newEventId}` 
+      : `${newEventId}`;
+    
     // Create new event node
     const newEventNode: Node<TimelineNodeData> = {
       id: newEventId,
@@ -977,6 +982,7 @@ function UniverseTimelineEditor() {
         timelineColor: additionType === 'branch' ? '#f59e0b' : '#10b981',
         nodeType: 'scene',
         eventId: newEventId,
+        displayName: displayName, // User-friendly display name
         timelineId: `timeline-${id}`,
         universeId: id,
         onAddScene: handleAddEvent,
@@ -1077,21 +1083,10 @@ function UniverseTimelineEditor() {
       nodesByParent.get(parentId)!.push(nodeId);
     });
     
-    // Generate proper event labels based on branching structure
-    const getEventLabel = (nodeId: number, parentId: number): string => {
-      if (parentId === 0) return nodeId.toString(); // Root nodes keep numeric ID
-      
-      const siblings = nodesByParent.get(parentId) || [];
-      const siblingIndex = siblings.indexOf(nodeId);
-      
-      if (siblingIndex === 0) {
-        // First child continues the main timeline
-        return nodeId.toString();
-      } else {
-        // Additional children are branches with letter suffixes
-        const branchLetter = String.fromCharCode(97 + siblingIndex); // 'b', 'c', 'd', etc.
-        return `${parentId}${branchLetter}`;
-      }
+    // Generate meaningful display names for blockchain nodes
+    const getDisplayName = (nodeId: number, parentId: number): string => {
+      // Just use the node ID for blockchain nodes
+      return nodeId.toString();
     };
     
     // Create nodes from blockchain data with proper branching layout
@@ -1105,8 +1100,10 @@ function UniverseTimelineEditor() {
         ? (typeof previousNode === 'bigint' ? Number(previousNode) : parseInt(String(previousNode)))
         : 0;
       
-      // Generate proper event label
-      const eventLabel = getEventLabel(nodeId, parentId);
+      // Generate display name for UI
+      const displayName = getDisplayName(nodeId, parentId);
+      // Use nodeId as the actual eventId for uniqueness
+      const eventId = nodeId.toString();
       
       // Calculate position based on branching structure
       let x: number, y: number;
@@ -1138,7 +1135,7 @@ function UniverseTimelineEditor() {
       const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
       
       // Debug: Log the node creation data
-      console.log(`Creating node ${nodeId} (${eventLabel}):`, { 
+      console.log(`Creating node ${nodeId} (${displayName}):`, { 
         url, description, previousNode, parentId, position: { x, y }
       });
       
@@ -1149,12 +1146,13 @@ function UniverseTimelineEditor() {
         data: {
           label: description && description.length > 0 && description !== `Timeline event ${nodeId}` 
             ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
-            : `Event ${eventLabel}`,
-          description: description || `Timeline event ${eventLabel}`,
+            : displayName,
+          description: description || `Timeline event ${nodeId}`,
           videoUrl: url,
           timelineColor: color,
           nodeType: 'scene',
-          eventId: eventLabel, // Use the proper event label (e.g., "2b" for branches)
+          eventId: eventId, // Use nodeId for uniqueness
+          displayName: displayName, // User-friendly display name
           timelineId: `timeline-1`,
           universeId: finalUniverse?.id || id,
           isRoot: String(previousNode) === '0' || !previousNode,

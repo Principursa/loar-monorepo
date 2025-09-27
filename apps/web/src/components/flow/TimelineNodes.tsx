@@ -15,6 +15,7 @@ export interface TimelineNodeData {
   timelineName?: string;
   isRoot?: boolean;
   eventId?: string;
+  displayName?: string; // User-friendly display name for UI
   timelineId?: string;
   universeId?: string;
   nodeType?: 'scene' | 'branch' | 'add';
@@ -25,6 +26,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
   const navigate = useNavigate();
   const [displayVideoUrl, setDisplayVideoUrl] = useState<string | null>(null);
   const [isLoadingFilecoin, setIsLoadingFilecoin] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   
   // Debug: Log the node data
   console.log('TimelineEventNode data:', data);
@@ -146,14 +148,16 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
       
       <div className="relative group">
         <div 
-          className={`w-96 h-64 rounded-lg border-2 bg-card hover:bg-card/80 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${data.isRoot ? 'ring-2 ring-primary/50' : ''}`}
+          className={`w-96 h-80 rounded-lg border-2 bg-card hover:bg-card/80 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${data.isRoot ? 'ring-2 ring-primary/50' : ''}`}
           style={{ borderColor: data.timelineColor || '#10b981' }}
           onClick={handleClick}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
         >
           <div className="p-4 h-full flex flex-col">
-            {/* Video Preview - Even Larger */}
-            <div className="flex-shrink-0 mb-4">
-              <div className="w-full h-36 rounded-md overflow-hidden bg-black relative">
+            {/* Video Preview - Larger with proper aspect ratio */}
+            <div className="flex-shrink-0 mb-3">
+              <div className="w-full h-44 rounded-md overflow-hidden bg-black relative">
                 {isLoadingFilecoin && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
                     <div className="text-center">
@@ -166,8 +170,20 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   <>
                     <video 
                       className="w-full h-full object-cover"
-                      controls={true}
+                      controls={false}
                       preload="metadata"
+                      muted
+                      loop
+                      ref={(video) => {
+                        if (video) {
+                          if (isHovered) {
+                            video.play().catch(e => console.log('Video play failed:', e));
+                          } else {
+                            video.pause();
+                            video.currentTime = 0;
+                          }
+                        }
+                      }}
                       onClick={(e) => {
                         e.stopPropagation(); // Prevent node click when using video controls
                       }}
@@ -191,7 +207,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                     
                     {/* Event ID overlay */}
                     <div className="absolute top-2 left-2 bg-black/75 text-white text-xs px-2 py-1 rounded">
-                      Event {data.eventId || '?'}
+                      {data.displayName || `Event ${data.eventId || '?'}`}
                     </div>
                   </>
                 ) : (
@@ -204,25 +220,25 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
             </div>
 
             {/* Event Information */}
-            <div className="flex-1 flex flex-col justify-start min-w-0 space-y-2">
+            <div className="flex-1 flex flex-col justify-start min-w-0 space-y-2 max-h-32 overflow-hidden">
               {/* Event ID and Status */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <div 
                   className={`w-3 h-3 rounded-full flex-shrink-0 ${data.isRoot ? 'bg-primary' : 'bg-current'}`}
                   style={{ 
                     backgroundColor: data.timelineColor || '#10b981'
                   }}
                 />
-                <span className="text-lg font-bold text-primary">
-                  Event {data.eventId || '?'}
+                <span className="text-lg font-bold text-primary truncate">
+                  {data.displayName || data.eventId || '?'}
                 </span>
-                {data.isRoot && <Badge variant="secondary" className="text-sm">Start</Badge>}
+                {data.isRoot && <Badge variant="secondary" className="text-xs flex-shrink-0">Start</Badge>}
               </div>
               
               {/* Description */}
-              <div className="space-y-1">
-                <h4 className="text-sm font-medium text-foreground">Description:</h4>
-                <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
+              <div className="flex-1 min-h-0">
+                <h4 className="text-xs font-medium text-foreground mb-1">Description:</h4>
+                <p className="text-xs text-muted-foreground leading-tight overflow-hidden">
                   {data.description || 'No description available'}
                 </p>
               </div>
