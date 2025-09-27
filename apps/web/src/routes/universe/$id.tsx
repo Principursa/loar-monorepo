@@ -1,10 +1,9 @@
-import { createFileRoute, Link, useParams, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Film, Plus, Settings, Clock, Users, Sparkles, Image, Loader2, RefreshCw, UserPlus, Wand2 } from "lucide-react";
+import { ArrowLeft, Film, Plus, Clock, Users, Sparkles, Image, Loader2, RefreshCw, UserPlus, Wand2 } from "lucide-react";
 import ReactFlow, {
   Background,
   Controls,
@@ -21,19 +20,14 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { TimelineEventNode } from '@/components/flow/TimelineNodes';
-import { TimelineActions } from '@/components/TimelineActions';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useReadContract, useChainId, useWriteContract } from 'wagmi';
-import { trpc } from '@/utils/trpc';
 import { timelineAbi } from '@/generated';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
 import { type Address } from 'viem';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 
-interface UniverseParams {
-  id: string;
-}
 
 // Register custom node types
 const nodeTypes = {
@@ -42,7 +36,6 @@ const nodeTypes = {
 
 function UniverseTimelineEditor() {
   const { id } = useParams({ from: "/universe/$id" });
-  const navigate = useNavigate();
   const chainId = useChainId();
 
   // Timeline flow state
@@ -63,8 +56,11 @@ function UniverseTimelineEditor() {
   const [videoDescription, setVideoDescription] = useState("");
   const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
   const [additionType, setAdditionType] = useState<'after' | 'branch'>('after');
-  const [selectedVideoModel, setSelectedVideoModel] = useState<'lumaai' | 'fal-kling' | 'fal-wan25'>('lumaai');
+  const [selectedVideoModel, setSelectedVideoModel] = useState<'fal-veo3' | 'fal-kling' | 'fal-wan25'>('fal-veo3');
   const [negativePrompt, setNegativePrompt] = useState("");
+  const [videoPrompt, setVideoPrompt] = useState("");
+  const [videoRatio, setVideoRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
+  const [imageFormat, setImageFormat] = useState<'landscape_16_9' | 'portrait_16_9' | 'square_hd' | 'landscape_4_3' | 'portrait_4_3' | 'square'>('landscape_16_9');
   
   // Image generation state (now part of event creation)
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
@@ -101,7 +97,6 @@ function UniverseTimelineEditor() {
   const [isSavingToFilecoin, setIsSavingToFilecoin] = useState(false);
   const [filecoinSaved, setFilecoinSaved] = useState(false);
   const [pieceCid, setPieceCid] = useState<string | null>(null);
-  const [originalVideoUrl, setOriginalVideoUrl] = useState<string | null>(null); // Keep original URL for display
   
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
@@ -239,97 +234,6 @@ function UniverseTimelineEditor() {
     }
   };
 
-  // Dummy timeline data for testing
-  const dummyTimelineData = {
-    'cyberpunk-2077': {
-      nodeIds: [1, 2, 3, 4],
-      urls: [
-        'https://example.com/video1',
-        'https://example.com/video2', 
-        'https://example.com/video3',
-        'https://example.com/video4'
-      ],
-      descriptions: [
-        'V wakes up in Night City',
-        'Meeting with Jackie and T-Bug',
-        'The heist at Arasaka Tower',
-        'Johnny Silverhand appears'
-      ],
-      previousNodes: [0, 1, 2, 3],
-      children: [[], [], [], []],
-      flags: [true, true, false, true]
-    },
-    'space-odyssey': {
-      nodeIds: [1, 2, 3],
-      urls: [
-        'https://example.com/space1',
-        'https://example.com/space2',
-        'https://example.com/space3'
-      ],
-      descriptions: [
-        'Launch from Earth Station',
-        'First contact with aliens',
-        'Discovery of ancient artifact'
-      ],
-      previousNodes: [0, 1, 2],
-      children: [[], [], []],
-      flags: [true, true, true]
-    },
-    'medieval-kingdoms': {
-      nodeIds: [1, 2, 3, 4, 5],
-      urls: [
-        'https://example.com/medieval1',
-        'https://example.com/medieval2',
-        'https://example.com/medieval3',
-        'https://example.com/medieval4',
-        'https://example.com/medieval5'
-      ],
-      descriptions: [
-        'The young knight\'s quest begins',
-        'Battle with the dragon',
-        'Meeting the wise wizard',
-        'Storm the evil castle',
-        'Rescue the princess'
-      ],
-      previousNodes: [0, 1, 1, 3, 4],
-      children: [[], [], [], [], []],
-      flags: [true, true, false, true, true]
-    },
-    'detective-noir': {
-      nodeIds: [1, 2, 3],
-      urls: [
-        'https://example.com/noir1',
-        'https://example.com/noir2',
-        'https://example.com/noir3'
-      ],
-      descriptions: [
-        'The case begins with a mysterious dame',
-        'Following clues through the city',
-        'Confronting the corrupt mayor'
-      ],
-      previousNodes: [0, 1, 2],
-      children: [[], [], []],
-      flags: [true, false, true]
-    },
-    'zombie-apocalypse': {
-      nodeIds: [1, 2, 3, 4],
-      urls: [
-        'https://example.com/zombie1',
-        'https://example.com/zombie2',
-        'https://example.com/zombie3',
-        'https://example.com/zombie4'
-      ],
-      descriptions: [
-        'The outbreak begins',
-        'Finding other survivors',
-        'Securing the abandoned mall',
-        'The final escape'
-      ],
-      previousNodes: [0, 1, 2, 3],
-      children: [[], [], [], []],
-      flags: [true, true, true, true]
-    }
-  };
 
   // Try to get universe data from localStorage first, then fall back to dummy data
   const { data: universeFromStorage } = useQuery({
@@ -363,7 +267,7 @@ function UniverseTimelineEditor() {
   console.log('Chain ID:', chainId);
   
   // Blockchain data fetching hooks - use the universe's own contract address
-  const { data: leavesData, isLoading: isLoadingLeaves, refetch: refetchLeaves } = useUniverseLeaves(timelineContractAddress);
+  const { isLoading: isLoadingLeaves, refetch: refetchLeaves } = useUniverseLeaves(timelineContractAddress);
   const { data: fullGraphData, isLoading: isLoadingFullGraph, refetch: refetchFullGraph } = useUniverseFullGraph(timelineContractAddress);
   
   // Get timeline data: use blockchain data if available, otherwise dummy data
@@ -395,8 +299,8 @@ function UniverseTimelineEditor() {
       };
     }
     
-    // Fall back to dummy data for testing
-    return dummyTimelineData[id as keyof typeof dummyTimelineData] || {
+    // Return empty data structure if no data found
+    return {
       nodeIds: [], urls: [], descriptions: [], previousNodes: [], children: [], flags: []
     };
   }, [id, isBlockchainUniverse, fullGraphData]);
@@ -492,7 +396,7 @@ function UniverseTimelineEditor() {
     }
   });
 
-  // Image generation mutation with character support
+  // Image generation mutation using Qwen image-edit-plus for better quality and control
   const generateImageMutation = useMutation({
     mutationFn: async (prompt: string) => {
       // Check if we have selected characters to edit into the scene
@@ -506,58 +410,110 @@ function UniverseTimelineEditor() {
           // Create edit prompt that places characters in the scene
           const editPrompt = `${characterNames} ${prompt}, cinematic scene, high quality, detailed environment`;
           
-          // Process all character image URLs through weserv.nl for better compatibility
-          const processedImageUrls = selectedChars.map((char: any) => 
-            `https://images.weserv.nl/?url=${encodeURIComponent(char.image_url)}`
-          );
+          // Use character image URLs directly - don't over-process them
+          const processedImageUrls = selectedChars
+            .filter((char: any) => char.image_url && char.image_url.trim()) // Filter out empty URLs
+            .map((char: any) => char.image_url); // Use URLs directly without weserv processing
           
-          console.log('🎭 === CHARACTER SCENE EDITING ===');
+          console.log('🎭 === CHARACTER SCENE EDITING WITH QWEN ===');
           console.log('Selected characters:', selectedChars.map((c: any) => c.character_name));
           console.log('Number of characters:', selectedChars.length);
-          console.log('Original image URLs:', selectedChars.map((c: any) => c.image_url));
-          console.log('Processed image URLs:', processedImageUrls);
+          console.log('Original URLs:', selectedChars.map((c: any) => c.image_url));
+          console.log('Processed URLs:', processedImageUrls);
           console.log('Scene prompt:', editPrompt);
-          console.log('🚀 Calling FAL editImage with multiple images...');
+          console.log('Image format:', imageFormat);
+          console.log('🚀 Calling FAL imageToImage...');
+          
+          // Validate we have at least one valid image URL
+          if (processedImageUrls.length === 0) {
+            throw new Error('No valid character images found for editing');
+          }
           
           try {
-            // Use Nano Banana image editing to place all characters in scene
-            const result = await trpcClient.fal.editImage.mutate({
-              prompt: editPrompt,
-              imageUrls: processedImageUrls, // Now passing ALL character images
-              numImages: 1, // Generate one composed image with all characters
-              strength: 0.7, // Moderate transformation to keep characters recognizable
-              negativePrompt: "blurry, low quality, distorted"
+            // ALWAYS use Qwen image-edit-plus for character frame generation
+            console.log('🎯 Using fal-ai/qwen-image-edit-plus for character frame generation');
+            
+            const result = await trpcClient.fal.imageToImage.mutate({
+              prompt: `Create a cinematic frame: ${editPrompt}. Professional photography, detailed environment, high quality composition`,
+              imageUrls: processedImageUrls, // Character images as reference for Qwen
+              imageSize: imageFormat, // Use selected format (landscape_16_9, portrait_16_9, etc.)
+              numImages: 1,
+              negativePrompt: "blurry, low quality, distorted, bad anatomy, deformed, ugly, amateur"
             });
             
-            console.log('✅ FAL editImage result:', result);
+            console.log('✅ Qwen image-edit-plus result:', result);
             
             if (result.status !== 'completed' || !result.imageUrl) {
-              throw new Error(result.error || 'Failed to edit character into scene');
+              throw new Error(result.error || 'Qwen frame generation failed');
             }
             
-            console.log('🎉 CHARACTER EDITING SUCCESSFUL!');
+            console.log('🎉 QWEN CHARACTER FRAME GENERATION SUCCESSFUL!');
             return { success: true, imageUrl: result.imageUrl };
-          } catch (editError) {
-            console.error('❌ CHARACTER EDITING FAILED:', editError);
-            throw editError; // No fallback - throw the actual error
+          } catch (imageToImageError) {
+            console.error('❌ QWEN IMAGE-EDIT-PLUS FAILED:', imageToImageError);
+            console.error('Error details:', JSON.stringify(imageToImageError, null, 2));
+            
+            // More specific error message for Qwen failures
+            const errorMessage = imageToImageError instanceof Error 
+              ? imageToImageError.message 
+              : 'Qwen image-edit-plus failed';
+            
+            throw new Error(`Frame generation failed: ${errorMessage}. Please check character images and try again.`);
           }
         }
       }
       
-      // Generate scene without characters using FAL Nano Banana
-      console.log('Generating scene without characters using FAL Nano Banana');
-      const result = await trpcClient.fal.generateImage.mutate({
-        prompt: `${prompt}, cinematic scene, high quality, detailed environment, clean uniform background, no text, no letters, no words`,
-        model: 'fal-ai/nano-banana',
-        imageSize: 'landscape_16_9', // Better for scenes
-        numImages: 1
-      });
+      // For scenes without characters, we need a base image to transform
+      // We'll create a simple base composition and then enhance it with Qwen
+      console.log('🎨 Generating scene without characters using Qwen image-edit-plus');
       
-      if (result.status !== 'completed' || !result.imageUrl) {
-        throw new Error(result.error || 'Failed to generate scene image');
+      try {
+        // First, generate a basic composition with Nano Banana
+        const baseResult = await trpcClient.fal.generateImage.mutate({
+          prompt: `simple basic composition for: ${prompt}, rough sketch, basic layout`,
+          model: 'fal-ai/nano-banana',
+          imageSize: imageFormat,
+          numImages: 1
+        });
+        
+        if (baseResult.status !== 'completed' || !baseResult.imageUrl) {
+          throw new Error('Failed to generate base composition');
+        }
+        
+        console.log('✅ Base composition generated, now enhancing with Qwen...');
+        
+        // Then enhance it with Qwen image-edit-plus for higher quality
+        const enhancedResult = await trpcClient.fal.imageToImage.mutate({
+          prompt: `${prompt}, cinematic scene, high quality, detailed environment, professional photography, dramatic lighting`,
+          imageUrls: [baseResult.imageUrl],
+          imageSize: imageFormat,
+          numImages: 1,
+          negativePrompt: "blurry, low quality, distorted, sketch, rough, unfinished"
+        });
+        
+        if (enhancedResult.status !== 'completed' || !enhancedResult.imageUrl) {
+          throw new Error(enhancedResult.error || 'Failed to enhance scene with Qwen');
+        }
+        
+        console.log('🎉 QWEN ENHANCED SCENE SUCCESSFUL!');
+        return { success: true, imageUrl: enhancedResult.imageUrl };
+      } catch (error) {
+        console.error('❌ QWEN ENHANCEMENT FAILED, falling back to basic generation:', error);
+        
+        // Fallback to basic Nano Banana generation
+        const fallbackResult = await trpcClient.fal.generateImage.mutate({
+          prompt: `${prompt}, cinematic scene, high quality, detailed environment`,
+          model: 'fal-ai/nano-banana',
+          imageSize: imageFormat,
+          numImages: 1
+        });
+        
+        if (fallbackResult.status !== 'completed' || !fallbackResult.imageUrl) {
+          throw new Error(fallbackResult.error || 'Failed to generate scene image');
+        }
+        
+        return { success: true, imageUrl: fallbackResult.imageUrl };
       }
-      
-      return { success: true, imageUrl: result.imageUrl };
     },
     onSuccess: (data) => {
       if (data.imageUrl) {
@@ -621,20 +577,26 @@ function UniverseTimelineEditor() {
         model: selectedVideoModel
       });
       
-      if (selectedVideoModel === 'lumaai') {
-        const result = await trpcClient.video.generateAndWait.mutate({
-          prompt: prompt || videoDescription,
-          imageUrl, // Use the actual generated image
-          model: 'ray-flash-2', // Fast model like in Python test
-          duration: '5s'
+      const finalPrompt = videoPrompt.trim() || prompt || videoDescription;
+      
+      if (selectedVideoModel === 'fal-veo3') {
+        const result = await trpcClient.fal.generateVideo.mutate({
+          prompt: finalPrompt,
+          imageUrl,
+          model: "fal-ai/veo3/fast/image-to-video",
+          duration: 5,
+          aspectRatio: videoRatio,
+          motionStrength: 127,
+          negativePrompt: negativePrompt || undefined
         });
-        return result;
+        console.log('Veo3 video result:', result);
+        return { videoUrl: result.videoUrl };
       } else if (selectedVideoModel === 'fal-kling') {
         const result = await trpcClient.fal.klingVideo.mutate({
-          prompt: prompt || videoDescription,
+          prompt: finalPrompt,
           imageUrl,
           duration: 5,
-          aspectRatio: "16:9",
+          aspectRatio: videoRatio,
           negativePrompt: negativePrompt || undefined,
           cfgScale: 0.5
         });
@@ -642,11 +604,12 @@ function UniverseTimelineEditor() {
         return { videoUrl: result.videoUrl }; // Use actual video URL
       } else if (selectedVideoModel === 'fal-wan25') {
         const result = await trpcClient.fal.wan25ImageToVideo.mutate({
-          prompt: prompt || videoDescription,
+          prompt: finalPrompt,
           imageUrl,
           duration: 5,
-          aspectRatio: "16:9",
-          negativePrompt: negativePrompt || undefined
+          resolution: "1080p",
+          negativePrompt: negativePrompt || undefined,
+          enablePromptExpansion: true
         });
         console.log('Wan25 video result:', result);
         return { videoUrl: result.videoUrl }; // Use actual video URL
@@ -871,20 +834,6 @@ function UniverseTimelineEditor() {
   }, [generatedVideoUrl, videoTitle, videoDescription, graphData.nodeIds, writeContractAsync, isBlockchainUniverse, id, chainId]);
 
   // Debug function to test Filecoin functionality without generating video
-  const handleDebugFilecoin = useCallback(async () => {
-    // Use a 10-second, 1MB test video that should work reliably
-    const mockVideoUrl = "https://test-videos.co.uk/vids/bigbuckbunny/mp4/av1/360/Big_Buck_Bunny_360_10s_1MB.mp4";
-    const mockTitle = "Debug Test Video";
-    const mockDescription = "Testing Filecoin upload functionality";
-    
-    // Set the mock data
-    setGeneratedVideoUrl(mockVideoUrl);
-    setVideoTitle(mockTitle);
-    setVideoDescription(mockDescription);
-    setShowVideoStep(true);
-    
-    console.log('Debug: Set up mock video data for testing with URL:', mockVideoUrl);
-  }, []);
 
 
   // Manual refresh function
@@ -916,8 +865,11 @@ function UniverseTimelineEditor() {
     setUploadedUrl(null);
     setContractSaved(false);
     setIsSavingToContract(false);
-    setSelectedVideoModel('lumaai'); // Reset to default
+    setSelectedVideoModel('fal-veo3'); // Reset to default
     setNegativePrompt(""); // Reset negative prompt
+    setVideoPrompt(""); // Reset video prompt
+    setVideoRatio("16:9"); // Reset video ratio
+    setImageFormat('landscape_16_9'); // Reset image format
     setShowVideoDialog(true);
   }, []);
 
@@ -1720,10 +1672,84 @@ function UniverseTimelineEditor() {
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
                     {selectedCharacters.length > 0 
-                      ? `Edit ${selectedCharacters.length} character(s) into the scene using Nano Banana AI`
-                      : 'Generate an image based on your scene description'
+                      ? `Generate cinematic frame with ${selectedCharacters.length} character(s) using Qwen image-edit-plus`
+                      : 'Generate cinematic frame using Qwen image-edit-plus enhancement'
                     }
                   </p>
+
+                  {/* Image Format Selection */}
+                  <div className="mb-3">
+                    <Label className="text-xs font-medium text-muted-foreground">Image Format</Label>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setImageFormat('landscape_16_9')}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
+                          imageFormat === 'landscape_16_9' 
+                            ? "border-primary bg-primary text-primary-foreground" 
+                            : "border-input bg-background hover:bg-muted"
+                        }`}
+                      >
+                        16:9 Landscape
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setImageFormat('portrait_16_9')}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
+                          imageFormat === 'portrait_16_9' 
+                            ? "border-primary bg-primary text-primary-foreground" 
+                            : "border-input bg-background hover:bg-muted"
+                        }`}
+                      >
+                        9:16 Portrait
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setImageFormat('square_hd')}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
+                          imageFormat === 'square_hd' 
+                            ? "border-primary bg-primary text-primary-foreground" 
+                            : "border-input bg-background hover:bg-muted"
+                        }`}
+                      >
+                        1:1 Square HD
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setImageFormat('landscape_4_3')}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
+                          imageFormat === 'landscape_4_3' 
+                            ? "border-primary bg-primary text-primary-foreground" 
+                            : "border-input bg-background hover:bg-muted"
+                        }`}
+                      >
+                        4:3 Landscape
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setImageFormat('portrait_4_3')}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
+                          imageFormat === 'portrait_4_3' 
+                            ? "border-primary bg-primary text-primary-foreground" 
+                            : "border-input bg-background hover:bg-muted"
+                        }`}
+                      >
+                        3:4 Portrait
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setImageFormat('square')}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
+                          imageFormat === 'square' 
+                            ? "border-primary bg-primary text-primary-foreground" 
+                            : "border-input bg-background hover:bg-muted"
+                        }`}
+                      >
+                        1:1 Square
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <Button
                       onClick={handleGenerateEventImage}
@@ -1766,7 +1792,7 @@ function UniverseTimelineEditor() {
                   <img 
                     src={generatedImageUrl} 
                     alt="Generated first frame" 
-                    className="w-full max-h-48 object-cover rounded-lg border"
+                    className="w-full h-auto object-contain rounded-lg border max-h-64"
                   />
                   
                   {/* Upload to tmpfiles.org */}
@@ -1804,6 +1830,64 @@ function UniverseTimelineEditor() {
                   <p className="text-xs text-muted-foreground mb-3">
                     Create a video animation from the generated image
                   </p>
+
+                  {/* Video Prompt */}
+                  <div className="mb-3">
+                    <Label htmlFor="video-prompt" className="text-xs font-medium text-muted-foreground">
+                      Video Animation Prompt (optional)
+                    </Label>
+                    <textarea
+                      id="video-prompt"
+                      value={videoPrompt}
+                      onChange={(e) => setVideoPrompt(e.target.value)}
+                      placeholder="Describe how the scene should be animated (e.g., camera slowly moves closer, character looks around, wind blowing gently)..."
+                      rows={2}
+                      className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Leave empty to use the scene description as animation prompt
+                    </p>
+                  </div>
+
+                  {/* Video Ratio */}
+                  <div className="mb-3">
+                    <Label className="text-xs font-medium text-muted-foreground">Video Aspect Ratio</Label>
+                    <div className="flex gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setVideoRatio("16:9")}
+                        className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                          videoRatio === "16:9" 
+                            ? "border-primary bg-primary text-primary-foreground" 
+                            : "border-input bg-background hover:bg-muted"
+                        }`}
+                      >
+                        16:9 Landscape
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVideoRatio("9:16")}
+                        className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                          videoRatio === "9:16" 
+                            ? "border-primary bg-primary text-primary-foreground" 
+                            : "border-input bg-background hover:bg-muted"
+                        }`}
+                      >
+                        9:16 Portrait
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVideoRatio("1:1")}
+                        className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                          videoRatio === "1:1" 
+                            ? "border-primary bg-primary text-primary-foreground" 
+                            : "border-input bg-background hover:bg-muted"
+                        }`}
+                      >
+                        1:1 Square
+                      </button>
+                    </div>
+                  </div>
                   
                   {/* Model Selection */}
                   <div className="mb-3">
@@ -1812,16 +1896,16 @@ function UniverseTimelineEditor() {
                       <div className="flex items-center space-x-2">
                         <input
                           type="radio"
-                          id="lumaai"
+                          id="fal-veo3"
                           name="videoModel"
-                          value="lumaai"
-                          checked={selectedVideoModel === 'lumaai'}
+                          value="fal-veo3"
+                          checked={selectedVideoModel === 'fal-veo3'}
                           onChange={(e) => setSelectedVideoModel(e.target.value as any)}
                           className="w-4 h-4 text-primary"
                         />
-                        <label htmlFor="lumaai" className="text-sm">
-                          <span className="font-medium">LumaAI Ray Flash</span>
-                          <span className="text-muted-foreground ml-1">(Fast, reliable)</span>
+                        <label htmlFor="fal-veo3" className="text-sm">
+                          <span className="font-medium">Veo3 Fast</span>
+                          <span className="text-muted-foreground ml-1">(Fast, good quality)</span>
                         </label>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -1857,8 +1941,8 @@ function UniverseTimelineEditor() {
                     </div>
                   </div>
 
-                  {/* Negative Prompt for Kling and Wan25 */}
-                  {(selectedVideoModel === 'fal-wan25' || selectedVideoModel === 'fal-kling') && (
+                  {/* Negative Prompt for all FAL models */}
+                  {(selectedVideoModel === 'fal-wan25' || selectedVideoModel === 'fal-kling' || selectedVideoModel === 'fal-veo3') && (
                     <div className="mb-3">
                       <Label htmlFor="negative-prompt" className="text-xs font-medium text-muted-foreground">
                         Negative Prompt (optional)
@@ -1881,12 +1965,12 @@ function UniverseTimelineEditor() {
                     {isGeneratingVideo ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating with {selectedVideoModel === 'lumaai' ? 'LumaAI' : selectedVideoModel === 'fal-kling' ? 'Kling 2.5' : 'Wan 2.5'}...
+                        Generating with {selectedVideoModel === 'fal-veo3' ? 'Veo3 Fast' : selectedVideoModel === 'fal-kling' ? 'Kling 2.5' : 'Wan 2.5'}...
                       </>
                     ) : (
                       <>
                         <Film className="h-4 w-4 mr-2" />
-                        Generate Video with {selectedVideoModel === 'lumaai' ? 'LumaAI' : selectedVideoModel === 'fal-kling' ? 'Kling 2.5' : 'Wan 2.5'}
+                        Generate Video with {selectedVideoModel === 'fal-veo3' ? 'Veo3 Fast' : selectedVideoModel === 'fal-kling' ? 'Kling 2.5' : 'Wan 2.5'}
                       </>
                     )}
                   </Button>

@@ -24,6 +24,15 @@ export interface FalImageEditOptions {
   enableSafetyChecker?: boolean;
 }
 
+export interface FalImageToImageOptions {
+  prompt: string;
+  imageUrls: string[];
+  negativePrompt?: string;
+  imageSize?: 'square_hd' | 'square' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9' | { width: number; height: number };
+  numImages?: number;
+  seed?: number;
+}
+
 export interface FalImageGenerationResult {
   id: string;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
@@ -47,6 +56,8 @@ export interface FalVideoGenerationOptions {
   motionStrength?: number;
   negativePrompt?: string;
   cfgScale?: number;
+  resolution?: '720p' | '1080p';
+  enablePromptExpansion?: boolean;
 }
 
 export interface FalVideoGenerationResult {
@@ -179,6 +190,107 @@ export class FalService {
     }
   }
 
+  async imageToImage(options: FalImageToImageOptions): Promise<FalImageGenerationResult> {
+    console.log('🖼️ === FAL IMAGE TO IMAGE ===');
+    console.log('Options:', JSON.stringify(options, null, 2));
+
+    try {
+      const model = 'fal-ai/qwen-image-edit-plus';
+      const input: any = {
+        prompt: options.prompt,
+        image_urls: options.imageUrls,
+        num_images: options.numImages || 1,
+      };
+
+      if (options.negativePrompt) {
+        input.negative_prompt = options.negativePrompt;
+      }
+
+      if (options.imageSize) {
+        input.image_size = options.imageSize;
+      }
+
+      if (options.seed !== undefined) {
+        input.seed = options.seed;
+      }
+
+      console.log('Final input for FAL Image-to-Image:', JSON.stringify(input, null, 2));
+
+      const result = await fal.subscribe(model, {
+        input,
+        logs: true,
+        onQueueUpdate: (update) => {
+          if (update.status === "IN_PROGRESS") {
+            update.logs.map((log) => log.message).forEach(console.log);
+          }
+        }
+      });
+
+      console.log('📥 Raw FAL Image-to-Image Response:', JSON.stringify(result, null, 2));
+
+      // Handle response structure - try different possible structures
+      const resultAny = result as any;
+      console.log('Result keys:', Object.keys(resultAny));
+
+      let imageUrl: string | undefined;
+      let images: Array<{ url: string; width?: number; height?: number; content_type?: string }> = [];
+
+      // Try different response structures
+      if (resultAny.data && resultAny.data.images && Array.isArray(resultAny.data.images)) {
+        images = resultAny.data.images;
+        imageUrl = images[0]?.url;
+      } else if (resultAny.images && Array.isArray(resultAny.images)) {
+        images = resultAny.images;
+        imageUrl = images[0]?.url;
+      } else if (resultAny.data && resultAny.data.image) {
+        imageUrl = resultAny.data.image;
+        if (imageUrl) images = [{ url: imageUrl }];
+      } else if (resultAny.image) {
+        imageUrl = resultAny.image;
+        if (imageUrl) images = [{ url: imageUrl }];
+      } else if (resultAny.url) {
+        imageUrl = resultAny.url;
+        if (imageUrl) images = [{ url: imageUrl }];
+      }
+
+      if (!imageUrl) {
+        console.error('No image URL found in response');
+        console.error('Available keys:', Object.keys(resultAny));
+        if (resultAny.data) {
+          console.error('Data keys:', Object.keys(resultAny.data));
+        }
+        throw new Error('No image URL found in FAL image-to-image response');
+      }
+
+      return {
+        id: resultAny.requestId || Date.now().toString(),
+        status: 'completed',
+        imageUrl: imageUrl,
+        images: images
+      };
+    } catch (error) {
+      console.error('🚨 Fal AI image-to-image failed:', error);
+
+      // Log detailed error information
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+
+      // If it's a response error, log the response details
+      if ((error as any).response) {
+        console.error('Response status:', (error as any).response.status);
+        console.error('Response data:', (error as any).response.data);
+      }
+
+      return {
+        id: '',
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
   async generateVideo(options: FalVideoGenerationOptions): Promise<FalVideoGenerationResult> {
     try {
       const model = options.model || 'fal-ai/ltx-video';
@@ -194,8 +306,9 @@ export class FalService {
         if (!options.imageUrl) throw new Error('Image URL is required for wan25 image-to-video model');
         input.image_url = options.imageUrl;
         input.duration = String(options.duration || 5);
-        input.aspect_ratio = options.aspectRatio || "16:9";
+        input.resolution = options.resolution || "1080p";
         if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+        if (options.enablePromptExpansion !== undefined) input.enable_prompt_expansion = options.enablePromptExpansion;
       } else if (model === 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video') {
         if (!options.imageUrl) throw new Error('Image URL is required for kling v2.5 turbo model');
         input.image_url = options.imageUrl;
@@ -227,7 +340,7 @@ export class FalService {
       // Handle different response structures
       let data: any;
       let videoUrl: string | undefined;
-      
+
       if ((result as any).data) {
         data = (result as any).data;
         // Try different possible video URL locations
