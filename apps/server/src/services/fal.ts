@@ -24,6 +24,15 @@ export interface FalImageEditOptions {
   enableSafetyChecker?: boolean;
 }
 
+export interface FalImageToImageOptions {
+  prompt: string;
+  imageUrls: string[];
+  negativePrompt?: string;
+  imageSize?: 'square_hd' | 'square' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9' | { width: number; height: number };
+  numImages?: number;
+  seed?: number;
+}
+
 export interface FalImageGenerationResult {
   id: string;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
@@ -35,7 +44,7 @@ export interface FalImageGenerationResult {
 
 export interface FalVideoGenerationOptions {
   prompt: string;
-  model?: 'fal-ai/hunyuan-video' | 'fal-ai/ltx-video' | 'fal-ai/cogvideox-5b' | 'fal-ai/runway-gen3' | 'fal-ai/veo3/fast/image-to-video';
+  model?: 'fal-ai/hunyuan-video' | 'fal-ai/ltx-video' | 'fal-ai/cogvideox-5b' | 'fal-ai/runway-gen3' | 'fal-ai/veo3/fast/image-to-video' | 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video' | 'fal-ai/wan-25-preview/image-to-video';
   imageUrl?: string;
   duration?: number;
   fps?: number;
@@ -45,6 +54,10 @@ export interface FalVideoGenerationOptions {
   numInferenceSteps?: number;
   aspectRatio?: string;
   motionStrength?: number;
+  negativePrompt?: string;
+  cfgScale?: number;
+  resolution?: '720p' | '1080p';
+  enablePromptExpansion?: boolean;
 }
 
 export interface FalVideoGenerationResult {
@@ -177,6 +190,107 @@ export class FalService {
     }
   }
 
+  async imageToImage(options: FalImageToImageOptions): Promise<FalImageGenerationResult> {
+    console.log('🖼️ === FAL IMAGE TO IMAGE ===');
+    console.log('Options:', JSON.stringify(options, null, 2));
+
+    try {
+      const model = 'fal-ai/qwen-image-edit-plus';
+      const input: any = {
+        prompt: options.prompt,
+        image_urls: options.imageUrls,
+        num_images: options.numImages || 1,
+      };
+
+      if (options.negativePrompt) {
+        input.negative_prompt = options.negativePrompt;
+      }
+
+      if (options.imageSize) {
+        input.image_size = options.imageSize;
+      }
+
+      if (options.seed !== undefined) {
+        input.seed = options.seed;
+      }
+
+      console.log('Final input for FAL Image-to-Image:', JSON.stringify(input, null, 2));
+
+      const result = await fal.subscribe(model, {
+        input,
+        logs: true,
+        onQueueUpdate: (update) => {
+          if (update.status === "IN_PROGRESS") {
+            update.logs.map((log) => log.message).forEach(console.log);
+          }
+        }
+      });
+
+      console.log('📥 Raw FAL Image-to-Image Response:', JSON.stringify(result, null, 2));
+
+      // Handle response structure - try different possible structures
+      const resultAny = result as any;
+      console.log('Result keys:', Object.keys(resultAny));
+
+      let imageUrl: string | undefined;
+      let images: Array<{ url: string; width?: number; height?: number; content_type?: string }> = [];
+
+      // Try different response structures
+      if (resultAny.data && resultAny.data.images && Array.isArray(resultAny.data.images)) {
+        images = resultAny.data.images;
+        imageUrl = images[0]?.url;
+      } else if (resultAny.images && Array.isArray(resultAny.images)) {
+        images = resultAny.images;
+        imageUrl = images[0]?.url;
+      } else if (resultAny.data && resultAny.data.image) {
+        imageUrl = resultAny.data.image;
+        if (imageUrl) images = [{ url: imageUrl }];
+      } else if (resultAny.image) {
+        imageUrl = resultAny.image;
+        if (imageUrl) images = [{ url: imageUrl }];
+      } else if (resultAny.url) {
+        imageUrl = resultAny.url;
+        if (imageUrl) images = [{ url: imageUrl }];
+      }
+
+      if (!imageUrl) {
+        console.error('No image URL found in response');
+        console.error('Available keys:', Object.keys(resultAny));
+        if (resultAny.data) {
+          console.error('Data keys:', Object.keys(resultAny.data));
+        }
+        throw new Error('No image URL found in FAL image-to-image response');
+      }
+
+      return {
+        id: resultAny.requestId || Date.now().toString(),
+        status: 'completed',
+        imageUrl: imageUrl,
+        images: images
+      };
+    } catch (error) {
+      console.error('🚨 Fal AI image-to-image failed:', error);
+
+      // Log detailed error information
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+
+      // If it's a response error, log the response details
+      if ((error as any).response) {
+        console.error('Response status:', (error as any).response.status);
+        console.error('Response data:', (error as any).response.data);
+      }
+
+      return {
+        id: '',
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
   async generateVideo(options: FalVideoGenerationOptions): Promise<FalVideoGenerationResult> {
     try {
       const model = options.model || 'fal-ai/ltx-video';
@@ -188,6 +302,20 @@ export class FalService {
         input.duration = options.duration || 5;
         input.aspect_ratio = options.aspectRatio || "16:9";
         input.motion_strength = options.motionStrength || 127;
+      } else if (model === 'fal-ai/wan-25-preview/image-to-video') {
+        if (!options.imageUrl) throw new Error('Image URL is required for wan25 image-to-video model');
+        input.image_url = options.imageUrl;
+        input.duration = String(options.duration || 5);
+        input.resolution = options.resolution || "1080p";
+        if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+        if (options.enablePromptExpansion !== undefined) input.enable_prompt_expansion = options.enablePromptExpansion;
+      } else if (model === 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video') {
+        if (!options.imageUrl) throw new Error('Image URL is required for kling v2.5 turbo model');
+        input.image_url = options.imageUrl;
+        input.duration = String(options.duration || 5);
+        input.aspect_ratio = options.aspectRatio || "16:9";
+        if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+        if (options.cfgScale !== undefined) input.cfg_scale = options.cfgScale;
       } else {
         input.duration = options.duration || 5;
         input.fps = options.fps || 25;
@@ -207,15 +335,35 @@ export class FalService {
         onQueueUpdate: (update) => console.log('Fal AI queue update:', update)
       });
 
+      console.log('📥 Raw FAL Video Response:', JSON.stringify(result, null, 2));
+
+      // Handle different response structures
+      let data: any;
+      let videoUrl: string | undefined;
+
       if ((result as any).data) {
-        return {
-          id: (result as any).requestId || '',
-          status: 'completed',
-          videoUrl: ((result as any).data as any).video?.url
-        };
-      } else {
-        throw new Error('No video data returned from Fal AI');
+        data = (result as any).data;
+        // Try different possible video URL locations
+        videoUrl = data.video?.url || data.video_url || data.url;
+      } else if ((result as any).video) {
+        videoUrl = (result as any).video.url || (result as any).video;
+      } else if ((result as any).url) {
+        videoUrl = (result as any).url;
       }
+
+      if (!videoUrl) {
+        console.error('No video URL found in response. Available keys:', Object.keys(result as any));
+        if (data) {
+          console.error('Data keys:', Object.keys(data));
+        }
+        throw new Error('No video URL found in FAL response');
+      }
+
+      return {
+        id: (result as any).requestId || Date.now().toString(),
+        status: 'completed',
+        videoUrl: videoUrl
+      };
     } catch (error) {
       console.error('Fal AI video generation failed:', error);
       return {

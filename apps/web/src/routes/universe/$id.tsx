@@ -1,10 +1,5 @@
-import { createFileRoute, Link, useParams, useNavigate } from "@tanstack/react-router";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ArrowLeft, Film, Plus, Settings, Clock, Users, Sparkles, Image, Loader2, RefreshCw, UserPlus, Wand2 } from "lucide-react";
 import ReactFlow, {
   Background,
   Controls,
@@ -21,19 +16,15 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { TimelineEventNode } from '@/components/flow/TimelineNodes';
-import { TimelineActions } from '@/components/TimelineActions';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useReadContract, useChainId, useWriteContract } from 'wagmi';
-import { trpc } from '@/utils/trpc';
 import { timelineAbi } from '@/generated';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
 import { type Address } from 'viem';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
-
-interface UniverseParams {
-  id: string;
-}
+import { UniverseSidebar } from '@/components/UniverseSidebar';
+import { EventCreationSidebar } from '@/components/EventCreationSidebar';
 
 // Register custom node types
 const nodeTypes = {
@@ -42,7 +33,6 @@ const nodeTypes = {
 
 function UniverseTimelineEditor() {
   const { id } = useParams({ from: "/universe/$id" });
-  const navigate = useNavigate();
   const chainId = useChainId();
 
   // Timeline flow state
@@ -63,8 +53,13 @@ function UniverseTimelineEditor() {
   const [videoDescription, setVideoDescription] = useState("");
   const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
   const [additionType, setAdditionType] = useState<'after' | 'branch'>('after');
+  const [selectedVideoModel, setSelectedVideoModel] = useState<'fal-veo3' | 'fal-kling' | 'fal-wan25'>('fal-veo3');
+  const [negativePrompt, setNegativePrompt] = useState("");
+  const [videoPrompt, setVideoPrompt] = useState("");
+  const [videoRatio, setVideoRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
+  const [imageFormat, setImageFormat] = useState<'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3'>('landscape_16_9');
   
-  // Image generation state (now part of event creation)
+  // Image generation state
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
@@ -99,7 +94,6 @@ function UniverseTimelineEditor() {
   const [isSavingToFilecoin, setIsSavingToFilecoin] = useState(false);
   const [filecoinSaved, setFilecoinSaved] = useState(false);
   const [pieceCid, setPieceCid] = useState<string | null>(null);
-  const [originalVideoUrl, setOriginalVideoUrl] = useState<string | null>(null); // Keep original URL for display
   
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
@@ -175,161 +169,8 @@ function UniverseTimelineEditor() {
       }
     });
   };
-  
-  // Dummy universe data for testing
-  const dummyUniverses = {
-    'cyberpunk-2077': {
-      id: 'cyberpunk-2077',
-      name: 'Cyberpunk 2077',
-      description: 'A dystopian future where technology and humanity collide in Night City',
-      address: '0xabcd...ef01',
-      creator: '0x1234...5678',
-      tokenAddress: '0x1111...1111',
-      governanceAddress: '0x2222...2222',
-      isDefault: false
-    },
-    'space-odyssey': {
-      id: 'space-odyssey',
-      name: 'Space Odyssey',
-      description: 'An epic journey through the cosmos exploring alien civilizations',
-      address: '0xbcde...f012',
-      creator: '0x2345...6789',
-      tokenAddress: '0x3333...3333',
-      governanceAddress: '0x4444...4444',
-      isDefault: false
-    },
-    'medieval-kingdoms': {
-      id: 'medieval-kingdoms',
-      name: 'Medieval Kingdoms',
-      description: 'Knights, dragons, and magic in a fantasy realm of endless adventures',
-      address: '0xcdef...0123',
-      creator: '0x3456...789a',
-      tokenAddress: '0x5555...5555',
-      governanceAddress: '0x6666...6666',
-      isDefault: false
-    },
-    'detective-noir': {
-      id: 'detective-noir',
-      name: 'Detective Noir',
-      description: 'Dark mysteries in 1940s Los Angeles with corruption and crime',
-      address: '0xdef0...1234',
-      creator: '0x4567...89ab',
-      tokenAddress: '0x7777...7777',
-      governanceAddress: '0x8888...8888',
-      isDefault: false
-    },
-    'zombie-apocalypse': {
-      id: 'zombie-apocalypse',
-      name: 'Zombie Apocalypse',
-      description: 'Survival horror in a world overrun by the undead',
-      address: '0xef01...2345',
-      creator: '0x5678...9abc',
-      tokenAddress: '0x9999...9999',
-      governanceAddress: '0xaaaa...aaaa',
-      isDefault: false
-    },
-    'blockchain-universe': {
-      id: 'blockchain-universe',
-      name: 'Blockchain Universe',
-      description: 'A decentralized narrative universe powered by smart contracts',
-      address: null,
-      isDefault: true
-    }
-  };
 
-  // Dummy timeline data for testing
-  const dummyTimelineData = {
-    'cyberpunk-2077': {
-      nodeIds: [1, 2, 3, 4],
-      urls: [
-        'https://example.com/video1',
-        'https://example.com/video2', 
-        'https://example.com/video3',
-        'https://example.com/video4'
-      ],
-      descriptions: [
-        'V wakes up in Night City',
-        'Meeting with Jackie and T-Bug',
-        'The heist at Arasaka Tower',
-        'Johnny Silverhand appears'
-      ],
-      previousNodes: [0, 1, 2, 3],
-      children: [[], [], [], []],
-      flags: [true, true, false, true]
-    },
-    'space-odyssey': {
-      nodeIds: [1, 2, 3],
-      urls: [
-        'https://example.com/space1',
-        'https://example.com/space2',
-        'https://example.com/space3'
-      ],
-      descriptions: [
-        'Launch from Earth Station',
-        'First contact with aliens',
-        'Discovery of ancient artifact'
-      ],
-      previousNodes: [0, 1, 2],
-      children: [[], [], []],
-      flags: [true, true, true]
-    },
-    'medieval-kingdoms': {
-      nodeIds: [1, 2, 3, 4, 5],
-      urls: [
-        'https://example.com/medieval1',
-        'https://example.com/medieval2',
-        'https://example.com/medieval3',
-        'https://example.com/medieval4',
-        'https://example.com/medieval5'
-      ],
-      descriptions: [
-        'The young knight\'s quest begins',
-        'Battle with the dragon',
-        'Meeting the wise wizard',
-        'Storm the evil castle',
-        'Rescue the princess'
-      ],
-      previousNodes: [0, 1, 1, 3, 4],
-      children: [[], [], [], [], []],
-      flags: [true, true, false, true, true]
-    },
-    'detective-noir': {
-      nodeIds: [1, 2, 3],
-      urls: [
-        'https://example.com/noir1',
-        'https://example.com/noir2',
-        'https://example.com/noir3'
-      ],
-      descriptions: [
-        'The case begins with a mysterious dame',
-        'Following clues through the city',
-        'Confronting the corrupt mayor'
-      ],
-      previousNodes: [0, 1, 2],
-      children: [[], [], []],
-      flags: [true, false, true]
-    },
-    'zombie-apocalypse': {
-      nodeIds: [1, 2, 3, 4],
-      urls: [
-        'https://example.com/zombie1',
-        'https://example.com/zombie2',
-        'https://example.com/zombie3',
-        'https://example.com/zombie4'
-      ],
-      descriptions: [
-        'The outbreak begins',
-        'Finding other survivors',
-        'Securing the abandoned mall',
-        'The final escape'
-      ],
-      previousNodes: [0, 1, 2, 3],
-      children: [[], [], [], []],
-      flags: [true, true, true, true]
-    }
-  };
-
-  // Try to get universe data from localStorage first, then fall back to dummy data
+  // Try to get universe data from localStorage
   const { data: universeFromStorage } = useQuery({
     queryKey: ['universe-metadata', id],
     queryFn: () => {
@@ -342,12 +183,21 @@ function UniverseTimelineEditor() {
     }
   });
 
-  // Use localStorage data if available, otherwise fall back to dummy data
-  const universe = universeFromStorage || dummyUniverses[id as keyof typeof dummyUniverses] || null;
+  // Use localStorage data if available
+  const universe = universeFromStorage || null;
   const isLoadingUniverse = false;
   
   // For blockchain universes (addresses starting with 0x), use blockchain data
   const isBlockchainUniverse = id?.startsWith('0x');
+  
+  // For blockchain universes, create a default universe object if not found in localStorage
+  const finalUniverse = universe || (isBlockchainUniverse ? {
+    id: id,
+    name: `Universe ${id.slice(0, 8)}...`,
+    description: 'Blockchain-based cinematic universe',
+    address: id,
+    isDefault: false
+  } : null);
   
   // Each universe with a 0x address IS its own Timeline contract
   // So we use the universe ID as the contract address
@@ -393,21 +243,11 @@ function UniverseTimelineEditor() {
       };
     }
     
-    // Fall back to dummy data for testing
-    return dummyTimelineData[id as keyof typeof dummyTimelineData] || {
+    // Return empty data structure if no data found
+    return {
       nodeIds: [], urls: [], descriptions: [], previousNodes: [], children: [], flags: []
     };
   }, [id, isBlockchainUniverse, fullGraphData]);
-
-  // Commented out real API calls for testing
-  // const { data: cinematicUniverse, isLoading: isLoadingUniverse } = useQuery({
-  //   queryKey: ['cinematicUniverse', id],
-  //   queryFn: () => trpcClient.cinematicUniverses.get.query({ id }),
-  //   enabled: id !== 'blockchain-universe',
-  // });
-  
-  // const { data: leavesData, isLoading: isLoadingLeaves } = useUniverseLeaves(universe?.address || undefined);
-  // const { data: fullGraphData, isLoading: isLoadingFullGraph } = useUniverseFullGraph(universe?.address || undefined);
 
   // Update timeline title when universe data loads
   useEffect(() => {
@@ -490,7 +330,7 @@ function UniverseTimelineEditor() {
     }
   });
 
-  // Image generation mutation with character support
+  // Image generation mutation using Qwen image-edit-plus for better quality and control
   const generateImageMutation = useMutation({
     mutationFn: async (prompt: string) => {
       // Check if we have selected characters to edit into the scene
@@ -504,58 +344,110 @@ function UniverseTimelineEditor() {
           // Create edit prompt that places characters in the scene
           const editPrompt = `${characterNames} ${prompt}, cinematic scene, high quality, detailed environment`;
           
-          // Process all character image URLs through weserv.nl for better compatibility
-          const processedImageUrls = selectedChars.map((char: any) => 
-            `https://images.weserv.nl/?url=${encodeURIComponent(char.image_url)}`
-          );
+          // Use character image URLs directly - don't over-process them
+          const processedImageUrls = selectedChars
+            .filter((char: any) => char.image_url && char.image_url.trim()) // Filter out empty URLs
+            .map((char: any) => char.image_url); // Use URLs directly without weserv processing
           
-          console.log('🎭 === CHARACTER SCENE EDITING ===');
+          console.log('🎭 === CHARACTER SCENE EDITING WITH QWEN ===');
           console.log('Selected characters:', selectedChars.map((c: any) => c.character_name));
           console.log('Number of characters:', selectedChars.length);
-          console.log('Original image URLs:', selectedChars.map((c: any) => c.image_url));
-          console.log('Processed image URLs:', processedImageUrls);
+          console.log('Original URLs:', selectedChars.map((c: any) => c.image_url));
+          console.log('Processed URLs:', processedImageUrls);
           console.log('Scene prompt:', editPrompt);
-          console.log('🚀 Calling FAL editImage with multiple images...');
+          console.log('Image format:', imageFormat);
+          console.log('🚀 Calling FAL imageToImage...');
+          
+          // Validate we have at least one valid image URL
+          if (processedImageUrls.length === 0) {
+            throw new Error('No valid character images found for editing');
+          }
           
           try {
-            // Use Nano Banana image editing to place all characters in scene
-            const result = await trpcClient.fal.editImage.mutate({
-              prompt: editPrompt,
-              imageUrls: processedImageUrls, // Now passing ALL character images
-              numImages: 1, // Generate one composed image with all characters
-              strength: 0.7, // Moderate transformation to keep characters recognizable
-              negativePrompt: "blurry, low quality, distorted"
+            // ALWAYS use Qwen image-edit-plus for character frame generation
+            console.log('🎯 Using fal-ai/qwen-image-edit-plus for character frame generation');
+            
+            const result = await trpcClient.fal.imageToImage.mutate({
+              prompt: `Create a cinematic frame: ${editPrompt}. Professional photography, detailed environment, high quality composition`,
+              imageUrls: processedImageUrls, // Character images as reference for Qwen
+              imageSize: imageFormat, // Use selected format (landscape_16_9, portrait_16_9, etc.)
+              numImages: 1,
+              negativePrompt: "blurry, low quality, distorted, bad anatomy, deformed, ugly, amateur"
             });
             
-            console.log('✅ FAL editImage result:', result);
+            console.log('✅ Qwen image-edit-plus result:', result);
             
             if (result.status !== 'completed' || !result.imageUrl) {
-              throw new Error(result.error || 'Failed to edit character into scene');
+              throw new Error(result.error || 'Qwen frame generation failed');
             }
             
-            console.log('🎉 CHARACTER EDITING SUCCESSFUL!');
+            console.log('🎉 QWEN CHARACTER FRAME GENERATION SUCCESSFUL!');
             return { success: true, imageUrl: result.imageUrl };
-          } catch (editError) {
-            console.error('❌ CHARACTER EDITING FAILED:', editError);
-            throw editError; // No fallback - throw the actual error
+          } catch (imageToImageError) {
+            console.error('❌ QWEN IMAGE-EDIT-PLUS FAILED:', imageToImageError);
+            console.error('Error details:', JSON.stringify(imageToImageError, null, 2));
+            
+            // More specific error message for Qwen failures
+            const errorMessage = imageToImageError instanceof Error 
+              ? imageToImageError.message 
+              : 'Qwen image-edit-plus failed';
+            
+            throw new Error(`Frame generation failed: ${errorMessage}. Please check character images and try again.`);
           }
         }
       }
       
-      // Generate scene without characters using FAL Nano Banana
-      console.log('Generating scene without characters using FAL Nano Banana');
-      const result = await trpcClient.fal.generateImage.mutate({
-        prompt: `${prompt}, cinematic scene, high quality, detailed environment, clean uniform background, no text, no letters, no words`,
-        model: 'fal-ai/nano-banana',
-        imageSize: 'landscape_16_9', // Better for scenes
-        numImages: 1
-      });
+      // For scenes without characters, we need a base image to transform
+      // We'll create a simple base composition and then enhance it with Qwen
+      console.log('🎨 Generating scene without characters using Qwen image-edit-plus');
       
-      if (result.status !== 'completed' || !result.imageUrl) {
-        throw new Error(result.error || 'Failed to generate scene image');
+      try {
+        // First, generate a basic composition with Nano Banana
+        const baseResult = await trpcClient.fal.generateImage.mutate({
+          prompt: `simple basic composition for: ${prompt}, rough sketch, basic layout`,
+          model: 'fal-ai/nano-banana',
+          imageSize: imageFormat,
+          numImages: 1
+        });
+        
+        if (baseResult.status !== 'completed' || !baseResult.imageUrl) {
+          throw new Error('Failed to generate base composition');
+        }
+        
+        console.log('✅ Base composition generated, now enhancing with Qwen...');
+        
+        // Then enhance it with Qwen image-edit-plus for higher quality
+        const enhancedResult = await trpcClient.fal.imageToImage.mutate({
+          prompt: `${prompt}, cinematic scene, high quality, detailed environment, professional photography, dramatic lighting`,
+          imageUrls: [baseResult.imageUrl],
+          imageSize: imageFormat,
+          numImages: 1,
+          negativePrompt: "blurry, low quality, distorted, sketch, rough, unfinished"
+        });
+        
+        if (enhancedResult.status !== 'completed' || !enhancedResult.imageUrl) {
+          throw new Error(enhancedResult.error || 'Failed to enhance scene with Qwen');
+        }
+        
+        console.log('🎉 QWEN ENHANCED SCENE SUCCESSFUL!');
+        return { success: true, imageUrl: enhancedResult.imageUrl };
+      } catch (error) {
+        console.error('❌ QWEN ENHANCEMENT FAILED, falling back to basic generation:', error);
+        
+        // Fallback to basic Nano Banana generation
+        const fallbackResult = await trpcClient.fal.generateImage.mutate({
+          prompt: `${prompt}, cinematic scene, high quality, detailed environment`,
+          model: 'fal-ai/nano-banana',
+          imageSize: imageFormat,
+          numImages: 1
+        });
+        
+        if (fallbackResult.status !== 'completed' || !fallbackResult.imageUrl) {
+          throw new Error(fallbackResult.error || 'Failed to generate scene image');
+        }
+        
+        return { success: true, imageUrl: fallbackResult.imageUrl };
       }
-      
-      return { success: true, imageUrl: result.imageUrl };
     },
     onSuccess: (data) => {
       if (data.imageUrl) {
@@ -610,21 +502,54 @@ function UniverseTimelineEditor() {
     }
   }, [videoDescription, generateImageMutation]);
 
-  // Handle video generation with LumaAI using existing video service
+  // Handle video generation with multiple models
   const generateVideoMutation = useMutation({
     mutationFn: async ({ imageUrl, prompt }: { imageUrl: string; prompt?: string }) => {
       console.log('Generating video with:', {
         imageUrl,
-        prompt: prompt || videoDescription
+        prompt: prompt || videoDescription,
+        model: selectedVideoModel
       });
       
-      const result = await trpcClient.video.generateAndWait.mutate({
-        prompt: prompt || videoDescription,
-        imageUrl, // Use the actual generated image
-        model: 'ray-flash-2', // Fast model like in Python test
-        duration: '5s'
-      });
-      return result;
+      const finalPrompt = videoPrompt.trim() || prompt || videoDescription;
+      
+      if (selectedVideoModel === 'fal-veo3') {
+        const result = await trpcClient.fal.generateVideo.mutate({
+          prompt: finalPrompt,
+          imageUrl,
+          model: "fal-ai/veo3/fast/image-to-video",
+          duration: 5,
+          aspectRatio: videoRatio,
+          motionStrength: 127,
+          negativePrompt: negativePrompt || undefined
+        });
+        console.log('Veo3 video result:', result);
+        return { videoUrl: result.videoUrl };
+      } else if (selectedVideoModel === 'fal-kling') {
+        const result = await trpcClient.fal.klingVideo.mutate({
+          prompt: finalPrompt,
+          imageUrl,
+          duration: 5,
+          aspectRatio: videoRatio,
+          negativePrompt: negativePrompt || undefined,
+          cfgScale: 0.5
+        });
+        console.log('Kling video result:', result);
+        return { videoUrl: result.videoUrl }; // Use actual video URL
+      } else if (selectedVideoModel === 'fal-wan25') {
+        const result = await trpcClient.fal.wan25ImageToVideo.mutate({
+          prompt: finalPrompt,
+          imageUrl,
+          duration: 5,
+          resolution: "1080p",
+          negativePrompt: negativePrompt || undefined,
+          enablePromptExpansion: true
+        });
+        console.log('Wan25 video result:', result);
+        return { videoUrl: result.videoUrl }; // Use actual video URL
+      }
+      
+      throw new Error('Invalid video model selected');
     },
     onSuccess: (data) => {
       if (data.videoUrl) {
@@ -771,12 +696,18 @@ function UniverseTimelineEditor() {
       let previousNodeId: number;
       
       if (additionType === 'branch' && sourceNodeId) {
-        // For branches, use the source node as previous
-        previousNodeId = parseInt(sourceNodeId);
-        console.log('Creating branch from event:', sourceNodeId);
+        // For branches, extract numeric part from sourceNodeId (e.g., "4c" -> 4)
+        const numericPart = sourceNodeId.match(/^\d+/);
+        previousNodeId = numericPart ? parseInt(numericPart[0]) : 0;
+        console.log('Creating branch from event:', sourceNodeId, '-> numeric:', previousNodeId);
       } else {
-        // For linear continuation, find the last node ID
-        previousNodeId = Math.max(...(graphData.nodeIds.map(id => Number(id)) || [0]), 0);
+        // For linear continuation, find the last node ID (extract numeric parts)
+        const numericIds = graphData.nodeIds.map(id => {
+          const idStr = String(id);
+          const numericPart = idStr.match(/^\d+/);
+          return numericPart ? parseInt(numericPart[0]) : 0;
+        });
+        previousNodeId = Math.max(...(numericIds || [0]), 0);
         console.log('Creating linear continuation after event:', previousNodeId);
       }
       
@@ -842,23 +773,6 @@ function UniverseTimelineEditor() {
     }
   }, [generatedVideoUrl, videoTitle, videoDescription, graphData.nodeIds, writeContractAsync, isBlockchainUniverse, id, chainId]);
 
-  // Debug function to test Filecoin functionality without generating video
-  const handleDebugFilecoin = useCallback(async () => {
-    // Use a 10-second, 1MB test video that should work reliably
-    const mockVideoUrl = "https://test-videos.co.uk/vids/bigbuckbunny/mp4/av1/360/Big_Buck_Bunny_360_10s_1MB.mp4";
-    const mockTitle = "Debug Test Video";
-    const mockDescription = "Testing Filecoin upload functionality";
-    
-    // Set the mock data
-    setGeneratedVideoUrl(mockVideoUrl);
-    setVideoTitle(mockTitle);
-    setVideoDescription(mockDescription);
-    setShowVideoStep(true);
-    
-    console.log('Debug: Set up mock video data for testing with URL:', mockVideoUrl);
-  }, []);
-
-
   // Manual refresh function
   const handleRefreshTimeline = useCallback(async () => {
     console.log('Manually refreshing timeline...');
@@ -888,10 +802,15 @@ function UniverseTimelineEditor() {
     setUploadedUrl(null);
     setContractSaved(false);
     setIsSavingToContract(false);
+    setSelectedVideoModel('fal-veo3'); // Reset to default
+    setNegativePrompt(""); // Reset negative prompt
+    setVideoPrompt(""); // Reset video prompt
+    setVideoRatio("16:9"); // Reset video ratio
+    setImageFormat('landscape_16_9'); // Reset image format
     setShowVideoDialog(true);
   }, []);
 
-  // Handle creating actual event after dialog submission
+  // Handle creating actual event after dialog submission - Keep universe branch logic
   const handleCreateEvent = useCallback(() => {
     if (!videoTitle.trim()) return;
 
@@ -916,31 +835,70 @@ function UniverseTimelineEditor() {
       }))
     });
     
-    // Generate UUID-based event ID for better protocol compatibility
-    const generateEventId = () => {
-      // Generate a short UUID-like identifier (8 characters)
-      return Math.random().toString(36).substr(2, 8).toUpperCase();
-    };
-    
+    // Generate appropriate event ID based on addition type - Keep universe branch logic
     let newEventId: string;
     let newAddId: string;
     
-    // Always generate a unique ID regardless of addition type
-    newEventId = generateEventId();
-    newAddId = `add-${newEventId}`;
-    
-    // Ensure uniqueness by checking existing IDs
-    while (nodes.some(n => n.data.eventId === newEventId || n.id === newEventId)) {
-      newEventId = generateEventId();
+    if (additionType === 'branch' && sourceNodeId) {
+      // For branches, add a letter suffix to the source node ID
+      const sourceEventId = sourceNodeId;
+      
+      // Find all existing branches from this source node
+      const existingBranches = nodes.filter((n: any) => {
+        const eventId = n.data.eventId?.toString();
+        return eventId && eventId.startsWith(sourceEventId) && /[a-z]/.test(eventId);
+      });
+      
+      // Determine the next branch letter
+      const branchLetter = String.fromCharCode(98 + existingBranches.length); // 'b', 'c', 'd', etc.
+      newEventId = `${sourceEventId}${branchLetter}`;
+      newAddId = `add-${newEventId}`;
+      
+      console.log('Creating branch:', {
+        sourceEventId,
+        existingBranches: existingBranches.map(n => n.data.eventId),
+        newEventId
+      });
+    } else {
+      // For linear continuation, determine if we're continuing a branch or main timeline
+      const sceneNodes = nodes.filter((n: any) => n.data.nodeType === 'scene');
+      
+      if (sceneNodes.length === 0) {
+        // First event
+        newEventId = "1";
+      } else {
+        // Find the rightmost (last added) event to continue from
+        const lastNode = sceneNodes.reduce((latest: any, node: any) => {
+          if (!latest) return node;
+          // Compare positions to find the rightmost node
+          return node.position.x > latest.position.x ? node : latest;
+        }, null);
+        
+        const lastEventId = lastNode?.data.eventId?.toString();
+        console.log('Last event ID for continuation:', lastEventId);
+        
+        if (lastEventId && /[a-z]/.test(lastEventId)) {
+          // We're continuing a branch (e.g., from "1b" to "1c")
+          const baseNumber = lastEventId.replace(/[a-z]/g, '');
+          const lastLetter = lastEventId.match(/[a-z]/)?.[0] || 'a';
+          const nextLetter = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
+          newEventId = `${baseNumber}${nextLetter}`;
+        } else {
+          // We're continuing the main timeline (e.g., from "2" to "3")
+          const maxEventId = sceneNodes.reduce((max: number, node: any) => {
+            const eventId = node.data.eventId;
+            if (eventId) {
+              // Extract numeric part only (ignore branch suffixes like 'b', 'c')
+              const numericId = parseInt(eventId.toString().replace(/[a-z]/g, ''));
+              return !isNaN(numericId) ? Math.max(max, numericId) : max;
+            }
+            return max;
+          }, 0);
+          newEventId = String(maxEventId + 1);
+        }
+      }
       newAddId = `add-${newEventId}`;
     }
-    
-    console.log('Generated new event ID:', {
-      newEventId,
-      additionType,
-      sourceNodeId,
-      isUnique: !nodes.some(n => n.data.eventId === newEventId || n.id === newEventId)
-    });
     
     console.log('handleCreateEvent debug:', { 
       additionType, 
@@ -955,21 +913,19 @@ function UniverseTimelineEditor() {
     let newAddPosition;
     
     if (additionType === 'branch' && sourceNode) {
-      // Create branch: forward and below the source node
-      const branchY = sourceNode.position.y + 220; // Increased from 150 to 220
-      newEventPosition = { x: sourceNode.position.x + 480, y: branchY }; // Increased from 280 to 480
-      newAddPosition = { x: sourceNode.position.x + 960, y: branchY }; // Increased from 630 to 960
+      // Create branch: forward and below the source node - increased spacing
+      const branchY = sourceNode.position.y + 350; // Increased from 220 to 350
+      newEventPosition = { x: sourceNode.position.x + 480, y: branchY };
+      newAddPosition = { x: sourceNode.position.x + 960, y: branchY };
     } else {
       // Linear addition to the right
       const rightmostX = nodes.length > 0 ? Math.max(...nodes.map((n: any) => n.position.x)) : 100;
-      newEventPosition = { x: rightmostX + 480, y: 200 }; // Increased from 320 to 480
-      newAddPosition = { x: rightmostX + 960, y: 200 }; // Increased from 670 to 960
+      newEventPosition = { x: rightmostX + 480, y: 200 };
+      newAddPosition = { x: rightmostX + 960, y: 200 };
     }
 
-    // Generate user-friendly display name showing UUID
-    const displayName = additionType === 'branch' 
-      ? `${newEventId}` 
-      : `${newEventId}`;
+    // Generate user-friendly display name - Keep it simple for universe branch
+    const displayName = newEventId;
     
     // Create new event node
     const newEventNode: Node<TimelineNodeData> = {
@@ -1043,6 +999,43 @@ function UniverseTimelineEditor() {
     setEdges([...filteredEdges, ...newEdges]);
     setEventCounter(prev => prev + 1);
     
+    // Save event data to localStorage for ALL events (not just branched)
+    console.log('🔍 Checking if should save event:', {
+      newEventId,
+      additionType,
+      isBranched: /[a-z]/.test(newEventId),
+      hasVideo: !!generatedVideoUrl,
+      hasImage: !!generatedImageUrl
+    });
+    
+    // Save ALL events to localStorage for now (easier debugging)
+    const eventData = {
+      eventId: newEventId,
+      title: videoTitle,
+      description: videoDescription,
+      videoUrl: generatedVideoUrl,
+      imageUrl: generatedImageUrl,
+      sourceNodeId: sourceNodeId,
+      additionType: additionType,
+      timestamp: Date.now(),
+      position: newEventPosition
+    };
+    
+    // Store in universe-specific localStorage
+    const storageKey = `universe_events_${id}`;
+    const existingEvents = localStorage.getItem(storageKey);
+    const eventsData = existingEvents ? JSON.parse(existingEvents) : {};
+    
+    eventsData[newEventId] = eventData;
+    localStorage.setItem(storageKey, JSON.stringify(eventsData));
+    
+    console.log('💾 Saved event to localStorage:', {
+      key: storageKey,
+      eventId: newEventId,
+      eventData,
+      allEvents: eventsData
+    });
+    
     // Close dialog and reset
     setShowVideoDialog(false);
     setVideoTitle("");
@@ -1051,7 +1044,7 @@ function UniverseTimelineEditor() {
     setGeneratedImageUrl(null);
     setGeneratedVideoUrl(null);
     setShowVideoStep(false);
-  }, [nodes, edges, eventCounter, id, videoTitle, videoDescription, additionType, sourceNodeId, handleAddEvent]);
+  }, [nodes, edges, eventCounter, id, videoTitle, videoDescription, additionType, sourceNodeId, handleAddEvent, generatedVideoUrl, generatedImageUrl]);
 
   // Convert blockchain data to timeline nodes
   useEffect(() => {
@@ -1059,8 +1052,8 @@ function UniverseTimelineEditor() {
 
     const blockchainNodes: Node<TimelineNodeData>[] = [];
     const blockchainEdges: Edge[] = [];
-    const horizontalSpacing = 480; // Increased from 320 to 480 for more space between events
-    const verticalSpacing = 220;   // Increased from 150 to 220 for more space between branches
+    const horizontalSpacing = 480; // Space between events horizontally
+    const verticalSpacing = 350;   // Increased from 220 to 350 for much more space between branches
     const startY = 200;
 
     // Colors for different types
@@ -1083,10 +1076,21 @@ function UniverseTimelineEditor() {
       nodesByParent.get(parentId)!.push(nodeId);
     });
     
-    // Generate meaningful display names for blockchain nodes
-    const getDisplayName = (nodeId: number, parentId: number): string => {
-      // Just use the node ID for blockchain nodes
-      return nodeId.toString();
+    // Generate proper event labels based on branching structure
+    const getEventLabel = (nodeId: number, parentId: number): string => {
+      if (parentId === 0) return nodeId.toString(); // Root nodes keep numeric ID
+      
+      const siblings = nodesByParent.get(parentId) || [];
+      const siblingIndex = siblings.indexOf(nodeId);
+      
+      if (siblingIndex === 0) {
+        // First child continues the main timeline
+        return nodeId.toString();
+      } else {
+        // Additional children are branches with letter suffixes
+        const branchLetter = String.fromCharCode(97 + siblingIndex); // 'b', 'c', 'd', etc.
+        return `${parentId}${branchLetter}`;
+      }
     };
     
     // Create nodes from blockchain data with proper branching layout
@@ -1100,10 +1104,8 @@ function UniverseTimelineEditor() {
         ? (typeof previousNode === 'bigint' ? Number(previousNode) : parseInt(String(previousNode)))
         : 0;
       
-      // Generate display name for UI
-      const displayName = getDisplayName(nodeId, parentId);
-      // Use nodeId as the actual eventId for uniqueness
-      const eventId = nodeId.toString();
+      // Generate proper event label
+      const eventLabel = getEventLabel(nodeId, parentId);
       
       // Calculate position based on branching structure
       let x: number, y: number;
@@ -1124,7 +1126,7 @@ function UniverseTimelineEditor() {
           x = 100 + ((parentIndex + 1) * horizontalSpacing);
           y = startY;
         } else {
-          // Branch
+          // Branch - much more vertical space
           x = 100 + ((parentIndex + 1) * horizontalSpacing);
           y = startY + (siblingIndex * verticalSpacing);
         }
@@ -1135,7 +1137,7 @@ function UniverseTimelineEditor() {
       const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
       
       // Debug: Log the node creation data
-      console.log(`Creating node ${nodeId} (${displayName}):`, { 
+      console.log(`Creating node ${nodeId} (${eventLabel}):`, { 
         url, description, previousNode, parentId, position: { x, y }
       });
       
@@ -1146,13 +1148,13 @@ function UniverseTimelineEditor() {
         data: {
           label: description && description.length > 0 && description !== `Timeline event ${nodeId}` 
             ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
-            : displayName,
-          description: description || `Timeline event ${nodeId}`,
+            : `Event ${eventLabel}`,
+          description: description || `Timeline event ${eventLabel}`,
           videoUrl: url,
           timelineColor: color,
           nodeType: 'scene',
-          eventId: eventId, // Use nodeId for uniqueness
-          displayName: displayName, // User-friendly display name
+          eventId: eventLabel, // Use the proper event label (e.g., "2b" for branches)
+          displayName: eventLabel, // User-friendly display name
           timelineId: `timeline-1`,
           universeId: finalUniverse?.id || id,
           isRoot: String(previousNode) === '0' || !previousNode,
@@ -1213,7 +1215,7 @@ function UniverseTimelineEditor() {
     setNodes(blockchainNodes as any);
     setEdges(blockchainEdges);
     setEventCounter(graphData.nodeIds.length + 1);
-  }, [graphData, universe?.id, id]);
+  }, [graphData, finalUniverse?.id, id, handleAddEvent]);
 
   // Handle connections between nodes
   const onConnect = useCallback(
@@ -1272,27 +1274,6 @@ function UniverseTimelineEditor() {
 
   const isLoadingAny = isLoadingLeaves || isLoadingFullGraph || isLoadingUniverse;
 
-  // Loading state - only show loading if we're actually loading blockchain data
-  if (isLoadingUniverse || (isBlockchainUniverse && (isLoadingLeaves || isLoadingFullGraph))) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading universe timeline...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // For blockchain universes, create a default universe object if not found in localStorage
-  const finalUniverse = universe || (isBlockchainUniverse ? {
-    id: id,
-    name: `Universe ${id.slice(0, 8)}...`,
-    description: 'Blockchain-based cinematic universe',
-    address: id,
-    isDefault: false
-  } : null);
-
   // Not found state - only for non-blockchain universes
   if (!isBlockchainUniverse && !finalUniverse) {
     return (
@@ -1308,171 +1289,49 @@ function UniverseTimelineEditor() {
     );
   }
 
-  return (
-    <div className="flex h-screen bg-background">
-      {/* Left Sidebar */}
-      <div className="w-5 hover:w-80 border-r bg-card p-4 overflow-y-auto transition-all duration-300 overflow-hidden whitespace-nowrap">
-        <div className="space-y-6">
-          {/* Back Button */}
-          <div>
-            <Button variant="ghost" size="sm" asChild className="mb-4">
-              <Link to="/universes">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Universes
-              </Link>
-            </Button>
-          </div>
-
-          {/* Universe Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-4 w-4" />
-                Universe Info
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="universe-name">Name</Label>
-                <div className="text-sm font-medium">{finalUniverse?.name}</div>
-              </div>
-              <div>
-                <Label htmlFor="universe-description">Description</Label>
-                <div className="text-sm text-muted-foreground">{finalUniverse?.description}</div>
-              </div>
-              {!finalUniverse?.isDefault && (
-                <div className="text-xs text-muted-foreground">
-                  <div>Creator: {finalUniverse?.creator?.slice(0, 6)}...{finalUniverse?.creator?.slice(-4)}</div>
-                  <div>Contract: {finalUniverse?.address?.slice(0, 6)}...{finalUniverse?.address?.slice(-4)}</div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-
-          {/* Add Event */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Plus className="h-4 w-4" />
-                Add Event
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button onClick={() => handleAddEvent('after')} className="w-full">
-                <Plus className="h-4 w-4 mr-2" />
-                Add New Event
-              </Button>
-              <Button 
-                onClick={handleRefreshTimeline} 
-                variant="outline" 
-                size="sm"
-                className="w-full"
-              >
-                <RefreshCw className="h-3 w-3 mr-2" />
-                Refresh Timeline
-              </Button>
-            </CardContent>
-          </Card>
-
-
-          {/* Selected Event */}
-          {selectedNode && selectedNode.data.nodeType === 'scene' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Film className="h-4 w-4" />
-                  Edit Event
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="event-title">Event Title</Label>
-                  <Input
-                    id="event-title"
-                    value={selectedEventTitle}
-                    onChange={(e: any) => setSelectedEventTitle(e.target.value)}
-                    placeholder="Enter event title"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="event-description">Description</Label>
-                  <textarea
-                    id="event-description"
-                    value={selectedEventDescription}
-                    onChange={(e: any) => setSelectedEventDescription(e.target.value)}
-                    placeholder="Describe this event"
-                    rows={3}
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                  />
-                </div>
-                <Button onClick={updateSelectedNode} className="w-full">
-                  Update Event
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Timeline Stats */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Clock className="h-4 w-4" />
-                Timeline Stats
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Total Events:</span>
-                <span className="text-sm font-medium">{nodes.filter((n: any) => n.data.nodeType === 'scene').length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Blockchain Nodes:</span>
-                <span className="text-sm font-medium">{graphData.nodeIds.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Universe ID:</span>
-                <span className="text-sm font-mono text-xs">{id}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Status:</span>
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isLoadingAny ? 'bg-yellow-500' : nodes.length > 0 ? 'bg-green-500' : 'bg-gray-400'}`} />
-                  <span className="text-xs">
-                    {isLoadingAny ? 'Loading...' : nodes.length > 0 ? 'Active' : 'Empty'}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+  // Loading state
+  if (isLoadingUniverse || (isBlockchainUniverse && (isLoadingLeaves || isLoadingFullGraph))) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading universe timeline...</p>
         </div>
       </div>
+    );
+  }
 
-      {/* Timeline Flow */}
-      <div className="flex-1">
+  return (
+    <div className="flex h-full bg-background overflow-hidden">
+      {/* Left Sidebar Component */}
+      <UniverseSidebar
+        finalUniverse={finalUniverse}
+        graphData={graphData}
+        leavesData={leavesData}
+        nodes={nodes}
+        isLoadingAny={isLoadingAny}
+        selectedNode={selectedNode}
+        handleAddEvent={handleAddEvent}
+        handleRefreshTimeline={handleRefreshTimeline}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <ReactFlowProvider>
-          <div ref={reactFlowWrapper} className="h-full w-full">
+          <div className="flex-1 relative overflow-hidden">
             <ReactFlow
               nodes={nodes}
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
-              onNodeClick={onNodeClick}
               nodeTypes={nodeTypes}
               fitView
-              fitViewOptions={{
-                padding: 0.2,
-                includeHiddenNodes: false,
-              }}
-              defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-              minZoom={0.3}
+              className="bg-gradient-to-br from-background via-background/95 to-muted/20"
+              minZoom={0.1}
               maxZoom={2}
-              snapToGrid={true}
-              snapGrid={[20, 20]}
-              connectionLineStyle={{ stroke: '#10b981', strokeWidth: 2 }}
             >
-              <Background gap={20} size={1} color="#f1f5f9" />
+              <Background />
               <Controls />
               
               <Panel position="top-center" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
@@ -1493,581 +1352,64 @@ function UniverseTimelineEditor() {
         </ReactFlowProvider>
       </div>
 
-      {/* Event Creation Modal with Image and Video Generation */}
+      {/* Right Sidebar - Event Creation */}
       {showVideoDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <Card className="w-full max-w-lg mx-4 my-8 max-h-[90vh] overflow-y-auto">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Film className="h-5 w-5" />
-                Create Scene with AI Generation
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {additionType === 'branch' ? 'Create a new story branch' : 'Continue the timeline'}
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="video-title">Scene Title</Label>
-                <Input
-                  id="video-title"
-                  value={videoTitle}
-                  onChange={(e) => setVideoTitle(e.target.value)}
-                  placeholder="Enter scene title"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="video-description">Scene Description</Label>
-                <textarea
-                  id="video-description"
-                  value={videoDescription}
-                  onChange={(e) => setVideoDescription(e.target.value)}
-                  placeholder="Describe what happens in this scene in detail... This will be used to generate the first frame image."
-                  rows={4}
-                  className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                />
-              </div>
-
-              {/* Character Selection Section */}
-              <div className="border rounded-lg p-4 bg-muted/20">
-                <div className="flex items-center justify-between mb-3">
-                  <Label className="text-sm font-medium">Characters in Scene</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowCharacterSelector(!showCharacterSelector)}
-                      disabled={isLoadingCharacters}
-                    >
-                      <UserPlus className="h-3 w-3 mr-1" />
-                      Select
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setShowCharacterGenerator(true);
-                        setCharacterName('');
-                        setCharacterDescription('');
-                        setCharacterStyle('cute');
-                      }}
-                      className="bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
-                    >
-                      <Wand2 className="h-3 w-3 mr-1" />
-                      Generate
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Selected Characters Display */}
-                {selectedCharacters.length > 0 && charactersData?.characters && (
-                  <div className="space-y-2 mb-2">
-                    {selectedCharacters.map(charId => {
-                      const char = charactersData.characters.find((c: any) => c.id === charId);
-                      if (!char) return null;
-                      return (
-                        <div key={charId} className="bg-background p-2 rounded-md border">
-                          <div className="flex items-center gap-2 mb-1">
-                            <img src={char.image_url} alt={char.character_name} className="w-8 h-8 rounded-full object-cover" />
-                            <div className="flex-1">
-                              <span className="text-sm font-medium">{char.character_name}</span>
-                              <div className="text-xs text-muted-foreground">{char.collection}</div>
-                            </div>
-                            <button
-                              onClick={() => setSelectedCharacters(prev => prev.filter(id => id !== charId))}
-                              className="text-muted-foreground hover:text-destructive"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Character Selector Dropdown */}
-                {showCharacterSelector && charactersData?.characters && (
-                  <div className="mt-2 max-h-48 overflow-y-auto border rounded-md bg-background">
-                    {charactersData.characters.map((character: any) => (
-                      <div
-                        key={character.id}
-                        onClick={() => {
-                          if (!selectedCharacters.includes(character.id)) {
-                            setSelectedCharacters(prev => [...prev, character.id]);
-                          }
-                          setShowCharacterSelector(false);
-                        }}
-                        className="p-2 hover:bg-muted cursor-pointer flex items-center gap-2"
-                      >
-                        <img src={character.image_url} alt={character.character_name} className="w-8 h-8 rounded object-cover" />
-                        <div className="flex-1">
-                          <div className="text-sm font-medium">{character.character_name}</div>
-                          <div className="text-xs text-muted-foreground">{character.collection}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {selectedCharacters.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Add characters to include them in the generated scene
-                  </p>
-                )}
-              </div>
-
-              {/* Step 1: Generate Image */}
-              {!generatedImageUrl && (
-                <div className="border rounded-lg p-4 bg-muted/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">1</span>
-                    <Label className="text-sm font-medium">
-                      {selectedCharacters.length > 0 ? 'Edit Characters into Scene' : 'Generate First Frame'}
-                    </Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    {selectedCharacters.length > 0 
-                      ? `Edit ${selectedCharacters.length} character(s) into the scene using Nano Banana AI`
-                      : 'Generate an image based on your scene description'
-                    }
-                  </p>
-                  <div className="space-y-2">
-                    <Button
-                      onClick={handleGenerateEventImage}
-                      disabled={!videoDescription.trim() || isGeneratingImage}
-                      className="w-full"
-                      variant="secondary"
-                    >
-                      {isGeneratingImage ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          {selectedCharacters.length > 0 ? 'Editing Characters...' : 'Generating Image...'}
-                        </>
-                      ) : (
-                        <>
-                          {selectedCharacters.length > 0 ? (
-                            <>
-                              <Wand2 className="h-4 w-4 mr-2" />
-                              Edit Characters into Scene
-                            </>
-                          ) : (
-                            <>
-                              <Image className="h-4 w-4 mr-2" />
-                              Generate First Frame
-                            </>
-                          )}
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Show Generated Image */}
-              {generatedImageUrl && (
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-6 h-6 rounded-full bg-green-500 text-white text-sm flex items-center justify-center">✓</span>
-                    <Label className="text-sm font-medium">First Frame Generated</Label>
-                  </div>
-                  <img 
-                    src={generatedImageUrl} 
-                    alt="Generated first frame" 
-                    className="w-full max-h-48 object-cover rounded-lg border"
-                  />
-                  
-                  {/* Upload to tmpfiles.org */}
-                  <div className="mt-3 space-y-2">
-                    <Button
-                      onClick={uploadToTmpfiles}
-                      disabled={isUploading}
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                    >
-                      {isUploading ? (
-                        <>
-                          <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                          Uploading to tmpfiles.org...
-                        </>
-                      ) : (
-                        <>
-                          <Image className="h-3 w-3 mr-2" />
-                          Upload to tmpfiles.org
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Generate Video */}
-              {showVideoStep && !generatedVideoUrl && (
-                <div className="border rounded-lg p-4 bg-muted/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">2</span>
-                    <Label className="text-sm font-medium">Generate Video with LumaAI</Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Create a video animation from the generated image
-                  </p>
-                  <Button
-                    onClick={handleGenerateVideo}
-                    disabled={isGeneratingVideo}
-                    className="w-full"
-                  >
-                    {isGeneratingVideo ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating Video...
-                      </>
-                    ) : (
-                      <>
-                        <Film className="h-4 w-4 mr-2" />
-                        Generate Video
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
-
-              {/* Show Generated Video */}
-              {generatedVideoUrl && (
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-6 h-6 rounded-full bg-green-500 text-white text-sm flex items-center justify-center">✓</span>
-                    <Label className="text-sm font-medium">Video Generated</Label>
-                  </div>
-                  {generatedVideoUrl === "placeholder-video-url" ? (
-                    <div className="w-full h-32 bg-muted rounded-lg flex items-center justify-center">
-                      <p className="text-sm text-muted-foreground">Video preview placeholder</p>
-                    </div>
-                  ) : (
-                    <video 
-                      key={generatedVideoUrl} // Force re-render when URL changes
-                      src={generatedVideoUrl}
-                      controls 
-                      className="w-full rounded-lg border"
-                      onError={(e) => {
-                        console.error("Video playback error:", e);
-                        console.error("Failed URL:", generatedVideoUrl);
-                      }}
-                    >
-                      Your browser does not support the video tag.
-                    </video>
-                  )}
-                  
-                  {/* Save to Contract */}
-                  <div className="mt-3 space-y-2">
-                    <Button
-                      onClick={handleSaveToContract}
-                      disabled={isSavingToContract || contractSaved}
-                      variant={contractSaved ? "secondary" : "default"}
-                      size="sm"
-                      className="w-full"
-                    >
-                      {isSavingToContract ? (
-                        <>
-                          <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                          {isSavingToFilecoin ? "Uploading to Filecoin..." : "Saving to Blockchain..."}
-                        </>
-                      ) : contractSaved ? (
-                        <>
-                          <span className="text-green-600">✓</span>
-                          <span className="ml-2">Saved to Timeline & Filecoin</span>
-                        </>
-                      ) : (
-                        <>
-                          <Film className="h-3 w-3 mr-2" />
-                          Save to Timeline & Filecoin
-                        </>
-                      )}
-                    </Button>
-                    
-                    {contractSaved && (
-                      <div className="p-2 bg-green-50 border border-green-200 rounded text-xs">
-                        <div className="text-green-700 font-medium">
-                          ✅ Successfully saved to universe timeline{filecoinSaved ? " and Filecoin" : ""}!
-                        </div>
-                        {filecoinSaved && pieceCid && (
-                          <div className="text-blue-600 mt-1">
-                            Filecoin PieceCID: <code className="bg-blue-100 px-1 rounded text-xs">{pieceCid}</code>
-                          </div>
-                        )}
-                        <div className="text-green-600 mt-1">
-                          Your scene is now part of the universe timeline{filecoinSaved ? " with permanent decentralized storage" : ""} and will be visible to all users.
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {/* Debug Section - only show in development */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="border-t pt-4 mt-4">
-                  <div className="text-xs text-muted-foreground mb-2">Debug Tools</div>
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={handleDebugFilecoin}
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-xs"
-                      >
-                        🔧 Setup Mock Video
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          // Use a smaller, faster test image instead
-                          const smallTestUrl = "https://httpbin.org/robots.txt";
-                          setGeneratedVideoUrl(smallTestUrl);
-                          setVideoTitle("Small File Test");
-                          setVideoDescription("Testing with small file");
-                          setShowVideoStep(true);
-                          console.log('Debug: Set up small test file:', smallTestUrl);
-                        }}
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-xs"
-                      >
-                        📄 Small Test File
-                      </Button>
-                    </div>
-                    <Button
-                      onClick={() => {
-                        // Clear all state
-                        setGeneratedVideoUrl(null);
-                        setVideoTitle("");
-                        setVideoDescription("");
-                        setShowVideoStep(false);
-                        setContractSaved(false);
-                        setFilecoinSaved(false);
-                        setPieceCid(null);
-                        setIsSavingToContract(false);
-                        setIsSavingToFilecoin(false);
-                        console.log('Debug: Cleared all state');
-                      }}
-                      variant="destructive"
-                      size="sm"
-                      className="w-full text-xs"
-                    >
-                      🗑️ Clear All State
-                    </Button>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowVideoDialog(false)}
-                  className="flex-1"
-                >
-                  Go Back
-                </Button>
-                <Button
-                  onClick={handleCreateEvent}
-                  disabled={!videoTitle.trim()}
-                  className="flex-1"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Scene
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <EventCreationSidebar
+          showVideoDialog={showVideoDialog}
+          setShowVideoDialog={setShowVideoDialog}
+          videoTitle={videoTitle}
+          setVideoTitle={setVideoTitle}
+          videoDescription={videoDescription}
+          setVideoDescription={setVideoDescription}
+          additionType={additionType}
+          selectedCharacters={selectedCharacters}
+          setSelectedCharacters={setSelectedCharacters}
+          showCharacterSelector={showCharacterSelector}
+          setShowCharacterSelector={setShowCharacterSelector}
+          showCharacterGenerator={showCharacterGenerator}
+          setShowCharacterGenerator={setShowCharacterGenerator}
+          charactersData={charactersData}
+          isLoadingCharacters={isLoadingCharacters}
+          characterName={characterName}
+          setCharacterName={setCharacterName}
+          characterDescription={characterDescription}
+          setCharacterDescription={setCharacterDescription}
+          characterStyle={characterStyle}
+          setCharacterStyle={setCharacterStyle}
+          isGeneratingCharacter={isGeneratingCharacter}
+          generatedCharacter={generatedCharacter}
+          setGeneratedCharacter={setGeneratedCharacter}
+          generateCharacterMutation={generateCharacterMutation}
+          saveCharacterMutation={saveCharacterMutation}
+          generatedImageUrl={generatedImageUrl}
+          isGeneratingImage={isGeneratingImage}
+          imageFormat={imageFormat}
+          setImageFormat={setImageFormat}
+          handleGenerateEventImage={handleGenerateEventImage}
+          showVideoStep={showVideoStep}
+          uploadedUrl={uploadedUrl}
+          isUploading={isUploading}
+          uploadToTmpfiles={uploadToTmpfiles}
+          generatedVideoUrl={generatedVideoUrl}
+          isGeneratingVideo={isGeneratingVideo}
+          videoPrompt={videoPrompt}
+          setVideoPrompt={setVideoPrompt}
+          videoRatio={videoRatio}
+          setVideoRatio={setVideoRatio}
+          selectedVideoModel={selectedVideoModel}
+          setSelectedVideoModel={setSelectedVideoModel}
+          negativePrompt={negativePrompt}
+          setNegativePrompt={setNegativePrompt}
+          handleGenerateVideo={handleGenerateVideo}
+          isSavingToContract={isSavingToContract}
+          contractSaved={contractSaved}
+          isSavingToFilecoin={isSavingToFilecoin}
+          filecoinSaved={filecoinSaved}
+          pieceCid={pieceCid}
+          handleSaveToContract={handleSaveToContract}
+          handleCreateEvent={handleCreateEvent}
+        />
       )}
-
-      {/* Character Generation Dialog */}
-      {showCharacterGenerator && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wand2 className="h-5 w-5 text-purple-600" />
-                Generate Character with Nano Banana AI
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="char-name">Character Name</Label>
-                <Input
-                  id="char-name"
-                  value={characterName}
-                  onChange={(e) => setCharacterName(e.target.value)}
-                  placeholder="Enter character name..."
-                  className="mt-1"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="char-desc">Character Description</Label>
-                <textarea
-                  id="char-desc"
-                  value={characterDescription}
-                  onChange={(e) => setCharacterDescription(e.target.value)}
-                  placeholder="Describe your character's appearance and personality..."
-                  rows={3}
-                  className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                />
-              </div>
-              
-              <div>
-                <Label>Art Style</Label>
-                <div className="grid grid-cols-3 gap-2 mt-1">
-                  {['cute', 'realistic', 'anime', 'fantasy', 'cyberpunk'].map((style) => (
-                    <Button
-                      key={style}
-                      type="button"
-                      size="sm"
-                      variant={characterStyle === style ? 'default' : 'outline'}
-                      onClick={() => setCharacterStyle(style as any)}
-                      className="capitalize"
-                    >
-                      {style}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Generated Character Preview */}
-              {generatedCharacter && (
-                <div className="border rounded-lg p-4 bg-muted/20">
-                  <Label className="text-sm font-medium mb-3 block">Generated Character Preview</Label>
-                  <div className="flex flex-col items-center space-y-4">
-                    {/* Large Character Image */}
-                    <img 
-                      src={generatedCharacter.imageUrl} 
-                      alt={generatedCharacter.name}
-                      className="w-64 h-64 object-cover rounded-lg border shadow-lg"
-                    />
-                    
-                    {/* Character Info */}
-                    <div className="text-center space-y-2">
-                      <h3 className="text-lg font-semibold">{generatedCharacter.name}</h3>
-                      <p className="text-sm text-muted-foreground max-w-sm">{generatedCharacter.description}</p>
-                      <div className="text-xs bg-muted px-2 py-1 rounded-full inline-block capitalize">
-                        {generatedCharacter.style} style
-                      </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-3 w-full">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setGeneratedCharacter(null);
-                          setCharacterName('');
-                          setCharacterDescription('');
-                          setCharacterStyle('cute');
-                        }}
-                        className="flex-1"
-                      >
-                        Generate Another
-                      </Button>
-                      <Button
-                        onClick={() => saveCharacterMutation.mutate()}
-                        disabled={saveCharacterMutation.isPending}
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                      >
-                        {saveCharacterMutation.isPending ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add to Database
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Bottom Action Buttons - only show when no character is generated */}
-              {!generatedCharacter && (
-                <div className="flex gap-3 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowCharacterGenerator(false);
-                      setGeneratedCharacter(null);
-                      setCharacterName('');
-                      setCharacterDescription('');
-                      setCharacterStyle('cute');
-                    }}
-                    disabled={isGeneratingCharacter}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={async () => {
-                      if (!characterName.trim() || !characterDescription.trim()) {
-                        alert('Please provide both name and description');
-                        return;
-                      }
-                      setIsGeneratingCharacter(true);
-                      try {
-                        await generateCharacterMutation.mutateAsync({
-                          name: characterName,
-                          description: characterDescription,
-                          style: characterStyle
-                        });
-                      } catch (error) {
-                        console.error('Failed to generate character:', error);
-                      }
-                    }}
-                    disabled={isGeneratingCharacter || !characterName.trim() || !characterDescription.trim()}
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
-                  >
-                    {isGeneratingCharacter ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Generate Character
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
-
-              {/* Close button when character is showing */}
-              {generatedCharacter && (
-                <div className="pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowCharacterGenerator(false);
-                      setGeneratedCharacter(null);
-                      setCharacterName('');
-                      setCharacterDescription('');
-                      setCharacterStyle('cute');
-                    }}
-                    className="w-full"
-                  >
-                    Close
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
     </div>
   );
 }

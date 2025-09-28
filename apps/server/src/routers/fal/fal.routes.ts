@@ -88,6 +88,36 @@ export const falRouter = router({
       }
     }),
 
+  imageToImage: publicProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1).max(2000),
+        imageUrls: z.array(z.string().url()).min(1).max(2),
+        negativePrompt: z.string().max(500).optional(),
+        imageSize: z.union([
+          z.enum(['square_hd', 'square', 'portrait_4_3', 'portrait_16_9', 'landscape_4_3', 'landscape_16_9']),
+          z.object({
+            width: z.number().min(384).max(5000),
+            height: z.number().min(384).max(5000)
+          })
+        ]).optional(),
+        numImages: z.number().min(1).max(4).optional().default(1),
+        seed: z.number().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      console.log("🖼️ === TRPC ROUTER: imageToImage called ===");
+      console.log("Input received:", JSON.stringify(input, null, 2));
+      try {
+        const result = await falService.imageToImage(input);
+        console.log("🖼️ FAL imageToImage service returned:", JSON.stringify(result, null, 2));
+        return result;
+      } catch (error) {
+        console.error("🖼️ FAL imageToImage service error:", error);
+        throw error;
+      }
+    }),
+
   // Character Generation with Nano Banana + DB Save
   generateCharacter: publicProcedure
     .input(
@@ -280,6 +310,8 @@ export const falRouter = router({
             "fal-ai/cogvideox-5b",
             "fal-ai/runway-gen3",
             "fal-ai/veo3/fast/image-to-video",
+            "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+            "fal-ai/wan-25-preview/image-to-video",
           ])
           .optional(),
         imageUrl: z.string().url().optional(),
@@ -291,6 +323,10 @@ export const falRouter = router({
         numInferenceSteps: z.number().min(10).max(50).optional(),
         aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional(),
         motionStrength: z.number().min(1).max(255).optional(),
+        negativePrompt: z.string().optional(),
+        cfgScale: z.number().min(0.1).max(2.0).optional(),
+        resolution: z.enum(["720p", "1080p"]).optional(),
+        enablePromptExpansion: z.boolean().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -337,6 +373,52 @@ export const falRouter = router({
         duration: input.duration,
         aspectRatio: input.aspectRatio,
         motionStrength: input.motionStrength,
+      });
+    }),
+
+  klingVideo: publicProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1),
+        imageUrl: z.string().url(),
+        duration: z.union([z.literal(5), z.literal(10)]).optional().default(5),
+        aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional().default("16:9"),
+        negativePrompt: z.string().optional(),
+        cfgScale: z.number().min(0.1).max(2.0).optional().default(0.5),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return await falService.generateVideo({
+        prompt: input.prompt,
+        imageUrl: input.imageUrl,
+        model: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        negativePrompt: input.negativePrompt,
+        cfgScale: input.cfgScale,
+      });
+    }),
+
+  wan25ImageToVideo: publicProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1),
+        imageUrl: z.string().url(),
+        duration: z.union([z.literal(5), z.literal(10)]).optional().default(5),
+        resolution: z.enum(["720p", "1080p"]).optional().default("1080p"),
+        negativePrompt: z.string().optional(),
+        enablePromptExpansion: z.boolean().optional().default(true),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return await falService.generateVideo({
+        prompt: input.prompt,
+        imageUrl: input.imageUrl,
+        model: "fal-ai/wan-25-preview/image-to-video",
+        duration: input.duration,
+        resolution: input.resolution,
+        negativePrompt: input.negativePrompt,
+        enablePromptExpansion: input.enablePromptExpansion,
       });
     }),
 });

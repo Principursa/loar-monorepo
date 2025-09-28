@@ -51,74 +51,74 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
 
   return (
     <Card 
-      className="cursor-pointer hover:shadow-lg transition-all duration-300 group overflow-hidden"
+      className="cursor-pointer hover:shadow-2xl hover:shadow-primary/20 transition-all duration-500 group overflow-hidden border-0 bg-gradient-to-br from-card via-card to-card/95 hover:scale-[1.02] hover:bg-gradient-to-br hover:from-card hover:via-card/98 hover:to-card/90"
       onClick={() => onSelect(universe.id)}
     >
       <CardContent className="p-0">
         {/* Universe Thumbnail/Header */}
-        <div className="h-32 relative overflow-hidden">
+        <div className="h-36 relative overflow-hidden">
           {universe.image_url ? (
             <>
               <img 
                 src={universe.image_url} 
                 alt={universe.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
               />
               {/* Fallback gradient (shown when image fails) */}
-              <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 -z-10" />
-              <div className="absolute inset-0 bg-black/20" />
+              <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 -z-10" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent group-hover:from-black/30" />
             </>
           ) : (
             <>
-              <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600" />
-              <div className="absolute inset-0 bg-black/20" />
+              <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 group-hover:from-indigo-400 group-hover:via-purple-400 group-hover:to-pink-400 transition-all duration-500" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent group-hover:from-black/30" />
             </>
           )}
-          <div className="absolute top-2 right-2 flex gap-2">
+          <div className="absolute top-3 right-3 flex gap-2">
             {universe.address && (
-              <Badge variant="secondary" className="bg-white/20 text-white border-0">
+              <Badge variant="secondary" className="bg-white/30 backdrop-blur-sm text-white border-0 shadow-lg">
                 <Database className="h-3 w-3 mr-1" />
                 {nodeCountNumber} nodes
               </Badge>
             )}
           </div>
-          <div className="absolute bottom-2 left-2">
-            <div className="text-white text-xs bg-black/40 px-2 py-1 rounded">
+          <div className="absolute bottom-3 left-3">
+            <div className="text-white text-xs bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full font-medium">
               {universe.address ? 'On-chain Timeline' : 'Off-chain'}
             </div>
           </div>
         </div>
         
         {/* Universe Info */}
-        <div className="p-4">
-          <h3 className="font-semibold truncate group-hover:text-primary transition-colors">
+        <div className="p-5">
+          <h3 className="text-lg font-bold truncate group-hover:text-primary transition-colors duration-300">
             {universe.name}
           </h3>
-          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+          <p className="text-sm text-muted-foreground mt-2 line-clamp-2 leading-relaxed">
             {universe.description || "Explore this narrative universe"}
           </p>
           
           {/* Contract Addresses */}
           {universe.address && (
-            <div className="mt-3 space-y-1">
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground">Timeline:</span>
-                <code className="text-xs bg-muted px-1 rounded truncate flex-1">
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground min-w-[60px]">Timeline:</span>
+                <code className="text-xs bg-gradient-to-r from-muted to-muted/80 px-2 py-1 rounded-md truncate flex-1 font-mono">
                   {universe.address.slice(0, 6)}...{universe.address.slice(-4)}
                 </code>
               </div>
               {universe.tokenAddress && (
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-muted-foreground">Token:</span>
-                  <code className="text-xs bg-muted px-1 rounded truncate flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground min-w-[60px]">Token:</span>
+                  <code className="text-xs bg-gradient-to-r from-muted to-muted/80 px-2 py-1 rounded-md truncate flex-1 font-mono">
                     {universe.tokenAddress.slice(0, 6)}...{universe.tokenAddress.slice(-4)}
                   </code>
                 </div>
               )}
               {universe.governanceAddress && (
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-muted-foreground">Governor:</span>
-                  <code className="text-xs bg-muted px-1 rounded truncate flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground min-w-[60px]">Governor:</span>
+                  <code className="text-xs bg-gradient-to-r from-muted to-muted/80 px-2 py-1 rounded-md truncate flex-1 font-mono">
                     {universe.governanceAddress.slice(0, 6)}...{universe.governanceAddress.slice(-4)}
                   </code>
                 </div>
@@ -126,20 +126,20 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
             </div>
           )}
           
-          <div className="flex items-center justify-between mt-3">
-            <span className="text-xs text-muted-foreground">
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
+            <span className="text-xs text-muted-foreground font-medium">
               Created {new Date(universe.createdAt).toLocaleDateString()}
             </span>
             <Button 
               size="sm" 
               variant="ghost" 
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
+              className="opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-primary/10 hover:text-primary"
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect(universe.id);
               }}
             >
-              <Play className="h-3 w-3" />
+              <Play className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -229,16 +229,22 @@ function RouteComponent() {
   const universes = universesData;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-6 py-4">
+      <div className="border-b bg-gradient-to-r from-card via-card/95 to-card/90 backdrop-blur-sm">
+        <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">LOAR Universes</h1>
-              <p className="text-muted-foreground">Select a narrative universe to explore</p>
+            <div className="space-y-1">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                LOAR Universes
+              </h1>
+              <p className="text-muted-foreground text-lg">Select a narrative universe to explore</p>
             </div>
-            <Button onClick={createNewUniverse} className="flex items-center gap-2">
+            <Button 
+              onClick={createNewUniverse} 
+              className="flex items-center gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg hover:shadow-xl transition-all duration-300"
+              size="lg"
+            >
               <Plus className="h-4 w-4" />
               Create Universe
             </Button>
@@ -260,9 +266,9 @@ function RouteComponent() {
       <div className="container mx-auto px-6 py-8">
         {/* Featured Universe Section */}
         {universes.length > 0 && (
-          <section className="mb-12">
-            <h2 className="text-xl font-semibold mb-6">Latest Universe</h2>
-            <div className="relative">
+          <section className="mb-16">
+            <h2 className="text-2xl font-bold mb-8 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">Latest Universe</h2>
+            <div className="relative max-w-md mx-auto lg:max-w-none lg:mx-0">
               <UniverseCard 
                 universe={universes[0]} 
                 onSelect={selectUniverse}
@@ -273,21 +279,30 @@ function RouteComponent() {
 
         {/* All Universes Grid */}
         <section>
-          <h2 className="text-xl font-semibold mb-6">All Universes</h2>
+          <h2 className="text-2xl font-bold mb-8 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">All Universes</h2>
           {universes.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="mb-4">
-                <Users className="h-12 w-12 mx-auto text-muted-foreground" />
+            <div className="text-center py-16">
+              <div className="relative mb-8">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 rounded-full blur-2xl"></div>
+                <div className="relative bg-gradient-to-br from-muted/50 to-muted/30 backdrop-blur-sm rounded-2xl p-8 inline-block">
+                  <Users className="h-16 w-16 mx-auto text-muted-foreground" />
+                </div>
               </div>
-              <h3 className="text-lg font-medium mb-2">No universes yet</h3>
-              <p className="text-muted-foreground mb-4">Create your first narrative universe to get started</p>
-              <Button onClick={createNewUniverse} className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
+              <h3 className="text-2xl font-bold mb-3 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">No universes yet</h3>
+              <p className="text-muted-foreground mb-8 text-lg max-w-md mx-auto leading-relaxed">
+                Create your first narrative universe to get started with collaborative storytelling
+              </p>
+              <Button 
+                onClick={createNewUniverse} 
+                className="flex items-center gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg hover:shadow-xl transition-all duration-300"
+                size="lg"
+              >
+                <Plus className="h-5 w-5" />
                 Create Your First Universe
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {universes.map((universe: any) => (
                 <UniverseCard 
                   key={universe.id}

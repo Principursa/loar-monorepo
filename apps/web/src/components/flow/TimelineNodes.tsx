@@ -141,108 +141,95 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
     );
   }
 
-  // Regular Timeline Event Node
+  // Regular Timeline Event Node - Merged design with best of both branches
   return (
     <>
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
       
       <div className="relative group">
         <div 
-          className={`w-96 h-80 rounded-lg border-2 bg-card hover:bg-card/80 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${data.isRoot ? 'ring-2 ring-primary/50' : ''}`}
+          className={`w-80 h-72 rounded-lg border-2 bg-card hover:bg-card/80 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden ${data.isRoot ? 'ring-2 ring-primary/50' : ''}`}
           style={{ borderColor: data.timelineColor || '#10b981' }}
           onClick={handleClick}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
-          <div className="p-4 h-full flex flex-col">
-            {/* Video Preview - Larger with proper aspect ratio */}
-            <div className="flex-shrink-0 mb-3">
-              <div className="w-full h-44 rounded-md overflow-hidden bg-black relative">
-                {isLoadingFilecoin && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-1"></div>
-                      <p className="text-white text-xs">Loading...</p>
-                    </div>
-                  </div>
-                )}
-                {displayVideoUrl ? (
-                  <>
-                    <video 
-                      className="w-full h-full object-cover"
-                      controls={false}
-                      preload="metadata"
-                      muted
-                      loop
-                      ref={(video) => {
-                        if (video) {
-                          if (isHovered) {
-                            video.play().catch(e => console.log('Video play failed:', e));
-                          } else {
-                            video.pause();
-                            video.currentTime = 0;
-                          }
-                        }
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent node click when using video controls
-                      }}
-                      onError={(e) => {
-                        // Show fallback on error
-                        const video = e.target as HTMLVideoElement;
-                        const container = video.parentElement;
-                        if (container) {
-                          container.innerHTML = `
-                            <div class="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex flex-col items-center justify-center">
-                              <div class="text-white text-3xl mb-2">🎬</div>
-                              <div class="text-white text-sm">Video unavailable</div>
-                            </div>
-                          `;
-                        }
-                      }}
-                    >
-                      <source src={displayVideoUrl} type="video/mp4" />
-                      <source src={displayVideoUrl} />
-                    </video>
-                    
-                    {/* Event ID overlay */}
-                    <div className="absolute top-2 left-2 bg-black/75 text-white text-xs px-2 py-1 rounded">
-                      {data.displayName || `Event ${data.eventId || '?'}`}
-                    </div>
-                  </>
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex flex-col items-center justify-center">
-                    <div className="text-white text-4xl mb-2">🎬</div>
-                    <div className="text-white text-sm">No Video</div>
-                  </div>
-                )}
+          {/* Video Preview - Fixed size with proper containment and hover effects */}
+          <div className="w-full h-52 bg-black relative overflow-hidden">
+            {isLoadingFilecoin && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-1"></div>
+                  <p className="text-white text-xs">Loading...</p>
+                </div>
               </div>
-            </div>
-
-            {/* Event Information */}
-            <div className="flex-1 flex flex-col justify-start min-w-0 space-y-2 max-h-32 overflow-hidden">
-              {/* Event ID and Status */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <div 
-                  className={`w-3 h-3 rounded-full flex-shrink-0 ${data.isRoot ? 'bg-primary' : 'bg-current'}`}
-                  style={{ 
-                    backgroundColor: data.timelineColor || '#10b981'
+            )}
+            {displayVideoUrl ? (
+              <>
+                <video 
+                  className="w-full h-full object-cover"
+                  controls={false}
+                  preload="metadata"
+                  muted
+                  loop
+                  ref={(video) => {
+                    if (video) {
+                      if (isHovered) {
+                        video.play().catch(e => console.log('Video play failed:', e));
+                      } else {
+                        video.pause();
+                        video.currentTime = 0;
+                      }
+                    }
                   }}
-                />
-                <span className="text-lg font-bold text-primary truncate">
-                  {data.displayName || data.eventId || '?'}
-                </span>
-                {data.isRoot && <Badge variant="secondary" className="text-xs flex-shrink-0">Start</Badge>}
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent node click when using video controls
+                  }}
+                  onError={(e) => {
+                    // Show fallback on error
+                    const video = e.target as HTMLVideoElement;
+                    const container = video.parentElement;
+                    if (container) {
+                      container.innerHTML = `
+                        <div class="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex flex-col items-center justify-center">
+                          <div class="text-white text-3xl mb-2">🎬</div>
+                          <div class="text-white text-sm">Video unavailable</div>
+                        </div>
+                      `;
+                    }
+                  }}
+                >
+                  <source src={displayVideoUrl} type="video/mp4" />
+                  <source src={displayVideoUrl} />
+                </video>
+                
+                {/* Event ID overlay - with displayName support */}
+                <div className="absolute top-2 left-2 bg-black/75 text-white text-xs px-2 py-1 rounded">
+                  {data.displayName || `Event ${data.eventId || '?'}`}
+                </div>
+              </>
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex flex-col items-center justify-center">
+                <div className="text-white text-4xl mb-2">🎬</div>
+                <div className="text-white text-sm">No Video</div>
               </div>
-              
-              {/* Description */}
-              <div className="flex-1 min-h-0">
-                <h4 className="text-xs font-medium text-foreground mb-1">Description:</h4>
-                <p className="text-xs text-muted-foreground leading-tight overflow-hidden">
-                  {data.description || 'No description available'}
-                </p>
-              </div>
+            )}
+          </div>
+
+          {/* Event ID and Status - Fixed footer with displayName support */}
+          <div className="p-4 h-20 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div 
+                className={`w-3 h-3 rounded-full flex-shrink-0 ${data.isRoot ? 'bg-primary' : 'bg-current'}`}
+                style={{ 
+                  backgroundColor: data.timelineColor || '#10b981'
+                }}
+              />
+              <span className="text-lg font-bold text-primary truncate">
+                {data.displayName || `Event ${data.eventId || '?'}`}
+              </span>
             </div>
+            {data.isRoot && <Badge variant="secondary" className="text-sm">Start</Badge>}
           </div>
         </div>
         
