@@ -810,18 +810,32 @@ function UniverseTimelineEditor() {
     setShowVideoDialog(true);
   }, []);
 
-  // Handle creating actual event after dialog submission
+  // Handle creating actual event after dialog submission - Keep universe branch logic
   const handleCreateEvent = useCallback(() => {
     if (!videoTitle.trim()) return;
 
     // Find source node if specified
     const sourceNode = sourceNodeId 
-      ? nodes.find(n => n.data.eventId === sourceNodeId)
+      ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
       : null;
     const lastEventNode = nodes.filter((n: any) => n.data.nodeType === 'scene').pop();
     const referenceNode = sourceNode || lastEventNode;
     
-    // Generate appropriate event ID based on addition type
+    // Debug: Log what we found for the source node
+    console.log('handleCreateEvent sourceNode lookup:', {
+      sourceNodeId,
+      foundSourceNode: sourceNode ? {
+        id: sourceNode.id,
+        eventId: sourceNode.data.eventId,
+        position: sourceNode.position
+      } : null,
+      allSceneNodes: nodes.filter(n => n.data.nodeType === 'scene').map(n => ({
+        id: n.id,
+        eventId: n.data.eventId
+      }))
+    });
+    
+    // Generate appropriate event ID based on addition type - Keep universe branch logic
     let newEventId: string;
     let newAddId: string;
     
@@ -910,6 +924,9 @@ function UniverseTimelineEditor() {
       newAddPosition = { x: rightmostX + 960, y: 200 };
     }
 
+    // Generate user-friendly display name - Keep it simple for universe branch
+    const displayName = newEventId;
+    
     // Create new event node
     const newEventNode: Node<TimelineNodeData> = {
       id: newEventId,
@@ -921,6 +938,7 @@ function UniverseTimelineEditor() {
         timelineColor: additionType === 'branch' ? '#f59e0b' : '#10b981',
         nodeType: 'scene',
         eventId: newEventId,
+        displayName: displayName, // User-friendly display name
         timelineId: `timeline-${id}`,
         universeId: id,
         onAddScene: handleAddEvent,
@@ -1026,7 +1044,7 @@ function UniverseTimelineEditor() {
     setGeneratedImageUrl(null);
     setGeneratedVideoUrl(null);
     setShowVideoStep(false);
-  }, [nodes, edges, eventCounter, id, videoTitle, videoDescription, additionType, sourceNodeId, handleAddEvent]);
+  }, [nodes, edges, eventCounter, id, videoTitle, videoDescription, additionType, sourceNodeId, handleAddEvent, generatedVideoUrl, generatedImageUrl]);
 
   // Convert blockchain data to timeline nodes
   useEffect(() => {
@@ -1136,6 +1154,7 @@ function UniverseTimelineEditor() {
           timelineColor: color,
           nodeType: 'scene',
           eventId: eventLabel, // Use the proper event label (e.g., "2b" for branches)
+          displayName: eventLabel, // User-friendly display name
           timelineId: `timeline-1`,
           universeId: finalUniverse?.id || id,
           isRoot: String(previousNode) === '0' || !previousNode,

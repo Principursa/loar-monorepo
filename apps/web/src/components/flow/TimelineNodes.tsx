@@ -15,6 +15,7 @@ export interface TimelineNodeData {
   timelineName?: string;
   isRoot?: boolean;
   eventId?: string;
+  displayName?: string; // User-friendly display name for UI
   timelineId?: string;
   universeId?: string;
   nodeType?: 'scene' | 'branch' | 'add';
@@ -25,6 +26,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
   const navigate = useNavigate();
   const [displayVideoUrl, setDisplayVideoUrl] = useState<string | null>(null);
   const [isLoadingFilecoin, setIsLoadingFilecoin] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   
   // Debug: Log the node data
   console.log('TimelineEventNode data:', data);
@@ -139,7 +141,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
     );
   }
 
-  // Regular Timeline Event Node - Fixed containment and proportions
+  // Regular Timeline Event Node - Merged design with best of both branches
   return (
     <>
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
@@ -149,8 +151,10 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
           className={`w-80 h-72 rounded-lg border-2 bg-card hover:bg-card/80 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md overflow-hidden ${data.isRoot ? 'ring-2 ring-primary/50' : ''}`}
           style={{ borderColor: data.timelineColor || '#10b981' }}
           onClick={handleClick}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
         >
-          {/* Video Preview - Fixed size with proper containment */}
+          {/* Video Preview - Fixed size with proper containment and hover effects */}
           <div className="w-full h-52 bg-black relative overflow-hidden">
             {isLoadingFilecoin && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
@@ -164,8 +168,20 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
               <>
                 <video 
                   className="w-full h-full object-cover"
-                  controls={true}
+                  controls={false}
                   preload="metadata"
+                  muted
+                  loop
+                  ref={(video) => {
+                    if (video) {
+                      if (isHovered) {
+                        video.play().catch(e => console.log('Video play failed:', e));
+                      } else {
+                        video.pause();
+                        video.currentTime = 0;
+                      }
+                    }
+                  }}
                   onClick={(e) => {
                     e.stopPropagation(); // Prevent node click when using video controls
                   }}
@@ -187,9 +203,9 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   <source src={displayVideoUrl} />
                 </video>
                 
-                {/* Event ID overlay */}
+                {/* Event ID overlay - with displayName support */}
                 <div className="absolute top-2 left-2 bg-black/75 text-white text-xs px-2 py-1 rounded">
-                  Event {data.eventId || '?'}
+                  {data.displayName || `Event ${data.eventId || '?'}`}
                 </div>
               </>
             ) : (
@@ -200,7 +216,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
             )}
           </div>
 
-          {/* Event ID and Status - Fixed footer */}
+          {/* Event ID and Status - Fixed footer with displayName support */}
           <div className="p-4 h-20 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div 
@@ -209,8 +225,8 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                   backgroundColor: data.timelineColor || '#10b981'
                 }}
               />
-              <span className="text-lg font-bold text-primary">
-                Event {data.eventId || '?'}
+              <span className="text-lg font-bold text-primary truncate">
+                {data.displayName || `Event ${data.eventId || '?'}`}
               </span>
             </div>
             {data.isRoot && <Badge variant="secondary" className="text-sm">Start</Badge>}
