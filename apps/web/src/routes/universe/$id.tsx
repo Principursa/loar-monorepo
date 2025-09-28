@@ -1,9 +1,5 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ArrowLeft, Film, Plus, Clock, Users, Sparkles, Image, Loader2, RefreshCw, UserPlus, Wand2 } from "lucide-react";
 import ReactFlow, {
   Background,
   Controls,
@@ -28,6 +24,7 @@ import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-t
 import { type Address } from 'viem';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { UniverseSidebar } from '@/components/UniverseSidebar';
+import { EventCreationSidebar } from '@/components/EventCreationSidebar';
 
 // Register custom node types
 const nodeTypes = {
@@ -60,9 +57,9 @@ function UniverseTimelineEditor() {
   const [negativePrompt, setNegativePrompt] = useState("");
   const [videoPrompt, setVideoPrompt] = useState("");
   const [videoRatio, setVideoRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
-  const [imageFormat, setImageFormat] = useState<'landscape_16_9' | 'portrait_16_9' | 'square_hd' | 'landscape_4_3' | 'portrait_4_3' | 'square'>('landscape_16_9');
+  const [imageFormat, setImageFormat] = useState<'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3'>('landscape_16_9');
   
-  // Image generation state (now part of event creation)
+  // Image generation state
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
@@ -192,6 +189,15 @@ function UniverseTimelineEditor() {
   
   // For blockchain universes (addresses starting with 0x), use blockchain data
   const isBlockchainUniverse = id?.startsWith('0x');
+  
+  // For blockchain universes, create a default universe object if not found in localStorage
+  const finalUniverse = universe || (isBlockchainUniverse ? {
+    id: id,
+    name: `Universe ${id.slice(0, 8)}...`,
+    description: 'Blockchain-based cinematic universe',
+    address: id,
+    isDefault: false
+  } : null);
   
   // Each universe with a 0x address IS its own Timeline contract
   // So we use the universe ID as the contract address
@@ -767,9 +773,6 @@ function UniverseTimelineEditor() {
     }
   }, [generatedVideoUrl, videoTitle, videoDescription, graphData.nodeIds, writeContractAsync, isBlockchainUniverse, id, chainId]);
 
-  // Debug function to test Filecoin functionality without generating video
-
-
   // Manual refresh function
   const handleRefreshTimeline = useCallback(async () => {
     console.log('Manually refreshing timeline...');
@@ -896,15 +899,15 @@ function UniverseTimelineEditor() {
     let newAddPosition;
     
     if (additionType === 'branch' && sourceNode) {
-      // Create branch: forward and below the source node
-      const branchY = sourceNode.position.y + 220; // Increased from 150 to 220
-      newEventPosition = { x: sourceNode.position.x + 480, y: branchY }; // Increased from 280 to 480
-      newAddPosition = { x: sourceNode.position.x + 960, y: branchY }; // Increased from 630 to 960
+      // Create branch: forward and below the source node - increased spacing
+      const branchY = sourceNode.position.y + 350; // Increased from 220 to 350
+      newEventPosition = { x: sourceNode.position.x + 480, y: branchY };
+      newAddPosition = { x: sourceNode.position.x + 960, y: branchY };
     } else {
       // Linear addition to the right
       const rightmostX = nodes.length > 0 ? Math.max(...nodes.map((n: any) => n.position.x)) : 100;
-      newEventPosition = { x: rightmostX + 480, y: 200 }; // Increased from 320 to 480
-      newAddPosition = { x: rightmostX + 960, y: 200 }; // Increased from 670 to 960
+      newEventPosition = { x: rightmostX + 480, y: 200 };
+      newAddPosition = { x: rightmostX + 960, y: 200 };
     }
 
     // Create new event node
@@ -1031,8 +1034,8 @@ function UniverseTimelineEditor() {
 
     const blockchainNodes: Node<TimelineNodeData>[] = [];
     const blockchainEdges: Edge[] = [];
-    const horizontalSpacing = 480; // Increased from 320 to 480 for more space between events
-    const verticalSpacing = 220;   // Increased from 150 to 220 for more space between branches
+    const horizontalSpacing = 480; // Space between events horizontally
+    const verticalSpacing = 350;   // Increased from 220 to 350 for much more space between branches
     const startY = 200;
 
     // Colors for different types
@@ -1105,7 +1108,7 @@ function UniverseTimelineEditor() {
           x = 100 + ((parentIndex + 1) * horizontalSpacing);
           y = startY;
         } else {
-          // Branch
+          // Branch - much more vertical space
           x = 100 + ((parentIndex + 1) * horizontalSpacing);
           y = startY + (siblingIndex * verticalSpacing);
         }
@@ -1193,7 +1196,7 @@ function UniverseTimelineEditor() {
     setNodes(blockchainNodes as any);
     setEdges(blockchainEdges);
     setEventCounter(graphData.nodeIds.length + 1);
-  }, [graphData, universe?.id, id]);
+  }, [graphData, finalUniverse?.id, id, handleAddEvent]);
 
   // Handle connections between nodes
   const onConnect = useCallback(
@@ -1252,27 +1255,6 @@ function UniverseTimelineEditor() {
 
   const isLoadingAny = isLoadingLeaves || isLoadingFullGraph || isLoadingUniverse;
 
-  // Loading state - only show loading if we're actually loading blockchain data
-  if (isLoadingUniverse || (isBlockchainUniverse && (isLoadingLeaves || isLoadingFullGraph))) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading universe timeline...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // For blockchain universes, create a default universe object if not found in localStorage
-  const finalUniverse = universe || (isBlockchainUniverse ? {
-    id: id,
-    name: `Universe ${id.slice(0, 8)}...`,
-    description: 'Blockchain-based cinematic universe',
-    address: id,
-    isDefault: false
-  } : null);
-
   // Not found state - only for non-blockchain universes
   if (!isBlockchainUniverse && !finalUniverse) {
     return (
@@ -1288,8 +1270,20 @@ function UniverseTimelineEditor() {
     );
   }
 
+  // Loading state
+  if (isLoadingUniverse || (isBlockchainUniverse && (isLoadingLeaves || isLoadingFullGraph))) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading universe timeline...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-full bg-background">
+    <div className="flex h-full bg-background overflow-hidden">
       {/* Left Sidebar Component */}
       <UniverseSidebar
         finalUniverse={finalUniverse}
@@ -1302,787 +1296,101 @@ function UniverseTimelineEditor() {
         handleRefreshTimeline={handleRefreshTimeline}
       />
 
-      {/* Timeline Flow */}
-      <div className="flex-1 flex">
-        <div className="flex-1">
-          <ReactFlowProvider>
-            <div ref={reactFlowWrapper} className="h-full w-full">
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                onNodeClick={onNodeClick}
-                nodeTypes={nodeTypes}
-                fitView
-                fitViewOptions={{
-                  padding: 0.2,
-                  includeHiddenNodes: false,
-                }}
-                defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-                minZoom={0.3}
-                maxZoom={2}
-                snapToGrid={true}
-                snapGrid={[20, 20]}
-                connectionLineStyle={{ stroke: '#10b981', strokeWidth: 2 }}
-              >
-                <Background gap={20} size={1} color="#f1f5f9" />
-                <Controls />
-                
-                <Panel position="top-center" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
-                  <h2 className="text-lg font-semibold">{timelineTitle}</h2>
-                  <p className="text-sm text-muted-foreground">{timelineDescription}</p>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <ReactFlowProvider>
+          <div className="flex-1 relative overflow-hidden">
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              nodeTypes={nodeTypes}
+              fitView
+              className="bg-gradient-to-br from-background via-background/95 to-muted/20"
+              minZoom={0.1}
+              maxZoom={2}
+            >
+              <Background />
+              <Controls />
+              
+              <Panel position="top-center" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
+                <h2 className="text-lg font-semibold">{timelineTitle}</h2>
+                <p className="text-sm text-muted-foreground">{timelineDescription}</p>
+              </Panel>
+
+              {isLoadingAny && (
+                <Panel position="top-right" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                    Loading blockchain data...
+                  </div>
                 </Panel>
-
-                {isLoadingAny && (
-                  <Panel position="top-right" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
-                    <div className="flex items-center gap-2 text-sm">
-                      <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                      Loading blockchain data...
-                    </div>
-                  </Panel>
-                )}
-              </ReactFlow>
-            </div>
-          </ReactFlowProvider>
-        </div>
-
-        {/* Event Creation Sidebar */}
-        {showVideoDialog && (
-          <div className="w-[500px] border-l bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-sm flex flex-col h-full overflow-hidden shadow-xl">
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                      Create Scene with AI
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {additionType === 'branch' ? 'Create a new story branch' : 'Continue the timeline'}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowVideoDialog(false)}
-                    className="hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    ×
-                  </Button>
-                </div>
-
-                {/* Scene Title */}
-                <div>
-                  <Label htmlFor="video-title">Scene Title</Label>
-                  <Input
-                    id="video-title"
-                    value={videoTitle}
-                    onChange={(e) => setVideoTitle(e.target.value)}
-                    placeholder="Enter scene title"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="video-description">Scene Description</Label>
-                  <textarea
-                    id="video-description"
-                    value={videoDescription}
-                    onChange={(e) => setVideoDescription(e.target.value)}
-                    placeholder="Describe what happens in this scene in detail... This will be used to generate the first frame image."
-                    rows={4}
-                    className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                  />
-                </div>
-
-                {/* Character Selection Section */}
-                <div className="border rounded-lg p-4 bg-muted/20">
-                <div className="flex items-center justify-between mb-3">
-                  <Label className="text-sm font-medium">Characters in Scene</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowCharacterSelector(!showCharacterSelector)}
-                      disabled={isLoadingCharacters}
-                    >
-                      <UserPlus className="h-3 w-3 mr-1" />
-                      Select
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setShowCharacterGenerator(true);
-                        setCharacterName('');
-                        setCharacterDescription('');
-                        setCharacterStyle('cute');
-                      }}
-                      className="bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
-                    >
-                      <Wand2 className="h-3 w-3 mr-1" />
-                      Generate
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Selected Characters Display */}
-                {selectedCharacters.length > 0 && charactersData?.characters && (
-                  <div className="space-y-2 mb-2">
-                    {selectedCharacters.map(charId => {
-                      const char = charactersData.characters.find((c: any) => c.id === charId);
-                      if (!char) return null;
-                      return (
-                        <div key={charId} className="bg-background p-2 rounded-md border">
-                          <div className="flex items-center gap-2 mb-1">
-                            <img src={char.image_url} alt={char.character_name} className="w-8 h-8 rounded-full object-cover" />
-                            <div className="flex-1">
-                              <span className="text-sm font-medium">{char.character_name}</span>
-                              <div className="text-xs text-muted-foreground">{char.collection}</div>
-                            </div>
-                            <button
-                              onClick={() => setSelectedCharacters(prev => prev.filter(id => id !== charId))}
-                              className="text-muted-foreground hover:text-destructive"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Character Selector Dropdown */}
-                {showCharacterSelector && charactersData?.characters && (
-                  <div className="mt-2 max-h-48 overflow-y-auto border rounded-md bg-background">
-                    {charactersData.characters.map((character: any) => (
-                      <div
-                        key={character.id}
-                        onClick={() => {
-                          if (!selectedCharacters.includes(character.id)) {
-                            setSelectedCharacters(prev => [...prev, character.id]);
-                          }
-                          setShowCharacterSelector(false);
-                        }}
-                        className="p-2 hover:bg-muted cursor-pointer flex items-center gap-2"
-                      >
-                        <img src={character.image_url} alt={character.character_name} className="w-8 h-8 rounded object-cover" />
-                        <div className="flex-1">
-                          <div className="text-sm font-medium">{character.character_name}</div>
-                          <div className="text-xs text-muted-foreground">{character.collection}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {selectedCharacters.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Add characters to include them in the generated scene
-                  </p>
-                )}
-              </div>
-
-              {/* Step 1: Generate Image */}
-              {!generatedImageUrl && (
-                <div className="border rounded-lg p-4 bg-muted/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">1</span>
-                    <Label className="text-sm font-medium">
-                      {selectedCharacters.length > 0 ? 'Edit Characters into Scene' : 'Generate First Frame'}
-                    </Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    {selectedCharacters.length > 0 
-                      ? `Generate cinematic frame with ${selectedCharacters.length} character(s) using Qwen image-edit-plus`
-                      : 'Generate cinematic frame using Qwen image-edit-plus enhancement'
-                    }
-                  </p>
-
-                  {/* Image Format Selection */}
-                  <div className="mb-3">
-                    <Label className="text-xs font-medium text-muted-foreground">Image Format</Label>
-                    <div className="grid grid-cols-2 gap-2 mt-1">
-                      <button
-                        type="button"
-                        onClick={() => setImageFormat('landscape_16_9')}
-                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                          imageFormat === 'landscape_16_9' 
-                            ? "border-primary bg-primary text-primary-foreground" 
-                            : "border-input bg-background hover:bg-muted"
-                        }`}
-                      >
-                        16:9 Landscape
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setImageFormat('portrait_16_9')}
-                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                          imageFormat === 'portrait_16_9' 
-                            ? "border-primary bg-primary text-primary-foreground" 
-                            : "border-input bg-background hover:bg-muted"
-                        }`}
-                      >
-                        9:16 Portrait
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setImageFormat('square_hd')}
-                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                          imageFormat === 'square_hd' 
-                            ? "border-primary bg-primary text-primary-foreground" 
-                            : "border-input bg-background hover:bg-muted"
-                        }`}
-                      >
-                        1:1 Square HD
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setImageFormat('landscape_4_3')}
-                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                          imageFormat === 'landscape_4_3' 
-                            ? "border-primary bg-primary text-primary-foreground" 
-                            : "border-input bg-background hover:bg-muted"
-                        }`}
-                      >
-                        4:3 Landscape
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setImageFormat('portrait_4_3')}
-                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                          imageFormat === 'portrait_4_3' 
-                            ? "border-primary bg-primary text-primary-foreground" 
-                            : "border-input bg-background hover:bg-muted"
-                        }`}
-                      >
-                        3:4 Portrait
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setImageFormat('square')}
-                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                          imageFormat === 'square' 
-                            ? "border-primary bg-primary text-primary-foreground" 
-                            : "border-input bg-background hover:bg-muted"
-                        }`}
-                      >
-                        1:1 Square
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Button
-                      onClick={handleGenerateEventImage}
-                      disabled={!videoDescription.trim() || isGeneratingImage}
-                      className="w-full"
-                      variant="secondary"
-                    >
-                      {isGeneratingImage ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          {selectedCharacters.length > 0 ? 'Editing Characters...' : 'Generating Image...'}
-                        </>
-                      ) : (
-                        <>
-                          {selectedCharacters.length > 0 ? (
-                            <>
-                              <Wand2 className="h-4 w-4 mr-2" />
-                              Edit Characters into Scene
-                            </>
-                          ) : (
-                            <>
-                              <Image className="h-4 w-4 mr-2" />
-                              Generate First Frame
-                            </>
-                          )}
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
               )}
-
-              {/* Show Generated Image */}
-              {generatedImageUrl && (
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-6 h-6 rounded-full bg-green-500 text-white text-sm flex items-center justify-center">✓</span>
-                    <Label className="text-sm font-medium">First Frame Generated</Label>
-                  </div>
-                  <img 
-                    src={generatedImageUrl} 
-                    alt="Generated first frame" 
-                    className="w-full h-auto object-contain rounded-lg border max-h-64"
-                  />
-                  
-                  {/* Upload to tmpfiles.org */}
-                  <div className="mt-3 space-y-2">
-                    <Button
-                      onClick={uploadToTmpfiles}
-                      disabled={isUploading}
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                    >
-                      {isUploading ? (
-                        <>
-                          <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                          Uploading to tmpfiles.org...
-                        </>
-                      ) : (
-                        <>
-                          <Image className="h-3 w-3 mr-2" />
-                          Upload to tmpfiles.org
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Generate Video */}
-              {showVideoStep && !generatedVideoUrl && (
-                <div className="border rounded-lg p-4 bg-muted/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">2</span>
-                    <Label className="text-sm font-medium">Generate Video with AI</Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Create a video animation from the generated image
-                  </p>
-
-                  {/* Video Prompt */}
-                  <div className="mb-3">
-                    <Label htmlFor="video-prompt" className="text-xs font-medium text-muted-foreground">
-                      Video Animation Prompt (optional)
-                    </Label>
-                    <textarea
-                      id="video-prompt"
-                      value={videoPrompt}
-                      onChange={(e) => setVideoPrompt(e.target.value)}
-                      placeholder="Describe how the scene should be animated (e.g., camera slowly moves closer, character looks around, wind blowing gently)..."
-                      rows={2}
-                      className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Leave empty to use the scene description as animation prompt
-                    </p>
-                  </div>
-
-                  {/* Video Ratio */}
-                  <div className="mb-3">
-                    <Label className="text-xs font-medium text-muted-foreground">Video Aspect Ratio</Label>
-                    <div className="flex gap-2 mt-1">
-                      <button
-                        type="button"
-                        onClick={() => setVideoRatio("16:9")}
-                        className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                          videoRatio === "16:9" 
-                            ? "border-primary bg-primary text-primary-foreground" 
-                            : "border-input bg-background hover:bg-muted"
-                        }`}
-                      >
-                        16:9 Landscape
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVideoRatio("9:16")}
-                        className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                          videoRatio === "9:16" 
-                            ? "border-primary bg-primary text-primary-foreground" 
-                            : "border-input bg-background hover:bg-muted"
-                        }`}
-                      >
-                        9:16 Portrait
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVideoRatio("1:1")}
-                        className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                          videoRatio === "1:1" 
-                            ? "border-primary bg-primary text-primary-foreground" 
-                            : "border-input bg-background hover:bg-muted"
-                        }`}
-                      >
-                        1:1 Square
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {/* Model Selection */}
-                  <div className="mb-3">
-                    <Label className="text-xs font-medium text-muted-foreground">Video Generation Model</Label>
-                    <div className="grid grid-cols-1 gap-2 mt-1">
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="radio"
-                          id="fal-veo3"
-                          name="videoModel"
-                          value="fal-veo3"
-                          checked={selectedVideoModel === 'fal-veo3'}
-                          onChange={(e) => setSelectedVideoModel(e.target.value as any)}
-                          className="w-4 h-4 text-primary"
-                        />
-                        <label htmlFor="fal-veo3" className="text-sm">
-                          <span className="font-medium">Veo3 Fast</span>
-                          <span className="text-muted-foreground ml-1">(Fast, good quality)</span>
-                        </label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="radio"
-                          id="fal-kling"
-                          name="videoModel"
-                          value="fal-kling"
-                          checked={selectedVideoModel === 'fal-kling'}
-                          onChange={(e) => setSelectedVideoModel(e.target.value as any)}
-                          className="w-4 h-4 text-primary"
-                        />
-                        <label htmlFor="fal-kling" className="text-sm">
-                          <span className="font-medium">Kling 2.5</span>
-                          <span className="text-muted-foreground ml-1">(High quality, slower)</span>
-                        </label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="radio"
-                          id="fal-wan25"
-                          name="videoModel"
-                          value="fal-wan25"
-                          checked={selectedVideoModel === 'fal-wan25'}
-                          onChange={(e) => setSelectedVideoModel(e.target.value as any)}
-                          className="w-4 h-4 text-primary"
-                        />
-                        <label htmlFor="fal-wan25" className="text-sm">
-                          <span className="font-medium">Wan 2.5</span>
-                          <span className="text-muted-foreground ml-1">(Premium, best quality)</span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Negative Prompt for all FAL models */}
-                  {(selectedVideoModel === 'fal-wan25' || selectedVideoModel === 'fal-kling' || selectedVideoModel === 'fal-veo3') && (
-                    <div className="mb-3">
-                      <Label htmlFor="negative-prompt" className="text-xs font-medium text-muted-foreground">
-                        Negative Prompt (optional)
-                      </Label>
-                      <Input
-                        id="negative-prompt"
-                        value={negativePrompt}
-                        onChange={(e) => setNegativePrompt(e.target.value)}
-                        placeholder="What to avoid in the video (e.g., low quality, blurry)"
-                        className="mt-1 text-sm"
-                      />
-                    </div>
-                  )}
-                  
-                  <Button
-                    onClick={handleGenerateVideo}
-                    disabled={isGeneratingVideo}
-                    className="w-full"
-                  >
-                    {isGeneratingVideo ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating with {selectedVideoModel === 'fal-veo3' ? 'Veo3 Fast' : selectedVideoModel === 'fal-kling' ? 'Kling 2.5' : 'Wan 2.5'}...
-                      </>
-                    ) : (
-                      <>
-                        <Film className="h-4 w-4 mr-2" />
-                        Generate Video with {selectedVideoModel === 'fal-veo3' ? 'Veo3 Fast' : selectedVideoModel === 'fal-kling' ? 'Kling 2.5' : 'Wan 2.5'}
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
-
-              {/* Show Generated Video */}
-              {generatedVideoUrl && (
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-6 h-6 rounded-full bg-green-500 text-white text-sm flex items-center justify-center">✓</span>
-                    <Label className="text-sm font-medium">Video Generated</Label>
-                  </div>
-                  {generatedVideoUrl === "placeholder-video-url" ? (
-                    <div className="w-full h-32 bg-muted rounded-lg flex items-center justify-center">
-                      <p className="text-sm text-muted-foreground">Video preview placeholder</p>
-                    </div>
-                  ) : (
-                    <video 
-                      key={generatedVideoUrl} // Force re-render when URL changes
-                      src={generatedVideoUrl}
-                      controls 
-                      className="w-full rounded-lg border"
-                      onError={(e) => {
-                        console.error("Video playback error:", e);
-                        console.error("Failed URL:", generatedVideoUrl);
-                      }}
-                    >
-                      Your browser does not support the video tag.
-                    </video>
-                  )}
-                  
-                  {/* Save to Contract */}
-                  <div className="mt-3 space-y-2">
-                    <Button
-                      onClick={handleSaveToContract}
-                      disabled={isSavingToContract || contractSaved}
-                      variant={contractSaved ? "secondary" : "default"}
-                      size="sm"
-                      className="w-full"
-                    >
-                      {isSavingToContract ? (
-                        <>
-                          <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                          {isSavingToFilecoin ? "Uploading to Filecoin..." : "Saving to Blockchain..."}
-                        </>
-                      ) : contractSaved ? (
-                        <>
-                          <span className="text-green-600">✓</span>
-                          <span className="ml-2">Saved to Timeline & Filecoin</span>
-                        </>
-                      ) : (
-                        <>
-                          <Film className="h-3 w-3 mr-2" />
-                          Save to Timeline & Filecoin
-                        </>
-                      )}
-                    </Button>
-                    
-                    {contractSaved && (
-                      <div className="p-2 bg-green-50 border border-green-200 rounded text-xs">
-                        <div className="text-green-700 font-medium">
-                          ✅ Successfully saved to universe timeline{filecoinSaved ? " and Filecoin" : ""}!
-                        </div>
-                        {filecoinSaved && pieceCid && (
-                          <div className="text-blue-600 mt-1">
-                            Filecoin PieceCID: <code className="bg-blue-100 px-1 rounded text-xs">{pieceCid}</code>
-                          </div>
-                        )}
-                        <div className="text-green-600 mt-1">
-                          Your scene is now part of the universe timeline{filecoinSaved ? " with permanent decentralized storage" : ""} and will be visible to all users.
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowVideoDialog(false)}
-                    className="flex-1"
-                  >
-                    Go Back
-                  </Button>
-                  <Button
-                    onClick={handleCreateEvent}
-                    disabled={!videoTitle.trim()}
-                    className="flex-1 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Scene
-                  </Button>
-                </div>
-              </div>
-            </div>
+            </ReactFlow>
           </div>
-        )}
+        </ReactFlowProvider>
       </div>
 
-      {/* Character Generation Dialog */}
-      {showCharacterGenerator && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wand2 className="h-5 w-5 text-purple-600" />
-                Generate Character with Nano Banana AI
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="char-name">Character Name</Label>
-                <Input
-                  id="char-name"
-                  value={characterName}
-                  onChange={(e) => setCharacterName(e.target.value)}
-                  placeholder="Enter character name..."
-                  className="mt-1"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="char-desc">Character Description</Label>
-                <textarea
-                  id="char-desc"
-                  value={characterDescription}
-                  onChange={(e) => setCharacterDescription(e.target.value)}
-                  placeholder="Describe your character's appearance and personality..."
-                  rows={3}
-                  className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                />
-              </div>
-              
-              <div>
-                <Label>Art Style</Label>
-                <div className="grid grid-cols-3 gap-2 mt-1">
-                  {['cute', 'realistic', 'anime', 'fantasy', 'cyberpunk'].map((style) => (
-                    <Button
-                      key={style}
-                      type="button"
-                      size="sm"
-                      variant={characterStyle === style ? 'default' : 'outline'}
-                      onClick={() => setCharacterStyle(style as any)}
-                      className="capitalize"
-                    >
-                      {style}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Generated Character Preview */}
-              {generatedCharacter && (
-                <div className="border rounded-lg p-4 bg-muted/20">
-                  <Label className="text-sm font-medium mb-3 block">Generated Character Preview</Label>
-                  <div className="flex flex-col items-center space-y-4">
-                    {/* Large Character Image */}
-                    <img 
-                      src={generatedCharacter.imageUrl} 
-                      alt={generatedCharacter.name}
-                      className="w-64 h-64 object-cover rounded-lg border shadow-lg"
-                    />
-                    
-                    {/* Character Info */}
-                    <div className="text-center space-y-2">
-                      <h3 className="text-lg font-semibold">{generatedCharacter.name}</h3>
-                      <p className="text-sm text-muted-foreground max-w-sm">{generatedCharacter.description}</p>
-                      <div className="text-xs bg-muted px-2 py-1 rounded-full inline-block capitalize">
-                        {generatedCharacter.style} style
-                      </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-3 w-full">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setGeneratedCharacter(null);
-                          setCharacterName('');
-                          setCharacterDescription('');
-                          setCharacterStyle('cute');
-                        }}
-                        className="flex-1"
-                      >
-                        Generate Another
-                      </Button>
-                      <Button
-                        onClick={() => saveCharacterMutation.mutate()}
-                        disabled={saveCharacterMutation.isPending}
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                      >
-                        {saveCharacterMutation.isPending ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add to Database
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Bottom Action Buttons - only show when no character is generated */}
-              {!generatedCharacter && (
-                <div className="flex gap-3 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowCharacterGenerator(false);
-                      setGeneratedCharacter(null);
-                      setCharacterName('');
-                      setCharacterDescription('');
-                      setCharacterStyle('cute');
-                    }}
-                    disabled={isGeneratingCharacter}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={async () => {
-                      if (!characterName.trim() || !characterDescription.trim()) {
-                        alert('Please provide both name and description');
-                        return;
-                      }
-                      setIsGeneratingCharacter(true);
-                      try {
-                        await generateCharacterMutation.mutateAsync({
-                          name: characterName,
-                          description: characterDescription,
-                          style: characterStyle
-                        });
-                      } catch (error) {
-                        console.error('Failed to generate character:', error);
-                      }
-                    }}
-                    disabled={isGeneratingCharacter || !characterName.trim() || !characterDescription.trim()}
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
-                  >
-                    {isGeneratingCharacter ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Generate Character
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
-
-              {/* Close button when character is showing */}
-              {generatedCharacter && (
-                <div className="pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowCharacterGenerator(false);
-                      setGeneratedCharacter(null);
-                      setCharacterName('');
-                      setCharacterDescription('');
-                      setCharacterStyle('cute');
-                    }}
-                    className="w-full"
-                  >
-                    Close
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      {/* Right Sidebar - Event Creation */}
+      {showVideoDialog && (
+        <EventCreationSidebar
+          showVideoDialog={showVideoDialog}
+          setShowVideoDialog={setShowVideoDialog}
+          videoTitle={videoTitle}
+          setVideoTitle={setVideoTitle}
+          videoDescription={videoDescription}
+          setVideoDescription={setVideoDescription}
+          additionType={additionType}
+          selectedCharacters={selectedCharacters}
+          setSelectedCharacters={setSelectedCharacters}
+          showCharacterSelector={showCharacterSelector}
+          setShowCharacterSelector={setShowCharacterSelector}
+          showCharacterGenerator={showCharacterGenerator}
+          setShowCharacterGenerator={setShowCharacterGenerator}
+          charactersData={charactersData}
+          isLoadingCharacters={isLoadingCharacters}
+          characterName={characterName}
+          setCharacterName={setCharacterName}
+          characterDescription={characterDescription}
+          setCharacterDescription={setCharacterDescription}
+          characterStyle={characterStyle}
+          setCharacterStyle={setCharacterStyle}
+          isGeneratingCharacter={isGeneratingCharacter}
+          generatedCharacter={generatedCharacter}
+          setGeneratedCharacter={setGeneratedCharacter}
+          generateCharacterMutation={generateCharacterMutation}
+          saveCharacterMutation={saveCharacterMutation}
+          generatedImageUrl={generatedImageUrl}
+          isGeneratingImage={isGeneratingImage}
+          imageFormat={imageFormat}
+          setImageFormat={setImageFormat}
+          handleGenerateEventImage={handleGenerateEventImage}
+          showVideoStep={showVideoStep}
+          uploadedUrl={uploadedUrl}
+          isUploading={isUploading}
+          uploadToTmpfiles={uploadToTmpfiles}
+          generatedVideoUrl={generatedVideoUrl}
+          isGeneratingVideo={isGeneratingVideo}
+          videoPrompt={videoPrompt}
+          setVideoPrompt={setVideoPrompt}
+          videoRatio={videoRatio}
+          setVideoRatio={setVideoRatio}
+          selectedVideoModel={selectedVideoModel}
+          setSelectedVideoModel={setSelectedVideoModel}
+          negativePrompt={negativePrompt}
+          setNegativePrompt={setNegativePrompt}
+          handleGenerateVideo={handleGenerateVideo}
+          isSavingToContract={isSavingToContract}
+          contractSaved={contractSaved}
+          isSavingToFilecoin={isSavingToFilecoin}
+          filecoinSaved={filecoinSaved}
+          pieceCid={pieceCid}
+          handleSaveToContract={handleSaveToContract}
+          handleCreateEvent={handleCreateEvent}
+        />
       )}
-
     </div>
   );
 }
