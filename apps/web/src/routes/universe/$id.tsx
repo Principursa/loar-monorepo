@@ -267,7 +267,7 @@ function UniverseTimelineEditor() {
   console.log('Chain ID:', chainId);
   
   // Blockchain data fetching hooks - use the universe's own contract address
-  const { isLoading: isLoadingLeaves, refetch: refetchLeaves } = useUniverseLeaves(timelineContractAddress);
+  const { data: leavesData, isLoading: isLoadingLeaves, refetch: refetchLeaves } = useUniverseLeaves(timelineContractAddress);
   const { data: fullGraphData, isLoading: isLoadingFullGraph, refetch: refetchFullGraph } = useUniverseFullGraph(timelineContractAddress);
   
   // Get timeline data: use blockchain data if available, otherwise dummy data
@@ -1362,12 +1362,12 @@ function UniverseTimelineEditor() {
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Left Sidebar */}
-      <div className="w-5 hover:w-80 border-r bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-sm p-4 overflow-y-auto transition-all duration-500 overflow-hidden whitespace-nowrap shadow-lg">
-        <div className="space-y-6">
+      {/* Left Sidebar - Open by default, compact, and no scroll */}
+      <div className="w-80 border-r bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-sm p-4 flex flex-col shadow-lg">
+        <div className="space-y-3 flex-1 min-h-0">
           {/* Back Button */}
           <div>
-            <Button variant="ghost" size="sm" asChild className="mb-4 hover:bg-primary/10 hover:text-primary transition-colors duration-300">
+            <Button variant="ghost" size="sm" asChild className="hover:bg-primary/10 hover:text-primary transition-colors duration-300">
               <Link to="/universes">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Universes
@@ -1375,35 +1375,51 @@ function UniverseTimelineEditor() {
             </Button>
           </div>
 
-          {/* Universe Info */}
-          <Card className="bg-gradient-to-br from-card/90 via-card to-card/95 border-border/50 shadow-md">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                <Users className="h-4 w-4 text-primary" />
+          {/* Universe Info - More Compact */}
+          <Card className="bg-gradient-to-br from-card/90 via-card to-card/95 border-border/50 shadow-md flex-shrink-0">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                <Users className="h-3 w-3 text-primary" />
                 Universe Info
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               <div>
-                <Label htmlFor="universe-name" className="text-xs font-medium text-muted-foreground">Name</Label>
-                <div className="text-sm font-semibold mt-1">{finalUniverse?.name}</div>
+                <Label className="text-xs font-medium text-muted-foreground">Name</Label>
+                <div className="text-sm font-semibold mt-1 line-clamp-1">{finalUniverse?.name}</div>
               </div>
               <div>
-                <Label htmlFor="universe-description" className="text-xs font-medium text-muted-foreground">Description</Label>
-                <div className="text-sm text-muted-foreground leading-relaxed mt-1">{finalUniverse?.description}</div>
+                <Label className="text-xs font-medium text-muted-foreground">Description</Label>
+                <div className="text-xs text-muted-foreground leading-relaxed mt-1 line-clamp-2">{finalUniverse?.description}</div>
               </div>
-              {!finalUniverse?.isDefault && (
-                <div className="space-y-2 pt-2 border-t border-border/50">
-                  <div className="text-xs">
-                    <span className="text-muted-foreground font-medium">Creator:</span>
-                    <code className="ml-2 bg-muted/50 px-1 py-0.5 rounded text-xs">
-                      {finalUniverse?.creator?.slice(0, 6)}...{finalUniverse?.creator?.slice(-4)}
-                    </code>
+              
+              {/* Timeline Statistics - Compact Grid - Remove duplicate */}
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/50">
+                <div className="p-2 rounded-md bg-muted/30 text-center">
+                  <div className="text-xs font-medium text-muted-foreground">Events</div>
+                  <div className="text-sm font-bold">{graphData.nodeIds.length}</div>
+                </div>
+                <div className="p-2 rounded-md bg-muted/30 text-center">
+                  <div className="text-xs font-medium text-muted-foreground">Leaves</div>
+                  <div className="text-sm font-bold">{leavesData ? (Array.isArray(leavesData) ? leavesData.length : 0) : 0}</div>
+                </div>
+                <div className="p-2 rounded-md bg-muted/30 text-center col-span-2">
+                  <div className="text-xs font-medium text-muted-foreground">Status</div>
+                  <div className="flex items-center justify-center gap-1">
+                    <div className={`w-1.5 h-1.5 rounded-full ${isLoadingAny ? 'bg-yellow-500 animate-pulse' : nodes.length > 0 ? 'bg-green-500' : 'bg-gray-400'}`} />
+                    <span className="text-xs font-medium">
+                      {isLoadingAny ? 'Loading' : nodes.length > 0 ? 'Active' : 'Empty'}
+                    </span>
                   </div>
+                </div>
+              </div>
+
+              {!finalUniverse?.isDefault && (
+                <div className="space-y-1 pt-2 border-t border-border/50">
                   <div className="text-xs">
                     <span className="text-muted-foreground font-medium">Contract:</span>
-                    <code className="ml-2 bg-muted/50 px-1 py-0.5 rounded text-xs">
-                      {finalUniverse?.address?.slice(0, 6)}...{finalUniverse?.address?.slice(-4)}
+                    <code className="ml-1 bg-muted/50 px-1 py-0.5 rounded text-xs">
+                      {finalUniverse?.address?.slice(0, 8)}...{finalUniverse?.address?.slice(-6)}
                     </code>
                   </div>
                 </div>
@@ -1411,111 +1427,74 @@ function UniverseTimelineEditor() {
             </CardContent>
           </Card>
 
-
-          {/* Add Event */}
-          <Card className="bg-gradient-to-br from-card/90 via-card to-card/95 border-border/50 shadow-md">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                <Plus className="h-4 w-4 text-primary" />
+          {/* Add Event - Compact */}
+          <Card className="bg-gradient-to-br from-card/90 via-card to-card/95 border-border/50 shadow-md flex-shrink-0">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                <Plus className="h-3 w-3 text-primary" />
                 Add Event
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2">
               <Button 
                 onClick={() => handleAddEvent('after')} 
                 className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-md hover:shadow-lg transition-all duration-300"
+                size="sm"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-3 w-3 mr-2" />
                 Add New Event
               </Button>
+              <p className="text-xs text-muted-foreground text-center leading-tight">
+                Click events to add after or branch
+              </p>
               <Button 
                 onClick={handleRefreshTimeline} 
                 variant="outline" 
                 size="sm"
                 className="w-full hover:bg-muted/50 transition-colors duration-300"
               >
-                <RefreshCw className="h-3 w-3 mr-2" />
-                Refresh Timeline
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Refresh
               </Button>
             </CardContent>
           </Card>
 
-
-          {/* Selected Event */}
+          {/* Selected Event - Compact and scrollable if needed */}
           {selectedNode && selectedNode.data.nodeType === 'scene' && (
-            <Card className="bg-gradient-to-br from-primary/5 via-card to-card/95 border-primary/20 shadow-md">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  <Film className="h-4 w-4 text-primary" />
-                  Edit Event
+            <Card className="bg-gradient-to-br from-primary/5 via-card to-card/95 border-primary/20 shadow-md flex-shrink-0">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                  <Film className="h-3 w-3 text-primary" />
+                  Event {selectedNode.data.eventId}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-2">
                 <div>
-                  <Label htmlFor="event-title" className="text-xs font-medium text-muted-foreground">Event Title</Label>
-                  <Input
-                    id="event-title"
-                    value={selectedEventTitle}
-                    onChange={(e: any) => setSelectedEventTitle(e.target.value)}
-                    placeholder="Enter event title"
-                    className="mt-1"
-                  />
+                  <div className="text-sm font-medium line-clamp-1">{selectedNode.data.label}</div>
+                  <div className="text-xs text-muted-foreground line-clamp-2">{selectedNode.data.description}</div>
                 </div>
-                <div>
-                  <Label htmlFor="event-description" className="text-xs font-medium text-muted-foreground">Description</Label>
-                  <textarea
-                    id="event-description"
-                    value={selectedEventDescription}
-                    onChange={(e: any) => setSelectedEventDescription(e.target.value)}
-                    placeholder="Describe this event"
-                    rows={3}
-                    className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                  />
+                
+                <div className="space-y-1">
+                  <Button 
+                    onClick={() => handleAddEvent('after', selectedNode.data.eventId)} 
+                    className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-md hover:shadow-lg transition-all duration-300"
+                    size="sm"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add After
+                  </Button>
+                  <Button 
+                    onClick={() => handleAddEvent('branch', selectedNode.data.eventId)} 
+                    className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white shadow-md hover:shadow-lg transition-all duration-300"
+                    size="sm"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Branch
+                  </Button>
                 </div>
-                <Button 
-                  onClick={updateSelectedNode} 
-                  className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-md hover:shadow-lg transition-all duration-300"
-                >
-                  Update Event
-                </Button>
               </CardContent>
             </Card>
           )}
-
-          {/* Timeline Stats */}
-          <Card className="bg-gradient-to-br from-card/90 via-card to-card/95 border-border/50 shadow-md">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                <Clock className="h-4 w-4 text-primary" />
-                Timeline Stats
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between items-center p-2 rounded-md bg-muted/30">
-                <span className="text-sm font-medium text-muted-foreground">Total Events:</span>
-                <span className="text-sm font-bold">{nodes.filter((n: any) => n.data.nodeType === 'scene').length}</span>
-              </div>
-              <div className="flex justify-between items-center p-2 rounded-md bg-muted/30">
-                <span className="text-sm font-medium text-muted-foreground">Blockchain Nodes:</span>
-                <span className="text-sm font-bold">{graphData.nodeIds.length}</span>
-              </div>
-              <div className="space-y-1">
-                <span className="text-xs font-medium text-muted-foreground">Universe ID:</span>
-                <code className="block text-xs font-mono bg-muted/50 px-2 py-1 rounded break-all">
-                  {id.length > 16 ? `${id.slice(0, 8)}...${id.slice(-8)}` : id}
-                </code>
-              </div>
-              <div className="flex justify-between items-center p-2 rounded-md bg-muted/30">
-                <span className="text-sm font-medium text-muted-foreground">Status:</span>
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${isLoadingAny ? 'bg-yellow-500 animate-pulse' : nodes.length > 0 ? 'bg-green-500' : 'bg-gray-400'}`} />
-                  <span className="text-xs font-medium">
-                    {isLoadingAny ? 'Loading...' : nodes.length > 0 ? 'Active' : 'Empty'}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
 
