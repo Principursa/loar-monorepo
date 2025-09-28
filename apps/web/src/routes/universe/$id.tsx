@@ -762,12 +762,18 @@ function UniverseTimelineEditor() {
       let previousNodeId: number;
       
       if (additionType === 'branch' && sourceNodeId) {
-        // For branches, use the source node as previous
-        previousNodeId = parseInt(sourceNodeId);
-        console.log('Creating branch from event:', sourceNodeId);
+        // For branches, extract numeric part from sourceNodeId (e.g., "4c" -> 4)
+        const numericPart = sourceNodeId.match(/^\d+/);
+        previousNodeId = numericPart ? parseInt(numericPart[0]) : 0;
+        console.log('Creating branch from event:', sourceNodeId, '-> numeric:', previousNodeId);
       } else {
-        // For linear continuation, find the last node ID
-        previousNodeId = Math.max(...(graphData.nodeIds.map(id => Number(id)) || [0]), 0);
+        // For linear continuation, find the last node ID (extract numeric parts)
+        const numericIds = graphData.nodeIds.map(id => {
+          const idStr = String(id);
+          const numericPart = idStr.match(/^\d+/);
+          return numericPart ? parseInt(numericPart[0]) : 0;
+        });
+        previousNodeId = Math.max(...(numericIds || [0]), 0);
         console.log('Creating linear continuation after event:', previousNodeId);
       }
       
@@ -1043,6 +1049,43 @@ function UniverseTimelineEditor() {
     setNodes([...filteredNodes, newEventNode as any, newAddNode as any]);
     setEdges([...filteredEdges, ...newEdges]);
     setEventCounter(prev => prev + 1);
+    
+    // Save event data to localStorage for ALL events (not just branched)
+    console.log('🔍 Checking if should save event:', {
+      newEventId,
+      additionType,
+      isBranched: /[a-z]/.test(newEventId),
+      hasVideo: !!generatedVideoUrl,
+      hasImage: !!generatedImageUrl
+    });
+    
+    // Save ALL events to localStorage for now (easier debugging)
+    const eventData = {
+      eventId: newEventId,
+      title: videoTitle,
+      description: videoDescription,
+      videoUrl: generatedVideoUrl,
+      imageUrl: generatedImageUrl,
+      sourceNodeId: sourceNodeId,
+      additionType: additionType,
+      timestamp: Date.now(),
+      position: newEventPosition
+    };
+    
+    // Store in universe-specific localStorage
+    const storageKey = `universe_events_${id}`;
+    const existingEvents = localStorage.getItem(storageKey);
+    const eventsData = existingEvents ? JSON.parse(existingEvents) : {};
+    
+    eventsData[newEventId] = eventData;
+    localStorage.setItem(storageKey, JSON.stringify(eventsData));
+    
+    console.log('💾 Saved event to localStorage:', {
+      key: storageKey,
+      eventId: newEventId,
+      eventData,
+      allEvents: eventsData
+    });
     
     // Close dialog and reset
     setShowVideoDialog(false);

@@ -2,7 +2,7 @@ import { createFileRoute, useParams, Link } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Play, Calendar } from "lucide-react";
+import { ArrowLeft, Play, Calendar, Plus } from "lucide-react";
 import { useReadContract, useChainId } from 'wagmi';
 import { timelineAbi } from '@/generated';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
@@ -13,9 +13,15 @@ import { trpcClient } from '@/utils/trpc';
 function EventPage() {
   const { universeId, eventId } = useParams({ from: "/event/$universeId/$eventId" });
   const chainId = useChainId();
+  
+  // Check if this is a branched event (contains letters like "1b", "3c")
+  const isBranchedEvent = /[a-z]/.test(eventId);
+  
   const [universe, setUniverse] = useState<any>(null);
   const [displayVideoUrl, setDisplayVideoUrl] = useState<string | null>(null);
   const [isLoadingFilecoin, setIsLoadingFilecoin] = useState(false);
+  const [localEventData, setLocalEventData] = useState<any>(null);
+  const [universeStats, setUniverseStats] = useState({ leafs: 0, events: 0 });
 
   // Custom function to create blob URL from Filecoin PieceCID
   const createFilecoinBlobUrl = useCallback(async (pieceCid: string, filename: string = 'video.mp4') => {
@@ -58,34 +64,130 @@ function EventPage() {
     }
   }, [universeId]);
 
+  // Get local event data for branched events
+  useEffect(() => {
+    if (isBranchedEvent) {
+      console.log('🔍 Looking for branched event data:', eventId);
+      
+      // Debug: Check all localStorage keys
+      console.log('All localStorage keys:', Object.keys(localStorage));
+      
+      // Try multiple possible keys for storing event data
+      const possibleKeys = [
+        `universe_events_${universeId}`,
+        `universe_${universeId}_events`,
+        `events_${universeId}`,
+        universeId
+      ];
+      
+      let eventData = null;
+      let foundKey = null;
+      
+      for (const key of possibleKeys) {
+        const savedData = localStorage.getItem(key);
+        if (savedData) {
+          try {
+            const parsedData = JSON.parse(savedData);
+            console.log(`Data found in key "${key}":`, parsedData);
+            
+            // Check if this contains our event
+            if (parsedData[eventId]) {
+              eventData = parsedData[eventId];
+              foundKey = key;
+              break;
+            }
+            
+            // Check if it's nested differently
+            if (parsedData.events && parsedData.events[eventId]) {
+              eventData = parsedData.events[eventId];
+              foundKey = key;
+              break;
+            }
+          } catch (e) {
+            console.log(`Failed to parse data from key "${key}"`);
+          }
+        }
+      }
+      
+      if (eventData) {
+        console.log('✅ Found local event data in key:', foundKey, eventData);
+        const processedData = {
+          id: eventId,
+          url: eventData.videoUrl || eventData.url || eventData.generatedVideoUrl,
+          description: eventData.description || eventData.title || eventData.videoDescription,
+          previousNodeId: eventData.previousNodeId || eventData.previous || eventData.sourceNodeId
+        };
+        console.log('🔄 Processed local event data:', processedData);
+        setLocalEventData(processedData);
+      } else {
+        console.log('❌ No local event data found for branched event:', eventId);
+        console.log('Checked keys:', possibleKeys);
+      }
+    }
+  }, [isBranchedEvent, eventId, universeId]);
+
+  // Calculate universe statistics
+  useEffect(() => {
+    if (universe) {
+      const storageKey = `universe_events_${universeId}`;
+      const savedEvents = localStorage.getItem(storageKey);
+      
+      let localEvents = 0;
+      if (savedEvents) {
+        try {
+          const eventsData = JSON.parse(savedEvents);
+          localEvents = Object.keys(eventsData).length;
+        } catch (e) {
+          console.log('Failed to parse saved events');
+        }
+      }
+      
+      // For blockchain universes, we could fetch from contract
+      // For now, just use local events count
+      setUniverseStats({
+        leafs: localEvents, // In this context, leafs could be branched events
+        events: localEvents
+      });
+      
+      console.log('Universe stats calculated:', { leafs: localEvents, events: localEvents });
+    }
+  }, [universe, universeId]);
+
   // Determine contract address - use universe ID if it's a blockchain universe
   const contractAddress = universeId && universeId.startsWith('0x') 
     ? (universeId as Address)
     : (TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address);
 
-  // eventId is already numeric (e.g., "1", "2", "3")
-  const nodeIdBigInt = BigInt(eventId);
+  // For blockchain queries, only use the numeric part
+  const numericPart = eventId.match(/^\d+/);
+  const numericEventId = numericPart ? numericPart[0] : "0";
+  const nodeIdBigInt = BigInt(numericEventId);
 
   console.log('Event Page Debug:', {
     universeId,
     eventId,
+    isBranchedEvent,
+    numericEventId,
+    nodeIdBigInt,
     contractAddress,
     universe
   });
 
-  // Fetch event data from blockchain
+  // Fetch event data from blockchain (only for non-branched events)
   const { data: nodeData, isLoading: isLoadingNode, error } = useReadContract({
     abi: timelineAbi,
     address: contractAddress,
     functionName: "getNode",
     args: [nodeIdBigInt],
     query: {
-      enabled: !!contractAddress && !!nodeIdBigInt
+      enabled: !!contractAddress && !!nodeIdBigInt && !isBranchedEvent
     }
   });
 
-  // Extract data from blockchain response for use in hooks
-  const videoUrl = nodeData && Array.isArray(nodeData) && nodeData.length >= 4 ? nodeData[1] : null;
+  // Extract data from blockchain response or local data
+  const videoUrl = isBranchedEvent 
+    ? localEventData?.url 
+    : (nodeData && Array.isArray(nodeData) && nodeData.length >= 4 ? nodeData[1] : null);
 
   console.log('Event page debug:', {
     nodeData,
@@ -132,7 +234,8 @@ function EventPage() {
     }
   }, [videoUrl, createFilecoinBlobUrl]);
 
-  if (isLoadingNode) {
+  // Show loading only for blockchain events
+  if (!isBranchedEvent && isLoadingNode) {
     return (
       <div className="container mx-auto p-6">
         <Card>
@@ -145,8 +248,12 @@ function EventPage() {
     );
   }
 
-  // Handle event not found
-  if (!isLoadingNode && (!nodeData || !Array.isArray(nodeData) || nodeData.length < 4)) {
+  // Handle event not found (check differently for branched vs blockchain events)
+  const eventNotFound = isBranchedEvent 
+    ? !localEventData
+    : (!isLoadingNode && (!nodeData || !Array.isArray(nodeData) || nodeData.length < 4));
+    
+  if (eventNotFound) {
     return (
       <div className="container mx-auto p-6">
         <Card>
@@ -169,10 +276,10 @@ function EventPage() {
     );
   }
 
-  // Extract data from blockchain response [id, url, desc, prev_node_id, array, bool]
-  const eventNodeId = nodeData?.[0];
-  const description = nodeData?.[2]; 
-  const previousNodeId = nodeData?.[3];
+  // Extract data from blockchain response or local data
+  const eventNodeId = isBranchedEvent ? eventId : nodeData?.[0];
+  const description = isBranchedEvent ? localEventData?.description : nodeData?.[2];
+  const previousNodeId = isBranchedEvent ? localEventData?.previousNodeId : nodeData?.[3];
 
   return (
     <div className="container mx-auto p-6">
@@ -204,7 +311,9 @@ function EventPage() {
                     <Badge variant="secondary">
                       {universe?.name || (universeId.length > 16 ? `Universe ${universeId.slice(0, 8)}...` : `Universe ${universeId}`)}
                     </Badge>
-                    <Badge variant="outline" className="bg-blue-50">Blockchain Event</Badge>
+                    <Badge variant="outline" className={isBranchedEvent ? "bg-purple-50" : "bg-blue-50"}>
+                      {isBranchedEvent ? "Branched Event" : "Blockchain Event"}
+                    </Badge>
                     {previousNodeId && previousNodeId === 0n && (
                       <Badge variant="default" className="bg-green-100 text-green-800">Root Event</Badge>
                     )}
@@ -342,89 +451,123 @@ function EventPage() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Event Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Event Details</CardTitle>
+          <Card className="border-l-4 border-l-primary">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Calendar className="w-5 h-5 text-primary" />
+                Event Details
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium mb-1">Event ID</h4>
-                <p className="text-2xl font-bold">{eventNodeId}</p>
-              </div>
-              
-              <div>
-                <h4 className="text-sm font-medium mb-1">Universe</h4>
-                <p className="text-sm text-muted-foreground break-all">
-                  {universe?.name || `Universe ${universeId.slice(0, 16)}...`}
-                </p>
-              </div>
-              
-              <div>
-                <h4 className="text-sm font-medium mb-1">Contract Address</h4>
-                <p className="text-xs text-muted-foreground break-all font-mono">
-                  {contractAddress}
-                </p>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium mb-1">Previous Event</h4>
-                <p className="text-sm text-muted-foreground">
-                  {previousNodeId && previousNodeId !== 0n 
-                    ? `Event ${previousNodeId}` 
-                    : 'Root/Start of universe'
-                  }
-                </p>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium mb-1">Data Source</h4>
-                <Badge variant="outline" className="bg-blue-50">
-                  Smart Contract
+            <CardContent className="space-y-5">
+              <div className="bg-gradient-to-r from-primary/10 to-primary/5 p-4 rounded-lg">
+                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Event ID</h4>
+                <p className="text-3xl font-bold text-primary">{eventNodeId}</p>
+                <Badge variant="outline" className={`mt-2 ${isBranchedEvent ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-blue-50 text-blue-700 border-blue-200"}`}>
+                  {isBranchedEvent ? "Branched Event" : "Main Timeline"}
                 </Badge>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="p-3 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg text-center border border-blue-200">
+                  <h4 className="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">Events</h4>
+                  <p className="text-2xl font-bold text-blue-700">{universeStats.events}</p>
+                </div>
+                <div className="p-3 bg-gradient-to-br from-green-50 to-green-100 rounded-lg text-center border border-green-200">
+                  <h4 className="text-xs font-medium text-green-600 uppercase tracking-wide mb-1">Leafs</h4>
+                  <p className="text-2xl font-bold text-green-700">{universeStats.leafs}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-4">
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Universe</h4>
+                  <p className="text-sm font-medium break-all">
+                    {universe?.name || `Universe ${universeId.slice(0, 16)}...`}
+                  </p>
+                </div>
+
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Previous Event</h4>
+                  <p className="text-sm font-medium">
+                    {previousNodeId && previousNodeId !== 0n 
+                      ? `Event ${previousNodeId}` 
+                      : 'Root/Start of universe'
+                    }
+                  </p>
+                </div>
+
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Data Source</h4>
+                  <Badge variant="secondary" className={isBranchedEvent ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800"}>
+                    {isBranchedEvent ? "Local Storage" : "Smart Contract"}
+                  </Badge>
+                </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Previous Event Link */}
           {previousNodeId && previousNodeId !== 0n && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Previous Event</CardTitle>
+            <Card className="border-l-4 border-l-orange-400">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ArrowLeft className="w-4 h-4 text-orange-500" />
+                  Previous Event
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="w-full justify-start"
+                  className="w-full justify-start bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200"
                   asChild
                 >
-                  <Link to={`/event/${universeId}/${previousNodeId.toString()}`}>
+                  <a href={`/event/${universeId}/${previousNodeId.toString()}`}>
                     <ArrowLeft className="w-3 h-3 mr-2" />
                     Event {previousNodeId.toString()}
-                  </Link>
+                  </a>
                 </Button>
               </CardContent>
             </Card>
           )}
 
-          {/* Navigation */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Navigation</CardTitle>
+          {/* Quick Actions */}
+          <Card className="border-l-4 border-l-green-400">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ArrowLeft className="w-4 h-4 text-green-500" />
+                Quick Actions
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                <Link to={`/universe/${universeId}`}>
-                  View Universe Timeline
-                </Link>
+            <CardContent className="space-y-3">
+              <Button variant="default" size="sm" className="w-full justify-start bg-green-600 hover:bg-green-700 text-white" asChild>
+                <a href={`/universe/${universeId}`}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Event
+                </a>
               </Button>
-              <Button variant="outline" size="sm" className="w-full justify-start" asChild>
+              <Button variant="default" size="sm" className="w-full justify-start bg-primary hover:bg-primary/90" asChild>
+                <a href={`/universe/${universeId}`}>
+                  <Play className="w-4 h-4 mr-2" />
+                  View Timeline
+                </a>
+              </Button>
+              <Button variant="outline" size="sm" className="w-full justify-start hover:bg-muted" asChild>
                 <Link to="/universes">
-                  Back to Universe Hub
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Universe Hub
                 </Link>
               </Button>
+              {videoUrl && (
+                <Button variant="secondary" size="sm" className="w-full justify-start" asChild>
+                  <a href={videoUrl} target="_blank" rel="noopener noreferrer">
+                    <Play className="w-4 h-4 mr-2" />
+                    Open Video
+                  </a>
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>

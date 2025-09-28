@@ -54,8 +54,6 @@ export class SynapseService {
     
     // Convert PieceCID to string - try different methods
     const pieceCidString = uploadResult.pieceCid.toString?.() || 
-                          uploadResult.pieceCid.value || 
-                          uploadResult.pieceCid.cid || 
                           String(uploadResult.pieceCid);
     
     console.log(`PieceCID as string:`, pieceCidString)
@@ -65,12 +63,17 @@ export class SynapseService {
     console.log(`Attempting to fetch URL: ${input}`)
     
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
       const response = await fetch(input, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; FilecoinUploader/1.0)'
         },
-        timeout: 30000 // 30 second timeout
+        signal: controller.signal
       })
+      
+      clearTimeout(timeoutId)
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)

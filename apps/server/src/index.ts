@@ -29,7 +29,7 @@ app.route("/images", imageRouter);
 
 // Add Filecoin content serving route
 app.get("/api/filecoin/:pieceCid", async (c) => {
-  let downloadTimeout: NodeJS.Timeout;
+  let downloadTimeout: NodeJS.Timeout | undefined;
   
   try {
     const pieceCid = c.req.param("pieceCid");
@@ -87,12 +87,6 @@ app.get("/api/filecoin/:pieceCid", async (c) => {
     const memUsage = process.memoryUsage();
     console.log(`📊 Memory usage: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB heap, ${Math.round(memUsage.rss / 1024 / 1024)}MB RSS`);
     
-    // Set appropriate headers for video content
-    c.header("Content-Type", "video/mp4");
-    c.header("Cache-Control", "public, max-age=31536000");
-    c.header("Accept-Ranges", "bytes");
-    c.header("Content-Length", data.length.toString());
-    
     console.log(`📤 Serving ${data.length} bytes as video/mp4`);
     
     // Force garbage collection if available
@@ -100,7 +94,14 @@ app.get("/api/filecoin/:pieceCid", async (c) => {
       global.gc();
     }
     
-    return c.body(data);
+    return new Response(Buffer.from(data), {
+      headers: {
+        "Content-Type": "video/mp4",
+        "Cache-Control": "public, max-age=31536000",
+        "Accept-Ranges": "bytes",
+        "Content-Length": data.length.toString(),
+      },
+    });
     
   } catch (error) {
     // Cleanup timeout on error
