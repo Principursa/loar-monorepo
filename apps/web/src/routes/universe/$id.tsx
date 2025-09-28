@@ -27,7 +27,7 @@ import { timelineAbi } from '@/generated';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
 import { type Address } from 'viem';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
-
+import { UniverseSidebar } from '@/components/UniverseSidebar';
 
 // Register custom node types
 const nodeTypes = {
@@ -172,70 +172,8 @@ function UniverseTimelineEditor() {
       }
     });
   };
-  
-  // Dummy universe data for testing
-  const dummyUniverses = {
-    'cyberpunk-2077': {
-      id: 'cyberpunk-2077',
-      name: 'Cyberpunk 2077',
-      description: 'A dystopian future where technology and humanity collide in Night City',
-      address: '0xabcd...ef01',
-      creator: '0x1234...5678',
-      tokenAddress: '0x1111...1111',
-      governanceAddress: '0x2222...2222',
-      isDefault: false
-    },
-    'space-odyssey': {
-      id: 'space-odyssey',
-      name: 'Space Odyssey',
-      description: 'An epic journey through the cosmos exploring alien civilizations',
-      address: '0xbcde...f012',
-      creator: '0x2345...6789',
-      tokenAddress: '0x3333...3333',
-      governanceAddress: '0x4444...4444',
-      isDefault: false
-    },
-    'medieval-kingdoms': {
-      id: 'medieval-kingdoms',
-      name: 'Medieval Kingdoms',
-      description: 'Knights, dragons, and magic in a fantasy realm of endless adventures',
-      address: '0xcdef...0123',
-      creator: '0x3456...789a',
-      tokenAddress: '0x5555...5555',
-      governanceAddress: '0x6666...6666',
-      isDefault: false
-    },
-    'detective-noir': {
-      id: 'detective-noir',
-      name: 'Detective Noir',
-      description: 'Dark mysteries in 1940s Los Angeles with corruption and crime',
-      address: '0xdef0...1234',
-      creator: '0x4567...89ab',
-      tokenAddress: '0x7777...7777',
-      governanceAddress: '0x8888...8888',
-      isDefault: false
-    },
-    'zombie-apocalypse': {
-      id: 'zombie-apocalypse',
-      name: 'Zombie Apocalypse',
-      description: 'Survival horror in a world overrun by the undead',
-      address: '0xef01...2345',
-      creator: '0x5678...9abc',
-      tokenAddress: '0x9999...9999',
-      governanceAddress: '0xaaaa...aaaa',
-      isDefault: false
-    },
-    'blockchain-universe': {
-      id: 'blockchain-universe',
-      name: 'Blockchain Universe',
-      description: 'A decentralized narrative universe powered by smart contracts',
-      address: null,
-      isDefault: true
-    }
-  };
 
-
-  // Try to get universe data from localStorage first, then fall back to dummy data
+  // Try to get universe data from localStorage
   const { data: universeFromStorage } = useQuery({
     queryKey: ['universe-metadata', id],
     queryFn: () => {
@@ -248,8 +186,8 @@ function UniverseTimelineEditor() {
     }
   });
 
-  // Use localStorage data if available, otherwise fall back to dummy data
-  const universe = universeFromStorage || dummyUniverses[id as keyof typeof dummyUniverses] || null;
+  // Use localStorage data if available
+  const universe = universeFromStorage || null;
   const isLoadingUniverse = false;
   
   // For blockchain universes (addresses starting with 0x), use blockchain data
@@ -304,16 +242,6 @@ function UniverseTimelineEditor() {
       nodeIds: [], urls: [], descriptions: [], previousNodes: [], children: [], flags: []
     };
   }, [id, isBlockchainUniverse, fullGraphData]);
-
-  // Commented out real API calls for testing
-  // const { data: cinematicUniverse, isLoading: isLoadingUniverse } = useQuery({
-  //   queryKey: ['cinematicUniverse', id],
-  //   queryFn: () => trpcClient.cinematicUniverses.get.query({ id }),
-  //   enabled: id !== 'blockchain-universe',
-  // });
-  
-  // const { data: leavesData, isLoading: isLoadingLeaves } = useUniverseLeaves(universe?.address || undefined);
-  // const { data: fullGraphData, isLoading: isLoadingFullGraph } = useUniverseFullGraph(universe?.address || undefined);
 
   // Update timeline title when universe data loads
   useEffect(() => {
@@ -1361,142 +1289,18 @@ function UniverseTimelineEditor() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Left Sidebar - Open by default, compact, and no scroll */}
-      <div className="w-80 border-r bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-sm p-4 flex flex-col shadow-lg">
-        <div className="space-y-3 flex-1 min-h-0">
-          {/* Back Button */}
-          <div>
-            <Button variant="ghost" size="sm" asChild className="hover:bg-primary/10 hover:text-primary transition-colors duration-300">
-              <Link to="/universes">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Universes
-              </Link>
-            </Button>
-          </div>
-
-          {/* Universe Info - More Compact */}
-          <Card className="bg-gradient-to-br from-card/90 via-card to-card/95 border-border/50 shadow-md flex-shrink-0">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                <Users className="h-3 w-3 text-primary" />
-                Universe Info
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <Label className="text-xs font-medium text-muted-foreground">Name</Label>
-                <div className="text-sm font-semibold mt-1 line-clamp-1">{finalUniverse?.name}</div>
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-muted-foreground">Description</Label>
-                <div className="text-xs text-muted-foreground leading-relaxed mt-1 line-clamp-2">{finalUniverse?.description}</div>
-              </div>
-              
-              {/* Timeline Statistics - Compact Grid - Remove duplicate */}
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/50">
-                <div className="p-2 rounded-md bg-muted/30 text-center">
-                  <div className="text-xs font-medium text-muted-foreground">Events</div>
-                  <div className="text-sm font-bold">{graphData.nodeIds.length}</div>
-                </div>
-                <div className="p-2 rounded-md bg-muted/30 text-center">
-                  <div className="text-xs font-medium text-muted-foreground">Leaves</div>
-                  <div className="text-sm font-bold">{leavesData ? (Array.isArray(leavesData) ? leavesData.length : 0) : 0}</div>
-                </div>
-                <div className="p-2 rounded-md bg-muted/30 text-center col-span-2">
-                  <div className="text-xs font-medium text-muted-foreground">Status</div>
-                  <div className="flex items-center justify-center gap-1">
-                    <div className={`w-1.5 h-1.5 rounded-full ${isLoadingAny ? 'bg-yellow-500 animate-pulse' : nodes.length > 0 ? 'bg-green-500' : 'bg-gray-400'}`} />
-                    <span className="text-xs font-medium">
-                      {isLoadingAny ? 'Loading' : nodes.length > 0 ? 'Active' : 'Empty'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {!finalUniverse?.isDefault && (
-                <div className="space-y-1 pt-2 border-t border-border/50">
-                  <div className="text-xs">
-                    <span className="text-muted-foreground font-medium">Contract:</span>
-                    <code className="ml-1 bg-muted/50 px-1 py-0.5 rounded text-xs">
-                      {finalUniverse?.address?.slice(0, 8)}...{finalUniverse?.address?.slice(-6)}
-                    </code>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Add Event - Compact */}
-          <Card className="bg-gradient-to-br from-card/90 via-card to-card/95 border-border/50 shadow-md flex-shrink-0">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                <Plus className="h-3 w-3 text-primary" />
-                Add Event
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button 
-                onClick={() => handleAddEvent('after')} 
-                className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-md hover:shadow-lg transition-all duration-300"
-                size="sm"
-              >
-                <Plus className="h-3 w-3 mr-2" />
-                Add New Event
-              </Button>
-              <p className="text-xs text-muted-foreground text-center leading-tight">
-                Click events to add after or branch
-              </p>
-              <Button 
-                onClick={handleRefreshTimeline} 
-                variant="outline" 
-                size="sm"
-                className="w-full hover:bg-muted/50 transition-colors duration-300"
-              >
-                <RefreshCw className="h-3 w-3 mr-1" />
-                Refresh
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Selected Event - Compact and scrollable if needed */}
-          {selectedNode && selectedNode.data.nodeType === 'scene' && (
-            <Card className="bg-gradient-to-br from-primary/5 via-card to-card/95 border-primary/20 shadow-md flex-shrink-0">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                  <Film className="h-3 w-3 text-primary" />
-                  Event {selectedNode.data.eventId}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div>
-                  <div className="text-sm font-medium line-clamp-1">{selectedNode.data.label}</div>
-                  <div className="text-xs text-muted-foreground line-clamp-2">{selectedNode.data.description}</div>
-                </div>
-                
-                <div className="space-y-1">
-                  <Button 
-                    onClick={() => handleAddEvent('after', selectedNode.data.eventId)} 
-                    className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-md hover:shadow-lg transition-all duration-300"
-                    size="sm"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add After
-                  </Button>
-                  <Button 
-                    onClick={() => handleAddEvent('branch', selectedNode.data.eventId)} 
-                    className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white shadow-md hover:shadow-lg transition-all duration-300"
-                    size="sm"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Branch
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+    <div className="flex h-full bg-background">
+      {/* Left Sidebar Component */}
+      <UniverseSidebar
+        finalUniverse={finalUniverse}
+        graphData={graphData}
+        leavesData={leavesData}
+        nodes={nodes}
+        isLoadingAny={isLoadingAny}
+        selectedNode={selectedNode}
+        handleAddEvent={handleAddEvent}
+        handleRefreshTimeline={handleRefreshTimeline}
+      />
 
       {/* Timeline Flow */}
       <div className="flex-1 flex">
