@@ -19,6 +19,7 @@ export interface TimelineNodeData {
   timelineId?: string;
   universeId?: string;
   nodeType?: 'scene' | 'branch' | 'add';
+  isInCanonChain?: boolean; // Whether this node is part of the canonical chain
   onAddScene?: (position: 'after' | 'branch', sourceNodeId?: string) => void;
 }
 
@@ -207,6 +208,15 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                 <div className="absolute top-2 left-2 bg-black/75 text-white text-xs px-2 py-1 rounded">
                   {data.displayName || `Event ${data.eventId || '?'}`}
                 </div>
+                
+                {/* Canon badge - displayed if node is in canonical chain */}
+                {data.isInCanonChain && (
+                  <div className="absolute top-2 right-2">
+                    <Badge variant="default" className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold text-xs px-2 py-1">
+                      Canon
+                    </Badge>
+                  </div>
+                )}
               </>
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-800 flex flex-col items-center justify-center">
