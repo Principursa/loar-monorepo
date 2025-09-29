@@ -17,7 +17,7 @@ import {
   X,
   RefreshCw
 } from "lucide-react";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from "wagmi";
 import { universeGovernorAbi, governanceErc20Abi, timelineAbi } from "@/generated";
 import { type Address } from "viem";
@@ -160,6 +160,47 @@ export function GovernanceSidebar({
   // Get only scene nodes for proposal creation
   const sceneNodes = nodes.filter(node => node.data.nodeType === 'scene');
 
+  // Create a mapping from UI eventIds to sequential numeric contract IDs
+  const eventIdToContractId = useMemo(() => {
+    const mapping = new Map<string, number>();
+    const sortedNodes = [...sceneNodes].sort((a, b) => {
+      // Sort to ensure consistent mapping: main sequence first, then branches
+      const aEventId = a.data.eventId || '0';
+      const bEventId = b.data.eventId || '0';
+      
+      // Extract numeric part for primary sorting
+      const aNumeric = parseInt(aEventId.replace(/[a-z]/g, ''));
+      const bNumeric = parseInt(bEventId.replace(/[a-z]/g, ''));
+      
+      if (aNumeric !== bNumeric) {
+        return aNumeric - bNumeric;
+      }
+      
+      // For same numeric part, sort alphabetically (2 < 2b < 2c)
+      return aEventId.localeCompare(bEventId);
+    });
+
+    // Assign sequential contract IDs starting from 1
+    sortedNodes.forEach((node, index) => {
+      const eventId = node.data.eventId;
+      if (eventId) {
+        mapping.set(eventId, index + 1);
+      }
+    });
+
+    console.log('Event ID to Contract ID mapping:', Array.from(mapping.entries()));
+    return mapping;
+  }, [sceneNodes]);
+
+  // Create reverse mapping for displaying UI event IDs in proposals
+  const contractIdToEventId = useMemo(() => {
+    const reverseMapping = new Map<number, string>();
+    eventIdToContractId.forEach((contractId, eventId) => {
+      reverseMapping.set(contractId, eventId);
+    });
+    return reverseMapping;
+  }, [eventIdToContractId]);
+
   // Check if user needs to delegate tokens to themselves
   const needsDelegation = address && currentDelegate !== address && tokenBalance && tokenBalance > 0n;
 
@@ -278,9 +319,12 @@ export function GovernanceSidebar({
             console.log('Could not fetch proposal state/votes:', error);
           }
 
-          // Parse description to extract node info
+          // Parse description to extract node info  
           const nodeMatch = args.description.match(/Set Event (.+?) as Canon/);
-          const nodeId = nodeMatch ? nodeMatch[1] : 'Unknown';
+          const displayedNodeId = nodeMatch ? nodeMatch[1] : 'Unknown';
+          
+          // The displayed node ID is the UI event ID (like "2b"), not the contract ID
+          const nodeId = displayedNodeId;
 
           // Debug logging for proposal data
           console.log('Processing proposal event:', {
@@ -344,7 +388,7 @@ export function GovernanceSidebar({
 
     setIsCreatingProposal(true);
     try {
-      // Find the selected node to get its numeric ID
+      // Find the selected node
       const selectedNode = sceneNodes.find(node => 
         node.data.eventId === selectedNodeId || node.id === selectedNodeId
       );
@@ -353,32 +397,36 @@ export function GovernanceSidebar({
         throw new Error('Selected node not found');
       }
 
-      // Extract numeric node ID (blockchain node IDs are numeric)
-      const nodeIdMatch = selectedNode.id.match(/blockchain-node-(\d+)/);
-      const numericNodeId = nodeIdMatch ? parseInt(nodeIdMatch[1]) : parseInt(selectedNode.data.eventId || '0');
+      // Get the contract ID from our mapping
+      const contractNodeId = eventIdToContractId.get(selectedNode.data.eventId || '');
+      
+      if (!contractNodeId) {
+        throw new Error(`No contract ID found for event ID: ${selectedNode.data.eventId}`);
+      }
 
       console.log('Creating proposal for node:', {
         selectedNodeId,
-        selectedNode: selectedNode.id,
-        eventId: selectedNode.data.eventId,
-        numericNodeId
+        uiEventId: selectedNode.data.eventId,
+        contractNodeId,
+        mapping: Array.from(eventIdToContractId.entries())
       });
 
       // Encode the setCanon function call properly
       const setCanonCalldata = encodeFunctionData({
         abi: timelineAbi,
         functionName: 'setCanon',
-        args: [BigInt(numericNodeId)]
+        args: [BigInt(contractNodeId)]
       });
 
-      const description = `Set Event ${selectedNode.data.displayName || numericNodeId} as Canon\n\n${proposalDescription}`;
+      const description = `Set Event ${selectedNode.data.displayName || selectedNode.data.eventId} as Canon\n\n${proposalDescription}`;
 
       console.log('Creating proposal:', {
         targets: [timelineAddress],
         values: [0n],
         calldatas: [setCanonCalldata],
         description,
-        numericNodeId
+        contractNodeId,
+        uiEventId: selectedNode.data.eventId
       });
 
       // Create proposal
@@ -412,7 +460,7 @@ export function GovernanceSidebar({
     } finally {
       setIsCreatingProposal(false);
     }
-  }, [isConnected, address, selectedNodeId, proposalDescription, votingPower, proposalThreshold, sceneNodes, writeContractAsync, governanceAddress, timelineAddress]);
+  }, [isConnected, address, selectedNodeId, proposalDescription, votingPower, proposalThreshold, sceneNodes, writeContractAsync, governanceAddress, timelineAddress, eventIdToContractId]);
 
   // Handle voting on proposal
   const handleVote = useCallback(async (proposalId: bigint, support: number) => {
@@ -619,11 +667,15 @@ export function GovernanceSidebar({
                       <SelectValue placeholder="Choose an event..." />
                     </SelectTrigger>
                     <SelectContent className="z-[70]">
-                      {sceneNodes.map((node) => (
-                        <SelectItem key={node.id} value={node.data.eventId || node.id}>
-                          Event {node.data.displayName || node.data.eventId} - {node.data.label}
-                        </SelectItem>
-                      ))}
+                      {sceneNodes.map((node) => {
+                        const uiEventId = node.data.eventId || node.id;
+                        const contractId = eventIdToContractId.get(uiEventId) || '?';
+                        return (
+                          <SelectItem key={node.id} value={uiEventId}>
+                            Event {node.data.displayName || uiEventId} (Contract ID: {contractId}) - {node.data.label}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
