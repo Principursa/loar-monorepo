@@ -38,6 +38,7 @@ interface GovernanceSidebarProps {
 interface Proposal {
   id: string;
   description: string;
+  fullDescription: string;
   proposalId: bigint;
   targets: string[];
   values: bigint[];
@@ -281,9 +282,18 @@ export function GovernanceSidebar({
           const nodeMatch = args.description.match(/Set Event (.+?) as Canon/);
           const nodeId = nodeMatch ? nodeMatch[1] : 'Unknown';
 
+          // Debug logging for proposal data
+          console.log('Processing proposal event:', {
+            proposalId: args.proposalId?.toString(),
+            startBlock: args.startBlock?.toString(),
+            endBlock: args.endBlock?.toString(),
+            description: args.description
+          });
+
           return {
             id: args.proposalId.toString(),
-            description: args.description.split('\n\n')[0], // Just the first line
+            description: args.description.split('\n\n')[0], // Just the first line for display
+            fullDescription: args.description, // Store full description for execution
             proposalId: args.proposalId,
             targets: args.targets,
             values: args.values,
@@ -452,10 +462,11 @@ export function GovernanceSidebar({
         targets: proposal.targets,
         values: proposal.values,
         calldatas: proposal.calldatas,
-        descriptionHash: keccak256(new TextEncoder().encode(proposal.description))
+        fullDescription: proposal.fullDescription,
+        descriptionHash: keccak256(new TextEncoder().encode(proposal.fullDescription))
       });
 
-      const descriptionHash = keccak256(new TextEncoder().encode(proposal.description));
+      const descriptionHash = keccak256(new TextEncoder().encode(proposal.fullDescription));
 
       const txHash = await writeContractAsync({
         abi: universeGovernorAbi,
@@ -765,8 +776,11 @@ export function GovernanceSidebar({
                                       <span className="text-xs text-blue-600 dark:text-blue-400">
                                         {(() => {
                                           try {
-                                            const currentBlockBig = currentBlock ? BigInt(currentBlock.toString()) : 0n;
-                                            const endBlockBig = proposal.endBlock;
+                                            if (!proposal.endBlock || !currentBlock) {
+                                              return "Loading...";
+                                            }
+                                            const currentBlockBig = BigInt(currentBlock.toString());
+                                            const endBlockBig = BigInt(proposal.endBlock.toString());
                                             if (currentBlockBig >= endBlockBig) {
                                               return "Voting Ended";
                                             } else {
@@ -782,8 +796,12 @@ export function GovernanceSidebar({
                                     </div>
                                     {(() => {
                                       try {
-                                        const currentBlockBig = currentBlock ? BigInt(currentBlock.toString()) : 0n;
-                                        return currentBlockBig >= proposal.endBlock;
+                                        if (!proposal.endBlock || !currentBlock) {
+                                          return false;
+                                        }
+                                        const currentBlockBig = BigInt(currentBlock.toString());
+                                        const endBlockBig = BigInt(proposal.endBlock.toString());
+                                        return currentBlockBig >= endBlockBig;
                                       } catch (error) {
                                         console.error('Block comparison error:', error);
                                         return false;
@@ -799,9 +817,12 @@ export function GovernanceSidebar({
                                           style={{
                                             width: `${(() => {
                                               try {
-                                                const totalBlocks = proposal.endBlock - proposal.startBlock;
+                                                if (!proposal.endBlock || !proposal.startBlock || !currentBlock) {
+                                                  return 0;
+                                                }
+                                                const totalBlocks = BigInt(proposal.endBlock.toString()) - BigInt(proposal.startBlock.toString());
                                                 const currentBlockBigInt = BigInt(currentBlock.toString());
-                                                const blocksElapsed = currentBlockBigInt - proposal.startBlock;
+                                                const blocksElapsed = currentBlockBigInt - BigInt(proposal.startBlock.toString());
                                                 if (totalBlocks <= 0n) return 0;
                                                 const percentage = (blocksElapsed * 100n) / totalBlocks;
                                                 return Math.min(100, Math.max(0, Number(percentage.toString())));
@@ -838,8 +859,12 @@ export function GovernanceSidebar({
                               {/* Manual refresh button for when voting ends */}
                               {proposal.state === 1 && (() => {
                                 try {
-                                  const currentBlockBig = currentBlock ? BigInt(currentBlock.toString()) : 0n;
-                                  return currentBlockBig >= proposal.endBlock;
+                                  if (!proposal.endBlock || !currentBlock) {
+                                    return false;
+                                  }
+                                  const currentBlockBig = BigInt(currentBlock.toString());
+                                  const endBlockBig = BigInt(proposal.endBlock.toString());
+                                  return currentBlockBig >= endBlockBig;
                                 } catch (error) {
                                   console.error('Final block comparison error:', error);
                                   return false;
