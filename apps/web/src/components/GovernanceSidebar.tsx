@@ -14,7 +14,8 @@ import {
   Loader2,
   AlertTriangle,
   Crown,
-  X
+  X,
+  RefreshCw
 } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from "wagmi";
@@ -49,6 +50,18 @@ interface Proposal {
   endBlock: bigint;
   nodeId?: string;
 }
+
+// Proposal states from OpenZeppelin Governor
+const ProposalState = {
+  0: 'Pending',
+  1: 'Active', 
+  2: 'Canceled',
+  3: 'Defeated',
+  4: 'Succeeded',
+  5: 'Queued',
+  6: 'Expired',
+  7: 'Executed'
+} as const;
 
 export function GovernanceSidebar({
   isOpen,
@@ -172,6 +185,28 @@ export function GovernanceSidebar({
     }
   }, [address, tokenAddress, writeContractAsync]);
 
+  // Get current block number for progress tracking
+  const [currentBlock, setCurrentBlock] = useState<bigint>(0n);
+
+  // Update current block number
+  useEffect(() => {
+    const updateBlockNumber = async () => {
+      if (publicClient) {
+        try {
+          const block = await publicClient.getBlockNumber();
+          setCurrentBlock(block);
+        } catch (error) {
+          console.error('Error fetching block number:', error);
+        }
+      }
+    };
+
+    updateBlockNumber();
+    // Update every 30 seconds
+    const interval = setInterval(updateBlockNumber, 30000);
+    return () => clearInterval(interval);
+  }, [publicClient]);
+
   // Fetch proposals from ProposalCreated events
   const fetchProposalsFromEvents = useCallback(async () => {
     if (!publicClient || !governanceAddress) return;
@@ -182,6 +217,7 @@ export function GovernanceSidebar({
 
       // Get current block number
       const currentBlock = await publicClient.getBlockNumber();
+      setCurrentBlock(currentBlock);
       const fromBlock = currentBlock - 10000n; // Look back ~10k blocks (adjust as needed)
 
       // Fetch ProposalCreated events
@@ -403,6 +439,51 @@ export function GovernanceSidebar({
     }
   }, [isConnected, address, votingPower, writeContractAsync, governanceAddress, fetchProposalsFromEvents]);
 
+  // Handle proposal execution
+  const handleExecuteProposal = useCallback(async (proposal: Proposal) => {
+    if (!isConnected || !address) {
+      alert('Please connect your wallet');
+      return;
+    }
+
+    try {
+      console.log('Executing proposal:', {
+        proposalId: proposal.proposalId.toString(),
+        targets: proposal.targets,
+        values: proposal.values,
+        calldatas: proposal.calldatas,
+        descriptionHash: keccak256(new TextEncoder().encode(proposal.description))
+      });
+
+      const descriptionHash = keccak256(new TextEncoder().encode(proposal.description));
+
+      const txHash = await writeContractAsync({
+        abi: universeGovernorAbi,
+        address: governanceAddress,
+        functionName: 'execute',
+        args: [
+          proposal.targets,
+          proposal.values,
+          proposal.calldatas,
+          descriptionHash
+        ]
+      });
+
+      console.log('Proposal executed:', txHash);
+      alert(`Proposal executed successfully! Transaction: ${txHash}\n\nThe canon node has been updated.`);
+      
+      // Refresh proposals to show updated state
+      setTimeout(() => {
+        fetchProposalsFromEvents();
+        onRefresh?.(); // Also refresh the timeline to show canon changes
+      }, 5000);
+      
+    } catch (error) {
+      console.error('Error executing proposal:', error);
+      alert('Failed to execute proposal: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  }, [isConnected, address, writeContractAsync, governanceAddress, fetchProposalsFromEvents, onRefresh]);
+
   if (!isOpen) return null;
 
   return (
@@ -595,12 +676,29 @@ export function GovernanceSidebar({
                                 <h4 className="font-medium text-sm text-slate-900 dark:text-slate-100 line-clamp-2">
                                   {proposal.description}
                                 </h4>
-                                {proposal.nodeId && (
-                                  <Badge variant="outline" className="mt-1 text-xs">
-                                    <Crown className="h-3 w-3 mr-1" />
-                                    Event {proposal.nodeId}
+                                <div className="flex items-center gap-2 mt-1">
+                                  {proposal.nodeId && (
+                                    <Badge variant="outline" className="text-xs">
+                                      <Crown className="h-3 w-3 mr-1" />
+                                      Event {proposal.nodeId}
+                                    </Badge>
+                                  )}
+                                  <Badge 
+                                    variant={
+                                      proposal.state === 4 ? "default" : 
+                                      proposal.state === 1 ? "secondary" :
+                                      proposal.state === 7 ? "default" : 
+                                      "destructive"
+                                    } 
+                                    className={`text-xs ${
+                                      proposal.state === 4 ? "bg-green-500 hover:bg-green-600" :
+                                      proposal.state === 7 ? "bg-gray-500 hover:bg-gray-600" :
+                                      ""
+                                    }`}
+                                  >
+                                    {ProposalState[proposal.state as keyof typeof ProposalState] || 'Unknown'}
                                   </Badge>
-                                )}
+                                </div>
                               </div>
                             </div>
 
@@ -612,8 +710,8 @@ export function GovernanceSidebar({
                                   <Button
                                     size="sm"
                                     onClick={() => handleVote(proposal.proposalId, 1)}
-                                    disabled={!votingPower || votingPower === 0n}
-                                    className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-xs h-7 px-2"
+                                    disabled={!votingPower || votingPower === 0n || proposal.state !== 1}
+                                    className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-xs h-7 px-2 disabled:opacity-50"
                                   >
                                     <CheckCircle className="h-3 w-3" />
                                     For
@@ -628,8 +726,8 @@ export function GovernanceSidebar({
                                     size="sm"
                                     variant="destructive"
                                     onClick={() => handleVote(proposal.proposalId, 0)}
-                                    disabled={!votingPower || votingPower === 0n}
-                                    className="flex items-center gap-1 text-xs h-7 px-2"
+                                    disabled={!votingPower || votingPower === 0n || proposal.state !== 1}
+                                    className="flex items-center gap-1 text-xs h-7 px-2 disabled:opacity-50"
                                   >
                                     <XCircle className="h-3 w-3" />
                                     Against
@@ -644,8 +742,8 @@ export function GovernanceSidebar({
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleVote(proposal.proposalId, 2)}
-                                    disabled={!votingPower || votingPower === 0n}
-                                    className="flex items-center gap-1 text-xs h-7 px-2"
+                                    disabled={!votingPower || votingPower === 0n || proposal.state !== 1}
+                                    className="flex items-center gap-1 text-xs h-7 px-2 disabled:opacity-50"
                                   >
                                     <Clock className="h-3 w-3" />
                                     Abstain
@@ -655,6 +753,110 @@ export function GovernanceSidebar({
                                   </span>
                                 </div>
                               </div>
+                              
+                              {/* Voting Progress and Execute Button */}
+                              {proposal.state === 1 && currentBlock > 0n && (
+                                <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                                  <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                                        Voting Progress
+                                      </span>
+                                      <span className="text-xs text-blue-600 dark:text-blue-400">
+                                        {(() => {
+                                          try {
+                                            const currentBlockBig = currentBlock ? BigInt(currentBlock.toString()) : 0n;
+                                            const endBlockBig = proposal.endBlock;
+                                            if (currentBlockBig >= endBlockBig) {
+                                              return "Voting Ended";
+                                            } else {
+                                              const remaining = endBlockBig - currentBlockBig;
+                                              return `${remaining.toString()} blocks left`;
+                                            }
+                                          } catch (error) {
+                                            console.error('Block calculation error:', error, { currentBlock, endBlock: proposal.endBlock });
+                                            return "Loading...";
+                                          }
+                                        })()}
+                                      </span>
+                                    </div>
+                                    {(() => {
+                                      try {
+                                        const currentBlockBig = currentBlock ? BigInt(currentBlock.toString()) : 0n;
+                                        return currentBlockBig >= proposal.endBlock;
+                                      } catch (error) {
+                                        console.error('Block comparison error:', error);
+                                        return false;
+                                      }
+                                    })() ? (
+                                      <div className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 p-2 rounded">
+                                        ⏰ Voting period ended. Refresh to see if proposal succeeded and execute it.
+                                      </div>
+                                    ) : (
+                                      <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                                        <div 
+                                          className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                          style={{
+                                            width: `${(() => {
+                                              try {
+                                                const totalBlocks = proposal.endBlock - proposal.startBlock;
+                                                const currentBlockBigInt = BigInt(currentBlock.toString());
+                                                const blocksElapsed = currentBlockBigInt - proposal.startBlock;
+                                                if (totalBlocks <= 0n) return 0;
+                                                const percentage = (blocksElapsed * 100n) / totalBlocks;
+                                                return Math.min(100, Math.max(0, Number(percentage.toString())));
+                                              } catch (error) {
+                                                console.error('Progress calculation error:', error);
+                                                return 0;
+                                              }
+                                            })()}%`
+                                          }}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Execute Button - only show if proposal succeeded */}
+                              {proposal.state === 4 && (
+                                <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                                  <Button
+                                    onClick={() => handleExecuteProposal(proposal)}
+                                    className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white h-8 text-xs"
+                                    size="sm"
+                                  >
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Execute Proposal
+                                  </Button>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 text-center">
+                                    This will set the canon node and update the timeline
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Manual refresh button for when voting ends */}
+                              {proposal.state === 1 && (() => {
+                                try {
+                                  const currentBlockBig = currentBlock ? BigInt(currentBlock.toString()) : 0n;
+                                  return currentBlockBig >= proposal.endBlock;
+                                } catch (error) {
+                                  console.error('Final block comparison error:', error);
+                                  return false;
+                                }
+                              })() && (
+                                <div className="pt-2">
+                                  <Button
+                                    onClick={fetchProposalsFromEvents}
+                                    variant="outline"
+                                    className="w-full h-7 text-xs"
+                                    size="sm"
+                                  >
+                                    <RefreshCw className="h-3 w-3 mr-1" />
+                                    Refresh Proposal Status
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </CardContent>
