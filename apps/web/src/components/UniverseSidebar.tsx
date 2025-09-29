@@ -48,13 +48,13 @@ export function UniverseSidebar({
   handleRefreshTimeline,
   onOpenGovernance,
 }: UniverseSidebarProps) {
-  const [copiedAddress, setCopiedAddress] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
 
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2000);
+      setCopiedAddress(text);
+      setTimeout(() => setCopiedAddress(null), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
     }
@@ -154,7 +154,7 @@ export function UniverseSidebar({
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Activity className="h-3 w-3 text-violet-600 dark:text-violet-400" />
-                    <span className="text-xs font-medium text-violet-700 dark:text-violet-300">Contract</span>
+                    <span className="text-xs font-medium text-violet-700 dark:text-violet-300">Timeline Contract</span>
                   </div>
                   <Button
                     variant="ghost"
@@ -162,7 +162,7 @@ export function UniverseSidebar({
                     onClick={() => copyToClipboard(finalUniverse.address)}
                     className="h-6 w-6 p-0 hover:bg-violet-200 dark:hover:bg-violet-800"
                   >
-                    {copiedAddress ? (
+                    {copiedAddress === finalUniverse.address ? (
                       <CheckCircle className="h-3 w-3 text-emerald-500" />
                     ) : (
                       <Copy className="h-3 w-3 text-violet-600 dark:text-violet-400" />
@@ -183,6 +183,44 @@ export function UniverseSidebar({
                     View on Etherscan
                   </Button>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Token Contract Info */}
+          {!finalUniverse?.isDefault && finalUniverse?.tokenAddress && (
+            <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/20 dark:to-emerald-900/20 border-emerald-200 dark:border-emerald-800">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Governance Token</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => copyToClipboard(finalUniverse.tokenAddress)}
+                    className="h-6 w-6 p-0 hover:bg-emerald-200 dark:hover:bg-emerald-800"
+                  >
+                    {copiedAddress === finalUniverse.tokenAddress ? (
+                      <CheckCircle className="h-3 w-3 text-emerald-500" />
+                    ) : (
+                      <Copy className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    )}
+                  </Button>
+                </div>
+                <code className="block text-xs bg-emerald-100 dark:bg-emerald-900/50 px-2 py-1 rounded font-mono text-emerald-800 dark:text-emerald-200">
+                  {finalUniverse.tokenAddress.slice(0, 8)}...{finalUniverse.tokenAddress.slice(-8)}
+                </code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2 h-7 text-xs border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                  onClick={() => window.open(`https://etherscan.io/address/${finalUniverse.tokenAddress}`, '_blank')}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  View on Etherscan
+                </Button>
               </CardContent>
             </Card>
           )}

@@ -13,7 +13,8 @@ import {
   XCircle,
   Loader2,
   AlertTriangle,
-  Crown
+  Crown,
+  X
 } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
 import { useAccount, useReadContract, useWriteContract, useBalance } from "wagmi";
@@ -282,7 +283,7 @@ export function GovernanceSidebar({
                 onClick={onClose}
                 className="hover:bg-slate-100 dark:hover:bg-slate-800"
               >
-                <ArrowLeft className="h-4 w-4" />
+                <X className="h-4 w-4" />
               </Button>
             </div>
 
@@ -339,7 +340,7 @@ export function GovernanceSidebar({
                     <SelectTrigger>
                       <SelectValue placeholder="Choose an event..." />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[70]">
                       {sceneNodes.map((node) => (
                         <SelectItem key={node.id} value={node.data.eventId || node.id}>
                           Event {node.data.displayName || node.data.eventId} - {node.data.label}
@@ -498,6 +499,19 @@ export function GovernanceSidebar({
               </Card>
             )}
           </div>
+        </div>
+        
+        {/* Footer with Close Button */}
+        <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+          <Button
+            onClick={onClose}
+            variant="outline"
+            className="w-full"
+            size="sm"
+          >
+            <X className="h-4 w-4 mr-2" />
+            Close Governance
+          </Button>
         </div>
       </div>
     </div>
