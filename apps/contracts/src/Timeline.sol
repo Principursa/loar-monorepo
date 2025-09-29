@@ -21,6 +21,8 @@ contract Timeline is Ownable {
 
     event NodeCanonized(uint id);
     event NodeCreated(uint id, uint previous);
+    //either put an event here to emit user + node to make it indexable or create data structure that associates addy w user
+    //for profile -> videos created by user
 
     function createNode(
         string memory _link,
@@ -183,4 +185,5 @@ contract Timeline is Ownable {
         require(canonId != 0, "No canon set");
         return getTimeline(canonId);
     }
+    //Might work as well to have a function that gets the canon status of an indiviudal node
 }

@@ -15,7 +15,8 @@ import {
   Loader2,
   GitBranch,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Vote
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -33,6 +34,7 @@ interface UniverseSidebarProps {
   selectedNode: Node<TimelineNodeData> | null;
   handleAddEvent: (type: 'after' | 'branch', nodeId?: string) => void;
   handleRefreshTimeline: () => void;
+  onOpenGovernance?: () => void;
 }
 
 export function UniverseSidebar({
@@ -44,14 +46,15 @@ export function UniverseSidebar({
   selectedNode,
   handleAddEvent,
   handleRefreshTimeline,
+  onOpenGovernance,
 }: UniverseSidebarProps) {
-  const [copiedAddress, setCopiedAddress] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
 
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2000);
+      setCopiedAddress(text);
+      setTimeout(() => setCopiedAddress(null), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
     }
@@ -60,8 +63,21 @@ export function UniverseSidebar({
   const isBlockchainUniverse = finalUniverse?.address?.startsWith('0x');
 
   return (
-    <div className="w-80 border-r bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 backdrop-blur-sm flex flex-col shadow-xl border-slate-200 dark:border-slate-700">
-      <div className="flex-1 p-4 overflow-y-auto min-h-0">
+    <div className="group w-16 hover:w-80 border-r bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 backdrop-blur-sm flex flex-col shadow-xl border-slate-200 dark:border-slate-700 transition-all duration-300 ease-in-out overflow-hidden relative">
+      {/* Collapsed state indicator */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center opacity-100 group-hover:opacity-0 transition-opacity duration-200 pointer-events-none">
+        <div className="text-slate-400 dark:text-slate-500 mb-2">
+          <ArrowRight className="h-4 w-4" />
+        </div>
+        <div className="flex flex-col items-center space-y-2">
+          <div className={`w-2 h-2 rounded-full ${isLoadingAny ? 'bg-amber-500 animate-pulse' : nodes.length > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+          {isBlockchainUniverse && (
+            <Sparkles className="h-3 w-3 text-blue-500" />
+          )}
+        </div>
+      </div>
+      
+      <div className="flex-1 p-4 overflow-y-auto min-h-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-150">
         <div className="space-y-4">
           {/* Enhanced Back Button */}
           <div>
@@ -138,7 +154,7 @@ export function UniverseSidebar({
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Activity className="h-3 w-3 text-violet-600 dark:text-violet-400" />
-                    <span className="text-xs font-medium text-violet-700 dark:text-violet-300">Contract</span>
+                    <span className="text-xs font-medium text-violet-700 dark:text-violet-300">Timeline Contract</span>
                   </div>
                   <Button
                     variant="ghost"
@@ -146,7 +162,7 @@ export function UniverseSidebar({
                     onClick={() => copyToClipboard(finalUniverse.address)}
                     className="h-6 w-6 p-0 hover:bg-violet-200 dark:hover:bg-violet-800"
                   >
-                    {copiedAddress ? (
+                    {copiedAddress === finalUniverse.address ? (
                       <CheckCircle className="h-3 w-3 text-emerald-500" />
                     ) : (
                       <Copy className="h-3 w-3 text-violet-600 dark:text-violet-400" />
@@ -161,12 +177,50 @@ export function UniverseSidebar({
                     variant="outline"
                     size="sm"
                     className="w-full mt-2 h-7 text-xs border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/50"
-                    onClick={() => window.open(`https://etherscan.io/address/${finalUniverse.address}`, '_blank')}
+                    onClick={() => window.open(`https://sepolia.etherscan.io/address/${finalUniverse.address}`, '_blank')}
                   >
                     <ExternalLink className="h-3 w-3 mr-1" />
                     View on Etherscan
                   </Button>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Token Contract Info */}
+          {!finalUniverse?.isDefault && finalUniverse?.tokenAddress && (
+            <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/20 dark:to-emerald-900/20 border-emerald-200 dark:border-emerald-800">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Governance Token</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => copyToClipboard(finalUniverse.tokenAddress)}
+                    className="h-6 w-6 p-0 hover:bg-emerald-200 dark:hover:bg-emerald-800"
+                  >
+                    {copiedAddress === finalUniverse.tokenAddress ? (
+                      <CheckCircle className="h-3 w-3 text-emerald-500" />
+                    ) : (
+                      <Copy className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    )}
+                  </Button>
+                </div>
+                <code className="block text-xs bg-emerald-100 dark:bg-emerald-900/50 px-2 py-1 rounded font-mono text-emerald-800 dark:text-emerald-200">
+                  {finalUniverse.tokenAddress.slice(0, 8)}...{finalUniverse.tokenAddress.slice(-8)}
+                </code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2 h-7 text-xs border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                  onClick={() => window.open(`https://sepolia.etherscan.io/address/${finalUniverse.tokenAddress}`, '_blank')}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  View on Etherscan
+                </Button>
               </CardContent>
             </Card>
           )}
@@ -181,6 +235,18 @@ export function UniverseSidebar({
               <Plus className="h-4 w-4 mr-2 group-hover:rotate-90 transition-transform duration-300" />
               Create New Event
             </Button>
+            
+            {/* Govern button - only show for blockchain universes with governance configured */}
+            {isBlockchainUniverse && onOpenGovernance && finalUniverse?.governanceAddress && finalUniverse?.tokenAddress && (
+              <Button 
+                onClick={onOpenGovernance}
+                className="w-full bg-gradient-to-r from-violet-600 via-violet-600 to-violet-700 hover:from-violet-700 hover:via-violet-800 hover:to-violet-800 shadow-lg hover:shadow-xl transition-all duration-300 group h-10"
+                size="sm"
+              >
+                <Vote className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
+                Govern
+              </Button>
+            )}
             
             <Button 
               onClick={handleRefreshTimeline} 
