@@ -177,7 +177,7 @@ export function UniverseSidebar({
                     variant="outline"
                     size="sm"
                     className="w-full mt-2 h-7 text-xs border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/50"
-                    onClick={() => window.open(`https://etherscan.io/address/${finalUniverse.address}`, '_blank')}
+                    onClick={() => window.open(`https://sepolia.etherscan.io/address/${finalUniverse.address}`, '_blank')}
                   >
                     <ExternalLink className="h-3 w-3 mr-1" />
                     View on Etherscan
@@ -216,7 +216,7 @@ export function UniverseSidebar({
                   variant="outline"
                   size="sm"
                   className="w-full mt-2 h-7 text-xs border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
-                  onClick={() => window.open(`https://etherscan.io/address/${finalUniverse.tokenAddress}`, '_blank')}
+                  onClick={() => window.open(`https://sepolia.etherscan.io/address/${finalUniverse.tokenAddress}`, '_blank')}
                 >
                   <ExternalLink className="h-3 w-3 mr-1" />
                   View on Etherscan

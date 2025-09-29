@@ -7,7 +7,10 @@ import {ERC20Votes} from "@openzeppelin/token/ERC20/extensions/ERC20Votes.sol";
 import {Nonces} from "@openzeppelin/utils/Nonces.sol";
 
 contract GovernanceERC20 is ERC20, ERC20Permit, ERC20Votes {
-    constructor(string memory _name, string memory _symbol) ERC20(_name,_symbol) ERC20Permit(_name) {}
+    constructor(string memory _name, string memory _symbol) ERC20(_name,_symbol) ERC20Permit(_name) {
+        // Mint initial supply to the deployer (1 million tokens with 18 decimals)
+        _mint(msg.sender, 1_000_000 * 10**decimals());
+    }
 
     // The following functions are overrides required by Solidity.
 
