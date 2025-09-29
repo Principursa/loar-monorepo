@@ -25,6 +25,7 @@ import { type Address } from 'viem';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { UniverseSidebar } from '@/components/UniverseSidebar';
 import { EventCreationSidebar } from '@/components/EventCreationSidebar';
+import { GovernanceSidebar } from '@/components/GovernanceSidebar';
 
 // Register custom node types
 const nodeTypes = {
@@ -89,6 +90,9 @@ function UniverseTimelineEditor() {
   // Contract integration state
   const [isSavingToContract, setIsSavingToContract] = useState(false);
   const [contractSaved, setContractSaved] = useState(false);
+  
+  // Governance state
+  const [showGovernanceSidebar, setShowGovernanceSidebar] = useState(false);
   
   // Filecoin integration state
   const [isSavingToFilecoin, setIsSavingToFilecoin] = useState(false);
@@ -196,7 +200,12 @@ function UniverseTimelineEditor() {
     name: `Universe ${id.slice(0, 8)}...`,
     description: 'Blockchain-based cinematic universe',
     address: id,
-    isDefault: false
+    isDefault: false,
+    // For governance, we need tokenAddress and governanceAddress
+    // These should come from localStorage when the universe was created
+    // If not available, the governance features won't work
+    tokenAddress: universe?.tokenAddress || null,
+    governanceAddress: universe?.governanceAddress || null
   } : null);
   
   // Each universe with a 0x address IS its own Timeline contract
@@ -213,6 +222,27 @@ function UniverseTimelineEditor() {
   // Blockchain data fetching hooks - use the universe's own contract address
   const { data: leavesData, isLoading: isLoadingLeaves, refetch: refetchLeaves } = useUniverseLeaves(timelineContractAddress);
   const { data: fullGraphData, isLoading: isLoadingFullGraph, refetch: refetchFullGraph } = useUniverseFullGraph(timelineContractAddress);
+
+  // Canon chain data fetching hook
+  const useUniverseCanonChain = (contractAddress?: string) => {
+    if (!contractAddress) {
+      console.log('useUniverseCanonChain - No contract address provided');
+      return { data: null, isLoading: false, refetch: async () => {} };
+    }
+    
+    console.log('useUniverseCanonChain - Using address:', contractAddress, 'for universe:', id);
+    
+    return useReadContract({
+      abi: timelineAbi,
+      address: contractAddress as Address,
+      functionName: 'getCanonChain',
+      query: {
+        enabled: !!contractAddress
+      }
+    });
+  };
+
+  const { data: canonChainData, isLoading: isLoadingCanonChain, refetch: refetchCanonChain } = useUniverseCanonChain(timelineContractAddress);
   
   // Get timeline data: use blockchain data if available, otherwise dummy data
   const graphData = useMemo(() => {
@@ -220,6 +250,7 @@ function UniverseTimelineEditor() {
     console.log('Is Blockchain Universe:', isBlockchainUniverse);
     console.log('Timeline Contract Address:', timelineContractAddress);
     console.log('Full Graph Data:', fullGraphData);
+    console.log('Canon Chain Data:', canonChainData);
     console.log('=========================');
     
     if (timelineContractAddress && fullGraphData) {
@@ -231,6 +262,7 @@ function UniverseTimelineEditor() {
       console.log('URLs:', urls);
       console.log('Descriptions:', descriptions);
       console.log('Previous IDs:', previousIds);
+      console.log('Canon Chain:', canonChainData);
       console.log('==============================');
       
       return {
@@ -239,15 +271,16 @@ function UniverseTimelineEditor() {
         descriptions: descriptions || [],
         previousNodes: previousIds || [],
         children: nextIds || [],
-        flags: flags || []
+        flags: flags || [],
+        canonChain: canonChainData || []
       };
     }
     
     // Return empty data structure if no data found
     return {
-      nodeIds: [], urls: [], descriptions: [], previousNodes: [], children: [], flags: []
+      nodeIds: [], urls: [], descriptions: [], previousNodes: [], children: [], flags: [], canonChain: []
     };
-  }, [id, isBlockchainUniverse, fullGraphData]);
+  }, [id, isBlockchainUniverse, fullGraphData, canonChainData]);
 
   // Update timeline title when universe data loads
   useEffect(() => {
@@ -757,6 +790,7 @@ function UniverseTimelineEditor() {
           // Specifically refetch blockchain data
           await refetchLeaves();
           await refetchFullGraph();
+          await refetchCanonChain();
           console.log('Refetched blockchain data after contract save');
         }
         // Invalidate all queries as fallback
@@ -780,11 +814,17 @@ function UniverseTimelineEditor() {
       // Specifically refetch blockchain data
       await refetchLeaves();
       await refetchFullGraph();
+      await refetchCanonChain();
       console.log('Refetched blockchain data for universe:', id);
     }
     // Also invalidate all queries as fallback
     await queryClient.invalidateQueries();
-  }, [queryClient, isBlockchainUniverse, refetchLeaves, refetchFullGraph, id]);
+  }, [queryClient, isBlockchainUniverse, refetchLeaves, refetchFullGraph, refetchCanonChain, id]);
+
+  // Handle opening governance sidebar
+  const handleOpenGovernance = useCallback(() => {
+    setShowGovernanceSidebar(true);
+  }, []);
 
   // Handle showing video generation dialog
   const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
@@ -1104,6 +1144,12 @@ function UniverseTimelineEditor() {
         ? (typeof previousNode === 'bigint' ? Number(previousNode) : parseInt(String(previousNode)))
         : 0;
       
+      // Check if this node is in the canon chain
+      const isInCanonChain = graphData.canonChain && graphData.canonChain.some((canonId: any) => {
+        const canonNodeId = typeof canonId === 'bigint' ? Number(canonId) : parseInt(String(canonId));
+        return canonNodeId === nodeId;
+      });
+      
       // Generate proper event label
       const eventLabel = getEventLabel(nodeId, parentId);
       
@@ -1158,6 +1204,7 @@ function UniverseTimelineEditor() {
           timelineId: `timeline-1`,
           universeId: finalUniverse?.id || id,
           isRoot: String(previousNode) === '0' || !previousNode,
+          isInCanonChain: isInCanonChain, // Pass canon chain information
           onAddScene: handleAddEvent,
         }
       });
@@ -1272,7 +1319,7 @@ function UniverseTimelineEditor() {
     }
   }, [selectedNode, selectedEventTitle, selectedEventDescription, setNodes]);
 
-  const isLoadingAny = isLoadingLeaves || isLoadingFullGraph || isLoadingUniverse;
+  const isLoadingAny = isLoadingLeaves || isLoadingFullGraph || isLoadingUniverse || isLoadingCanonChain;
 
   // Not found state - only for non-blockchain universes
   if (!isBlockchainUniverse && !finalUniverse) {
@@ -1313,10 +1360,11 @@ function UniverseTimelineEditor() {
         selectedNode={selectedNode}
         handleAddEvent={handleAddEvent}
         handleRefreshTimeline={handleRefreshTimeline}
+        onOpenGovernance={handleOpenGovernance}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ease-in-out">
         <ReactFlowProvider>
           <div className="flex-1 relative overflow-hidden">
             <ReactFlow
@@ -1410,6 +1458,15 @@ function UniverseTimelineEditor() {
           handleCreateEvent={handleCreateEvent}
         />
       )}
+
+      {/* Governance Sidebar */}
+      <GovernanceSidebar
+        isOpen={showGovernanceSidebar}
+        onClose={() => setShowGovernanceSidebar(false)}
+        finalUniverse={finalUniverse}
+        nodes={nodes}
+        onRefresh={handleRefreshTimeline}
+      />
     </div>
   );
 }

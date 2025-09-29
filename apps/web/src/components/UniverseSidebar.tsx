@@ -15,7 +15,8 @@ import {
   Loader2,
   GitBranch,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Vote
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -33,6 +34,7 @@ interface UniverseSidebarProps {
   selectedNode: Node<TimelineNodeData> | null;
   handleAddEvent: (type: 'after' | 'branch', nodeId?: string) => void;
   handleRefreshTimeline: () => void;
+  onOpenGovernance?: () => void;
 }
 
 export function UniverseSidebar({
@@ -44,6 +46,7 @@ export function UniverseSidebar({
   selectedNode,
   handleAddEvent,
   handleRefreshTimeline,
+  onOpenGovernance,
 }: UniverseSidebarProps) {
   const [copiedAddress, setCopiedAddress] = useState(false);
 
@@ -60,8 +63,21 @@ export function UniverseSidebar({
   const isBlockchainUniverse = finalUniverse?.address?.startsWith('0x');
 
   return (
-    <div className="w-80 border-r bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 backdrop-blur-sm flex flex-col shadow-xl border-slate-200 dark:border-slate-700">
-      <div className="flex-1 p-4 overflow-y-auto min-h-0">
+    <div className="group w-16 hover:w-80 border-r bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 backdrop-blur-sm flex flex-col shadow-xl border-slate-200 dark:border-slate-700 transition-all duration-300 ease-in-out overflow-hidden relative">
+      {/* Collapsed state indicator */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center opacity-100 group-hover:opacity-0 transition-opacity duration-200 pointer-events-none">
+        <div className="text-slate-400 dark:text-slate-500 mb-2">
+          <ArrowRight className="h-4 w-4" />
+        </div>
+        <div className="flex flex-col items-center space-y-2">
+          <div className={`w-2 h-2 rounded-full ${isLoadingAny ? 'bg-amber-500 animate-pulse' : nodes.length > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+          {isBlockchainUniverse && (
+            <Sparkles className="h-3 w-3 text-blue-500" />
+          )}
+        </div>
+      </div>
+      
+      <div className="flex-1 p-4 overflow-y-auto min-h-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-150">
         <div className="space-y-4">
           {/* Enhanced Back Button */}
           <div>
@@ -181,6 +197,18 @@ export function UniverseSidebar({
               <Plus className="h-4 w-4 mr-2 group-hover:rotate-90 transition-transform duration-300" />
               Create New Event
             </Button>
+            
+            {/* Govern button - only show for blockchain universes with governance configured */}
+            {isBlockchainUniverse && onOpenGovernance && finalUniverse?.governanceAddress && finalUniverse?.tokenAddress && (
+              <Button 
+                onClick={onOpenGovernance}
+                className="w-full bg-gradient-to-r from-violet-600 via-violet-600 to-violet-700 hover:from-violet-700 hover:via-violet-800 hover:to-violet-800 shadow-lg hover:shadow-xl transition-all duration-300 group h-10"
+                size="sm"
+              >
+                <Vote className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
+                Govern
+              </Button>
+            )}
             
             <Button 
               onClick={handleRefreshTimeline} 
