@@ -2,14 +2,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Film, 
-  Plus, 
-  Sparkles, 
-  Image, 
-  Loader2, 
-  UserPlus, 
-  Wand2 
+import {
+  Film,
+  Plus,
+  Sparkles,
+  Image,
+  Loader2,
+  UserPlus,
+  Wand2
 } from "lucide-react";
 import { useState } from 'react';
 
@@ -264,6 +264,142 @@ export function EventCreationSidebar({
             )}
           </div>
 
+          {showCharacterGenerator && (
+            <div className="border rounded-lg p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-sm font-medium">Generate New Character</Label>
+                <button
+                  onClick={() => {
+                    setShowCharacterGenerator(false);
+                    setGeneratedCharacter(null);
+                  }}
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  ×
+                </button>
+              </div>
+
+              {!generatedCharacter ? (
+                <>
+                  <div className="space-y-3 mb-3">
+                    <div>
+                      <Label htmlFor="character-name" className="text-xs">Character Name</Label>
+                      <Input
+                        id="character-name"
+                        value={characterName}
+                        onChange={(e) => setCharacterName(e.target.value)}
+                        placeholder="Enter character name"
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="character-description" className="text-xs">Character Description</Label>
+                      <textarea
+                        id="character-description"
+                        value={characterDescription}
+                        onChange={(e) => setCharacterDescription(e.target.value)}
+                        placeholder="Describe the character's appearance, personality, and traits..."
+                        rows={3}
+                        className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-xs">Art Style</Label>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        {(['cute', 'realistic', 'anime', 'fantasy', 'cyberpunk'] as const).map((style) => (
+                          <button
+                            key={style}
+                            type="button"
+                            onClick={() => setCharacterStyle(style)}
+                            className={`px-3 py-2 text-sm rounded-md border transition-colors capitalize ${characterStyle === style
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-input bg-background hover:bg-muted"
+                              }`}
+                          >
+                            {style}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={async () => {
+                      if (characterName.trim() && characterDescription.trim()) {
+                        try {
+                          await generateCharacterMutation.mutateAsync({
+                            name: characterName,
+                            description: characterDescription,
+                            style: characterStyle
+                          });
+                        } catch (error) {
+                          console.error('Character generation error:', error);
+                        }
+                      }
+                    }}
+                    disabled={!characterName.trim() || !characterDescription.trim() || isGeneratingCharacter || generateCharacterMutation.isPending}
+                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
+                  >
+                    {(isGeneratingCharacter || generateCharacterMutation.isPending) ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating Character...
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        Generate Character
+                      </>
+                    )}
+                  </Button>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="border rounded-lg p-3 bg-background">
+                    <img
+                      src={generatedCharacter.imageUrl}
+                      alt={generatedCharacter.name}
+                      className="w-full h-auto object-contain rounded-lg mb-2 max-h-96"
+                    />
+                    <div className="text-sm font-medium">{generatedCharacter.name}</div>
+                    <div className="text-xs text-muted-foreground capitalize">{generatedCharacter.style}</div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        saveCharacterMutation.mutate();
+                      }}
+                      disabled={saveCharacterMutation.isPending}
+                      className="flex-1"
+                    >
+                      {saveCharacterMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Save & Use
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={() => setGeneratedCharacter(null)}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Regenerate
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Step 1: Generate Image */}
           {!generatedImageUrl && (
             <div className="border rounded-lg p-4 bg-muted/20">
@@ -274,7 +410,7 @@ export function EventCreationSidebar({
                 </Label>
               </div>
               <p className="text-xs text-muted-foreground mb-3">
-                {selectedCharacters.length > 0 
+                {selectedCharacters.length > 0
                   ? `Generate cinematic frame with ${selectedCharacters.length} character(s) using Qwen image-edit-plus`
                   : 'Generate cinematic frame using Qwen image-edit-plus enhancement'
                 }
@@ -287,44 +423,40 @@ export function EventCreationSidebar({
                   <button
                     type="button"
                     onClick={() => setImageFormat('landscape_16_9')}
-                    className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                      imageFormat === 'landscape_16_9' 
-                        ? "border-primary bg-primary text-primary-foreground" 
+                    className={`px-3 py-2 text-sm rounded-md border transition-colors ${imageFormat === 'landscape_16_9'
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-input bg-background hover:bg-muted"
-                    }`}
+                      }`}
                   >
                     16:9 Landscape
                   </button>
                   <button
                     type="button"
                     onClick={() => setImageFormat('portrait_16_9')}
-                    className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                      imageFormat === 'portrait_16_9' 
-                        ? "border-primary bg-primary text-primary-foreground" 
+                    className={`px-3 py-2 text-sm rounded-md border transition-colors ${imageFormat === 'portrait_16_9'
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-input bg-background hover:bg-muted"
-                    }`}
+                      }`}
                   >
                     9:16 Portrait
                   </button>
                   <button
                     type="button"
                     onClick={() => setImageFormat('landscape_4_3')}
-                    className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                      imageFormat === 'landscape_4_3' 
-                        ? "border-primary bg-primary text-primary-foreground" 
+                    className={`px-3 py-2 text-sm rounded-md border transition-colors ${imageFormat === 'landscape_4_3'
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-input bg-background hover:bg-muted"
-                    }`}
+                      }`}
                   >
                     4:3 Landscape
                   </button>
                   <button
                     type="button"
                     onClick={() => setImageFormat('portrait_4_3')}
-                    className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                      imageFormat === 'portrait_4_3' 
-                        ? "border-primary bg-primary text-primary-foreground" 
+                    className={`px-3 py-2 text-sm rounded-md border transition-colors ${imageFormat === 'portrait_4_3'
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-input bg-background hover:bg-muted"
-                    }`}
+                      }`}
                   >
                     3:4 Portrait
                   </button>
@@ -370,12 +502,12 @@ export function EventCreationSidebar({
                 <span className="w-6 h-6 rounded-full bg-green-500 text-white text-sm flex items-center justify-center">✓</span>
                 <Label className="text-sm font-medium">First Frame Generated</Label>
               </div>
-              <img 
-                src={generatedImageUrl} 
-                alt="Generated first frame" 
+              <img
+                src={generatedImageUrl}
+                alt="Generated first frame"
                 className="w-full h-auto object-contain rounded-lg border max-h-64"
               />
-              
+
               {/* Upload to tmpfiles.org */}
               <div className="mt-3 space-y-2">
                 <Button
@@ -437,39 +569,36 @@ export function EventCreationSidebar({
                   <button
                     type="button"
                     onClick={() => setVideoRatio("16:9")}
-                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                      videoRatio === "16:9" 
-                        ? "border-primary bg-primary text-primary-foreground" 
+                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${videoRatio === "16:9"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-input bg-background hover:bg-muted"
-                    }`}
+                      }`}
                   >
                     16:9 Landscape
                   </button>
                   <button
                     type="button"
                     onClick={() => setVideoRatio("9:16")}
-                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                      videoRatio === "9:16" 
-                        ? "border-primary bg-primary text-primary-foreground" 
+                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${videoRatio === "9:16"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-input bg-background hover:bg-muted"
-                    }`}
+                      }`}
                   >
                     9:16 Portrait
                   </button>
                   <button
                     type="button"
                     onClick={() => setVideoRatio("1:1")}
-                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                      videoRatio === "1:1" 
-                        ? "border-primary bg-primary text-primary-foreground" 
+                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${videoRatio === "1:1"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-input bg-background hover:bg-muted"
-                    }`}
+                      }`}
                   >
                     1:1 Square
                   </button>
                 </div>
               </div>
-              
+
               {/* Model Selection */}
               <div className="mb-3">
                 <Label className="text-xs font-medium text-muted-foreground">Video Generation Model</Label>
@@ -537,7 +666,7 @@ export function EventCreationSidebar({
                   />
                 </div>
               )}
-              
+
               <Button
                 onClick={handleGenerateVideo}
                 disabled={isGeneratingVideo}
@@ -570,10 +699,10 @@ export function EventCreationSidebar({
                   <p className="text-sm text-muted-foreground">Video preview placeholder</p>
                 </div>
               ) : (
-                <video 
+                <video
                   key={generatedVideoUrl} // Force re-render when URL changes
                   src={generatedVideoUrl}
-                  controls 
+                  controls
                   className="w-full rounded-lg border"
                   onError={(e) => {
                     console.error("Video playback error:", e);
@@ -583,7 +712,7 @@ export function EventCreationSidebar({
                   Your browser does not support the video tag.
                 </video>
               )}
-              
+
               {/* Save to Contract */}
               <div className="mt-3 space-y-2">
                 <Button
@@ -610,7 +739,7 @@ export function EventCreationSidebar({
                     </>
                   )}
                 </Button>
-                
+
                 {contractSaved && (
                   <div className="p-2 bg-green-50 border border-green-200 rounded text-xs">
                     <div className="text-green-700 font-medium">
@@ -629,7 +758,7 @@ export function EventCreationSidebar({
               </div>
             </div>
           )}
-          
+
           <div className="flex gap-3 pt-4">
             <Button
               variant="outline"
