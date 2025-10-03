@@ -1,16 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Wallet, Copy, ExternalLink, Play, Users, Calendar, Plus, Database, Search, TrendingUp, Clock, Sparkles, BarChart3 } from "lucide-react";
+import { Play, Users, Plus, Database, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
-import { useChainId, useReadContract, useAccount } from 'wagmi';
+import { useReadContract, useAccount } from 'wagmi';
 import { timelineAbi } from '@/generated';
-import { createPublicClient, http, parseEventLogs } from 'viem';
-import { sepolia } from 'viem/chains';
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { trpc } from "@/utils/trpc";
 
@@ -18,75 +14,237 @@ export const Route = createFileRoute("/universes")({
   component: RouteComponent,
 });
 
-// Component to display Universe info with contract data
-function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
-  // Read contract data for Timeline contract with better error handling
-  const { data: nodeCount, isLoading: nodeCountLoading, error: nodeCountError } = useReadContract({
+// Netflix-style Hero Banner Component
+function HeroBanner({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
+  const { data: nodeCount } = useReadContract({
     abi: timelineAbi,
     address: universe.address as `0x${string}`,
     functionName: 'latestNodeId',
     query: {
       enabled: !!universe.address && universe.address.startsWith('0x'),
-      select: (data) => data ? Number(data) : 0, // Convert BigInt to number immediately
+      select: (data) => data ? Number(data) : 0,
       retry: 1,
       refetchOnWindowFocus: false,
     }
   });
 
-  const nodeCountNumber = nodeCountError ? '?' : (nodeCountLoading ? '...' : (nodeCount || 0));
+  return (
+    <div className="relative h-[75vh] w-full overflow-hidden">
+      {/* Background Image with Gradient Overlay */}
+      <div className="absolute inset-0">
+        {universe.image_url ? (
+          <img
+            src={universe.image_url}
+            alt={universe.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+      </div>
+
+      {/* Content */}
+      <div className="relative h-full flex flex-col justify-end p-16 pb-24 max-w-3xl">
+        <div className="space-y-6">
+          {/* Badges */}
+          <div className="flex gap-3">
+            {universe.address && (
+              <Badge className="bg-white/20 backdrop-blur-md text-white border-0 px-4 py-2 text-sm">
+                <Database className="h-4 w-4 mr-2" />
+                {nodeCount || 0} nodes
+              </Badge>
+            )}
+            <Badge className="bg-primary/90 backdrop-blur-md text-white border-0 px-4 py-2 text-sm font-semibold">
+              {universe.address ? 'ON-CHAIN' : 'OFF-CHAIN'}
+            </Badge>
+          </div>
+
+          {/* Title */}
+          <h1 className="text-7xl font-bold text-white drop-shadow-2xl leading-tight">
+            {universe.name}
+          </h1>
+
+          {/* Description */}
+          <p className="text-xl text-gray-100 max-w-2xl leading-relaxed drop-shadow-lg">
+            {universe.description || "Explore this narrative universe and discover its stories"}
+          </p>
+
+          {/* Action Buttons */}
+          <div className="flex gap-4 pt-4">
+            <Button
+              size="lg"
+              className="bg-white text-black hover:bg-white/90 px-10 text-lg h-14 font-bold"
+              onClick={() => onSelect(universe.id)}
+            >
+              <Play className="h-6 w-6 mr-3 fill-black" />
+              Explore Universe
+            </Button>
+            <Button
+              size="lg"
+              variant="secondary"
+              className="bg-gray-600/70 backdrop-blur-md text-white hover:bg-gray-600/90 border-0 px-10 text-lg h-14 font-semibold"
+            >
+              <Info className="h-6 w-6 mr-3" />
+              More Info
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Netflix-style Horizontal Scrolling Row Component
+function UniverseRow({ title, universes, onSelect }: { title: string; universes: any[]; onSelect: (id: string) => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const checkScroll = () => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+      setCanScrollLeft(scrollLeft > 10);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  useEffect(() => {
+    checkScroll();
+    const ref = scrollRef.current;
+    ref?.addEventListener('scroll', checkScroll);
+    window.addEventListener('resize', checkScroll);
+    return () => {
+      ref?.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, [universes]);
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollRef.current) {
+      const scrollAmount = scrollRef.current.clientWidth * 0.9;
+      scrollRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  if (universes.length === 0) return null;
+
+  return (
+    <div className="relative group/row mb-12">
+      <h2 className="text-3xl font-bold mb-6 px-16 text-white">{title}</h2>
+
+      {/* Left Scroll Button */}
+      {canScrollLeft && (
+        <button
+          onClick={() => scroll('left')}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-black/90 hover:bg-black text-white w-16 h-full opacity-0 group-hover/row:opacity-100 transition-all duration-300 flex items-center justify-center"
+          style={{ marginTop: '24px' }}
+        >
+          <ChevronLeft className="h-12 w-12" />
+        </button>
+      )}
+
+      {/* Scrollable Container */}
+      <div
+        ref={scrollRef}
+        className="flex gap-3 overflow-x-auto scrollbar-hide px-16"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {universes.map((universe) => (
+          <UniverseCard key={universe.id} universe={universe} onSelect={onSelect} />
+        ))}
+      </div>
+
+      {/* Right Scroll Button */}
+      {canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-black/90 hover:bg-black text-white w-16 h-full opacity-0 group-hover/row:opacity-100 transition-all duration-300 flex items-center justify-center"
+          style={{ marginTop: '24px' }}
+        >
+          <ChevronRight className="h-12 w-12" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Netflix-style Universe Card Component (LARGER SIZE)
+function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  const { data: nodeCount } = useReadContract({
+    abi: timelineAbi,
+    address: universe.address as `0x${string}`,
+    functionName: 'latestNodeId',
+    query: {
+      enabled: !!universe.address && universe.address.startsWith('0x'),
+      select: (data) => data ? Number(data) : 0,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
+  });
 
   return (
     <div
-      className="group cursor-pointer"
+      className="relative flex-shrink-0 w-[450px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:z-30"
       onClick={() => onSelect(universe.id)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-primary/10">
-        {/* Universe Image */}
-        <div className="aspect-square relative overflow-hidden bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
-          {universe.image_url ? (
-            <img
-              src={universe.image_url}
-              alt={universe.name}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500" />
-          )}
+      <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-900 shadow-2xl">
+        {/* Thumbnail */}
+        {universe.image_url ? (
+          <img
+            src={universe.image_url}
+            alt={universe.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500" />
+        )}
 
-          {/* Overlay gradient */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-300" />
-
-          {/* Node count badge */}
-          {universe.address && (
-            <div className="absolute top-3 right-3">
-              <Badge className="bg-white/90 dark:bg-black/90 text-foreground border-0 backdrop-blur-sm">
-                <Database className="h-3 w-3 mr-1" />
-                {nodeCountNumber}
+        {/* Hover Overlay with Info */}
+        <div className={`absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="absolute bottom-0 left-0 right-0 p-6 space-y-3">
+            <h3 className="text-white font-bold text-2xl truncate drop-shadow-lg">{universe.name}</h3>
+            <p className="text-gray-200 text-base line-clamp-2 leading-relaxed">
+              {universe.description || "Explore this narrative universe"}
+            </p>
+            <div className="flex items-center gap-3 pt-2">
+              {universe.address && (
+                <Badge className="bg-white/30 backdrop-blur-sm text-white border-0 text-sm px-3 py-1">
+                  <Database className="h-3.5 w-3.5 mr-1.5" />
+                  {nodeCount || 0} nodes
+                </Badge>
+              )}
+              <Badge className="bg-primary/80 backdrop-blur-sm text-white border-0 text-sm px-3 py-1">
+                {universe.address ? 'On-chain' : 'Off-chain'}
               </Badge>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Universe Info */}
-        <div className="p-4">
-          <h3 className="font-semibold text-base mb-1 truncate group-hover:text-primary transition-colors">
-            {universe.name}
-          </h3>
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-            {universe.description || "Explore this narrative universe"}
-          </p>
-
-          {/* Contract Info Compact */}
-          {universe.address && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <code className="font-mono bg-muted px-2 py-0.5 rounded">
-                {universe.address.slice(0, 6)}...{universe.address.slice(-4)}
-              </code>
-              <span>•</span>
-              <span>{new Date(universe.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-            </div>
-          )}
+        {/* Play Button Overlay */}
+        <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="bg-white/30 backdrop-blur-md rounded-full p-5 border-3 border-white shadow-2xl">
+            <Play className="h-10 w-10 text-white fill-white" />
+          </div>
         </div>
+
+        {/* Small badge when not hovering */}
+        {!isHovered && universe.address && (
+          <div className="absolute top-3 right-3">
+            <Badge className="bg-black/70 backdrop-blur-sm text-white border-0 text-xs">
+              <Database className="h-3 w-3 mr-1" />
+              {nodeCount || 0}
+            </Badge>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -95,72 +253,21 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
 function RouteComponent() {
   const { isConnected } = useAccount();
   const navigate = Route.useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState("trending");
 
-  // Fetch all universes from database using TRPC
   const { data: universesResponse, isLoading, error } = useQuery(trpc.cinematicUniverses.getAll.queryOptions());
 
-  // Transform the data to match frontend expectations
   const universesData = useMemo(() => {
     if (!universesResponse?.data) return [];
-
     return universesResponse.data.map((universe: any) => ({
       ...universe,
-      name: `Universe ${universe.id.slice(0, 8)}`, // Generate name from ID since it's not in DB
-      createdAt: universe.created_at, // Map created_at to createdAt
+      name: `Universe ${universe.id.slice(0, 8)}`,
+      createdAt: universe.created_at,
     }));
   }, [universesResponse]);
 
-  // Filter universes by search query
-  const filteredUniverses = useMemo(() => {
-    if (!searchQuery) return universesData;
-    const query = searchQuery.toLowerCase();
-    return universesData.filter((u: any) =>
-      u.name.toLowerCase().includes(query) ||
-      u.description?.toLowerCase().includes(query) ||
-      u.id.toLowerCase().includes(query) ||
-      u.address?.toLowerCase().includes(query) ||
-      u.creator?.toLowerCase().includes(query) ||
-      u.tokenAddress?.toLowerCase().includes(query) ||
-      u.governanceAddress?.toLowerCase().includes(query)
-    );
-  }, [universesData, searchQuery]);
-
-  // Categorize universes
-  const categories = useMemo(() => {
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    const getSuggestions = (universes: any[]) => {
-      if (universes.length === 0) return [];
-      return [...universes]
-        .sort((a, b) => {
-          const hashA = a.id.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-          const hashB = b.id.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-          return hashA - hashB;
-        })
-        .slice(0, 12);
-    };
-
-    return {
-      trending: filteredUniverses
-        .filter((u: any) => new Date(u.createdAt) > sevenDaysAgo)
-        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 12),
-      recent: [...filteredUniverses]
-        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 12),
-      popular: [...filteredUniverses].slice(0, 12),
-      suggestions: getSuggestions(filteredUniverses),
-    };
-  }, [filteredUniverses]);
-
   useEffect(() => {
     if (!isConnected) {
-      navigate({
-        to: "/",
-      });
+      navigate({ to: "/" });
     }
   }, [isConnected, navigate]);
 
@@ -172,24 +279,16 @@ function RouteComponent() {
   };
 
   const createNewUniverse = () => {
-    navigate({
-      to: "/cinematicUniverseCreate",
-    });
+    navigate({ to: "/cinematicUniverseCreate" });
   };
-
 
   if (!isConnected) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Connect Your Wallet</CardTitle>
-            <CardDescription>
-              Connect your wallet to access the universes
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <p className="text-muted-foreground">Please connect your wallet to view created universes.</p>
+      <div className="flex items-center justify-center min-h-screen bg-black">
+        <Card className="w-full max-w-md bg-gray-900 border-gray-800">
+          <CardContent className="text-center space-y-4 p-8">
+            <h2 className="text-2xl font-bold text-white">Connect Your Wallet</h2>
+            <p className="text-gray-400">Please connect your wallet to view universes.</p>
             <WalletConnectButton size="lg" />
           </CardContent>
         </Card>
@@ -199,134 +298,76 @@ function RouteComponent() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-black">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading universes...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-primary mx-auto mb-4"></div>
+          <p className="text-white text-xl">Loading universes...</p>
         </div>
       </div>
     );
   }
 
-  const currentUniverses = categories[activeCategory as keyof typeof categories] || [];
+  const universes = universesData;
+  const featuredUniverse = universes[0];
+  const latestUniverses = universes.slice(0, 8);
+  const onChainUniverses = universes.filter(u => u.address).slice(0, 8);
+  const allUniverses = universes;
 
   return (
-    <div className="min-h-screen bg-background pb-32">
-      {/* Hero Section */}
-      <div className="relative border-b bg-gradient-to-br from-background via-muted/20 to-background">
-        <div className="container mx-auto px-6 py-12">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-4xl font-bold mb-2">Explore Universes</h1>
-              <p className="text-muted-foreground text-lg">
-                Discover narrative worlds created by the community
-              </p>
-            </div>
-            <Button
-              onClick={createNewUniverse}
-              size="lg"
-              className="gap-2"
-            >
-              <Plus className="h-5 w-5" />
-              Create Universe
-            </Button>
-          </div>
-
-          {/* Category Tabs */}
-          <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
-            <TabsList className="grid w-full max-w-2xl grid-cols-4 h-auto p-1">
-              <TabsTrigger value="trending" className="gap-2 py-3">
-                <TrendingUp className="h-4 w-4" />
-                Trending
-              </TabsTrigger>
-              <TabsTrigger value="recent" className="gap-2 py-3">
-                <Clock className="h-4 w-4" />
-                Recent
-              </TabsTrigger>
-              <TabsTrigger value="popular" className="gap-2 py-3">
-                <BarChart3 className="h-4 w-4" />
-                Popular
-              </TabsTrigger>
-              <TabsTrigger value="suggestions" className="gap-2 py-3">
-                <Sparkles className="h-4 w-4" />
-                For You
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      </div>
+    <div className="min-h-screen bg-black overflow-x-hidden">
 
       {/* Error notification */}
       {error && (
-        <div className="container mx-auto px-6 pt-6">
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              ⚠️ Unable to load universes. Make sure you're connected to Sepolia testnet.
-            </p>
-          </div>
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 px-6 py-4 bg-yellow-900/90 backdrop-blur-md border border-yellow-700 rounded-lg shadow-2xl">
+          <p className="text-yellow-100 font-medium">
+            ⚠️ Unable to load universes. Make sure you're connected to Sepolia testnet.
+          </p>
         </div>
       )}
 
       {/* Main Content */}
-      <div className="container mx-auto px-6 py-8">
-        {currentUniverses.length === 0 ? (
-          <div className="text-center py-24">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted mb-6">
-              <Users className="h-10 w-10 text-muted-foreground" />
-            </div>
-            <h3 className="text-2xl font-semibold mb-2">
-              {universesData.length === 0 ? "No universes yet" : "No results"}
-            </h3>
-            <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-              {universesData.length === 0
-                ? "Create your first narrative universe to get started"
-                : "Try adjusting your search or exploring a different category"}
-            </p>
-            {universesData.length === 0 && (
-              <Button onClick={createNewUniverse} size="lg" className="gap-2">
-                <Plus className="h-5 w-5" />
+      <main>
+        {universes.length === 0 ? (
+          <div className="flex items-center justify-center min-h-screen text-center px-4">
+            <div>
+              <div className="relative mb-8">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 rounded-full blur-3xl"></div>
+                <div className="relative bg-gradient-to-br from-gray-800/50 to-gray-900/30 backdrop-blur-sm rounded-3xl p-12 inline-block">
+                  <Users className="h-24 w-24 mx-auto text-gray-400" />
+                </div>
+              </div>
+              <h2 className="text-4xl font-bold mb-4 text-white">No universes yet</h2>
+              <p className="text-gray-400 mb-10 text-xl max-w-lg mx-auto leading-relaxed">
+                Create your first narrative universe to get started with collaborative storytelling
+              </p>
+              <Button
+                onClick={createNewUniverse}
+                className="bg-white text-black hover:bg-gray-200 font-bold text-lg px-8"
+                size="lg"
+              >
+                <Plus className="h-6 w-6 mr-2" />
                 Create Your First Universe
               </Button>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-            {currentUniverses.map((universe: any) => (
-              <UniverseCard
-                key={universe.id}
-                universe={universe}
-                onSelect={selectUniverse}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Fixed Search Bar at Bottom */}
-      {universesData.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-background via-background to-transparent border-t backdrop-blur-sm">
-          <div className="container mx-auto px-6 py-6">
-            <div className="max-w-2xl mx-auto relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
-              <Input
-                type="text"
-                placeholder="Search universes by name, description, or contract address..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-14 pl-12 pr-12 text-base rounded-full bg-background/80 backdrop-blur-md border-2 focus:border-primary shadow-lg"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  ✕
-                </button>
-              )}
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <>
+            {/* Hero Banner */}
+            {featuredUniverse && (
+              <section className="mb-16 px-16">
+                <HeroBanner universe={featuredUniverse} onSelect={selectUniverse} />
+              </section>
+            )}
+
+            {/* Content Rows */}
+            <div className="space-y-8 pb-24">
+              <UniverseRow title="Latest Universes" universes={latestUniverses} onSelect={selectUniverse} />
+              <UniverseRow title="On-chain Universes" universes={onChainUniverses} onSelect={selectUniverse} />
+              <UniverseRow title="All Universes" universes={allUniverses} onSelect={selectUniverse} />
+            </div>
+          </>
+        )}
+      </main>
     </div>
   );
 }

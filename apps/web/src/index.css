@@ -137,13 +137,13 @@
   [class*="overlay"] {
     z-index: 9999 !important;
   }
-  
+
   /* Fix any portal/overlay z-index issues */
   [data-radix-portal],
   [data-portal] {
     z-index: 9999 !important;
   }
-  
+
   /* Ensure CDP components have proper stacking context */
   .cdp-auth-button,
   [data-cdp-auth-button],
@@ -151,10 +151,22 @@
     position: relative;
     z-index: 50;
   }
-  
+
   /* Fix any backdrop/overlay issues */
   [data-backdrop],
   [class*="backdrop"] {
     z-index: 9998 !important;
+  }
+}
+
+/* Streaming platform horizontal scroll */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
