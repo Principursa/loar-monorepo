@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, Users, Plus, Database, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Play, Users, Plus, Database, ChevronLeft, ChevronRight, Info, Search } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
 import { useReadContract, useAccount } from 'wagmi';
 import { timelineAbi } from '@/generated';
@@ -18,15 +19,17 @@ export const Route = createFileRoute("/universes")({
 function HeroBanner({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
   const { data: nodeCount } = useReadContract({
     abi: timelineAbi,
-    address: universe.address as `0x${string}`,
+    address: universe?.address as `0x${string}`,
     functionName: 'latestNodeId',
     query: {
-      enabled: !!universe.address && universe.address.startsWith('0x'),
+      enabled: !!universe?.address && universe.address.startsWith('0x'),
       select: (data) => data ? Number(data) : 0,
       retry: 1,
       refetchOnWindowFocus: false,
     }
   });
+
+  if (!universe) return null;
 
   return (
     <div className="relative h-[75vh] w-full overflow-hidden">
@@ -253,6 +256,7 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
 function RouteComponent() {
   const { isConnected } = useAccount();
   const navigate = Route.useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: universesResponse, isLoading, error } = useQuery(trpc.cinematicUniverses.getAll.queryOptions());
 
@@ -264,6 +268,24 @@ function RouteComponent() {
       createdAt: universe.created_at,
     }));
   }, [universesResponse]);
+
+  // Filter universes by search query (must be before early returns)
+  const filteredUniverses = useMemo(() => {
+    if (!searchQuery) return universesData;
+    const query = searchQuery.toLowerCase();
+    return universesData.filter((u: any) =>
+      u.name.toLowerCase().includes(query) ||
+      u.description?.toLowerCase().includes(query) ||
+      u.id.toLowerCase().includes(query) ||
+      u.address?.toLowerCase().includes(query)
+    );
+  }, [universesData, searchQuery]);
+
+  const universes = filteredUniverses;
+  const featuredUniverse = universes[0];
+  const latestUniverses = universes.slice(0, 8);
+  const onChainUniverses = universes.filter(u => u.address).slice(0, 8);
+  const allUniverses = universes;
 
   useEffect(() => {
     if (!isConnected) {
@@ -307,12 +329,6 @@ function RouteComponent() {
     );
   }
 
-  const universes = universesData;
-  const featuredUniverse = universes[0];
-  const latestUniverses = universes.slice(0, 8);
-  const onChainUniverses = universes.filter(u => u.address).slice(0, 8);
-  const allUniverses = universes;
-
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
 
@@ -352,12 +368,10 @@ function RouteComponent() {
           </div>
         ) : (
           <>
-            {/* Hero Banner */}
-            {featuredUniverse && (
-              <section className="mb-16 px-16">
-                <HeroBanner universe={featuredUniverse} onSelect={selectUniverse} />
-              </section>
-            )}
+            {/* Hero Banner - Always render component to maintain hook order */}
+            <section className="mb-16 px-16">
+              <HeroBanner universe={featuredUniverse} onSelect={selectUniverse} />
+            </section>
 
             {/* Content Rows */}
             <div className="space-y-8 pb-24">
@@ -368,6 +382,20 @@ function RouteComponent() {
           </>
         )}
       </main>
+
+      {/* Fixed Search Bar at Bottom */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search universes by name, description, or address..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-12 pr-4 h-14 text-base bg-background/95 backdrop-blur-md border-2 border-border shadow-2xl rounded-full focus:ring-2 focus:ring-primary"
+          />
+        </div>
+      </div>
     </div>
   );
 }
