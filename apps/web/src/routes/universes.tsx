@@ -135,16 +135,16 @@ function UniverseRow({ title, universes, onSelect }: { title: string; universes:
 
   return (
     <div className="relative group/row mb-12">
-      <h2 className="text-3xl font-bold mb-6 px-16 text-white">{title}</h2>
+      <h2 className="text-3xl font-bold mb-6 px-16 text-foreground">{title}</h2>
 
       {/* Left Scroll Button */}
       {canScrollLeft && (
         <button
           onClick={() => scroll('left')}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-black/90 hover:bg-black text-white w-16 h-full opacity-0 group-hover/row:opacity-100 transition-all duration-300 flex items-center justify-center"
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-30 bg-background/95 hover:bg-background backdrop-blur-sm border-2 border-border text-foreground rounded-full w-12 h-12 opacity-0 group-hover/row:opacity-100 transition-all duration-300 flex items-center justify-center shadow-xl hover:scale-110"
           style={{ marginTop: '24px' }}
         >
-          <ChevronLeft className="h-12 w-12" />
+          <ChevronLeft className="h-6 w-6" />
         </button>
       )}
 
@@ -163,17 +163,17 @@ function UniverseRow({ title, universes, onSelect }: { title: string; universes:
       {canScrollRight && (
         <button
           onClick={() => scroll('right')}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-black/90 hover:bg-black text-white w-16 h-full opacity-0 group-hover/row:opacity-100 transition-all duration-300 flex items-center justify-center"
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-30 bg-background/95 hover:bg-background backdrop-blur-sm border-2 border-border text-foreground rounded-full w-12 h-12 opacity-0 group-hover/row:opacity-100 transition-all duration-300 flex items-center justify-center shadow-xl hover:scale-110"
           style={{ marginTop: '24px' }}
         >
-          <ChevronRight className="h-12 w-12" />
+          <ChevronRight className="h-6 w-6" />
         </button>
       )}
     </div>
   );
 }
 
-// Netflix-style Universe Card Component (LARGER SIZE)
+// Netflix-style Universe Card Component
 function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -191,12 +191,12 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
 
   return (
     <div
-      className="relative flex-shrink-0 w-[450px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:z-30"
+      className="relative flex-shrink-0 w-[320px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:z-30"
       onClick={() => onSelect(universe.id)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-900 shadow-2xl">
+      <div className="relative aspect-video rounded-lg overflow-hidden bg-muted shadow-2xl">
         {/* Thumbnail */}
         {universe.image_url ? (
           <img
@@ -210,19 +210,19 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
 
         {/* Hover Overlay with Info */}
         <div className={`absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="absolute bottom-0 left-0 right-0 p-6 space-y-3">
-            <h3 className="text-white font-bold text-2xl truncate drop-shadow-lg">{universe.name}</h3>
-            <p className="text-gray-200 text-base line-clamp-2 leading-relaxed">
+          <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
+            <h3 className="text-white font-bold text-lg truncate drop-shadow-lg">{universe.name}</h3>
+            <p className="text-gray-200 text-sm line-clamp-2 leading-relaxed">
               {universe.description || "Explore this narrative universe"}
             </p>
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex items-center gap-2 pt-1">
               {universe.address && (
-                <Badge className="bg-white/30 backdrop-blur-sm text-white border-0 text-sm px-3 py-1">
-                  <Database className="h-3.5 w-3.5 mr-1.5" />
+                <Badge className="bg-white/30 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
+                  <Database className="h-3 w-3 mr-1" />
                   {nodeCount || 0} nodes
                 </Badge>
               )}
-              <Badge className="bg-primary/80 backdrop-blur-sm text-white border-0 text-sm px-3 py-1">
+              <Badge className="bg-primary/80 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
                 {universe.address ? 'On-chain' : 'Off-chain'}
               </Badge>
             </div>
@@ -231,16 +231,16 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
 
         {/* Play Button Overlay */}
         <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="bg-white/30 backdrop-blur-md rounded-full p-5 border-3 border-white shadow-2xl">
-            <Play className="h-10 w-10 text-white fill-white" />
+          <div className="bg-white/30 backdrop-blur-md rounded-full p-3 border-2 border-white shadow-2xl">
+            <Play className="h-8 w-8 text-white fill-white" />
           </div>
         </div>
 
         {/* Small badge when not hovering */}
         {!isHovered && universe.address && (
-          <div className="absolute top-3 right-3">
+          <div className="absolute top-2 right-2">
             <Badge className="bg-black/70 backdrop-blur-sm text-white border-0 text-xs">
-              <Database className="h-3 w-3 mr-1" />
+              <Database className="h-2.5 w-2.5 mr-1" />
               {nodeCount || 0}
             </Badge>
           </div>
@@ -284,11 +284,11 @@ function RouteComponent() {
 
   if (!isConnected) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
-        <Card className="w-full max-w-md bg-gray-900 border-gray-800">
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Card className="w-full max-w-md">
           <CardContent className="text-center space-y-4 p-8">
-            <h2 className="text-2xl font-bold text-white">Connect Your Wallet</h2>
-            <p className="text-gray-400">Please connect your wallet to view universes.</p>
+            <h2 className="text-2xl font-bold">Connect Your Wallet</h2>
+            <p className="text-muted-foreground">Please connect your wallet to view universes.</p>
             <WalletConnectButton size="lg" />
           </CardContent>
         </Card>
@@ -298,10 +298,10 @@ function RouteComponent() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-primary mx-auto mb-4"></div>
-          <p className="text-white text-xl">Loading universes...</p>
+          <p className="text-foreground text-xl">Loading universes...</p>
         </div>
       </div>
     );
@@ -314,7 +314,7 @@ function RouteComponent() {
   const allUniverses = universes;
 
   return (
-    <div className="min-h-screen bg-black overflow-x-hidden">
+    <div className="min-h-screen bg-background overflow-x-hidden">
 
       {/* Error notification */}
       {error && (
@@ -332,17 +332,17 @@ function RouteComponent() {
             <div>
               <div className="relative mb-8">
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 rounded-full blur-3xl"></div>
-                <div className="relative bg-gradient-to-br from-gray-800/50 to-gray-900/30 backdrop-blur-sm rounded-3xl p-12 inline-block">
-                  <Users className="h-24 w-24 mx-auto text-gray-400" />
+                <div className="relative bg-muted/50 backdrop-blur-sm rounded-3xl p-12 inline-block">
+                  <Users className="h-24 w-24 mx-auto text-muted-foreground" />
                 </div>
               </div>
-              <h2 className="text-4xl font-bold mb-4 text-white">No universes yet</h2>
-              <p className="text-gray-400 mb-10 text-xl max-w-lg mx-auto leading-relaxed">
+              <h2 className="text-4xl font-bold mb-4">No universes yet</h2>
+              <p className="text-muted-foreground mb-10 text-xl max-w-lg mx-auto leading-relaxed">
                 Create your first narrative universe to get started with collaborative storytelling
               </p>
               <Button
                 onClick={createNewUniverse}
-                className="bg-white text-black hover:bg-gray-200 font-bold text-lg px-8"
+                className="font-bold text-lg px-8"
                 size="lg"
               >
                 <Plus className="h-6 w-6 mr-2" />
