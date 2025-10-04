@@ -1,15 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { useAccount, useDeployContract, useWaitForTransactionReceipt, useBalance, useChainId, useSignMessage } from "wagmi";
+import { useState } from "react";
+import { useAccount, useDeployContract, useWaitForTransactionReceipt, useBalance, useChainId, useSignMessage, useSwitchChain } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
 import { trpcClient } from "@/utils/trpc";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { governanceErc20Abi, timelineAbi, universeGovernorAbi } from "@/generated";
+import { Rocket, CheckCircle2, Loader2, ExternalLink, AlertCircle, Sparkles, Image as ImageIcon, ArrowLeft } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import governanceERC20Artifact from "../abis/GovernanceERC20.json"
 import universeGovernorArtifact from "../abis/UniverseGovernor.json"
 import timelineArtifact from "../abis/Timeline.json"
@@ -33,6 +36,7 @@ function CinematicUniverseCreate() {
   const chainId = useChainId();
   const { data: balance } = useBalance({ address });
   const { signMessage } = useSignMessage();
+  const { switchChain } = useSwitchChain();
   const [tokenName, setTokenName] = useState("");
   const [tokenSymbol, setTokenSymbol] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -40,6 +44,14 @@ function CinematicUniverseCreate() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentStep, setDeploymentStep] = useState<string>("");
   const [universeSaved, setUniverseSaved] = useState(false);
+
+  const handleSwitchNetwork = async () => {
+    try {
+      await switchChain({ chainId: 11155111 });
+    } catch (error) {
+      console.error("Failed to switch network:", error);
+    }
+  };
 
   // Database mutation for universe storage
   const createCinematicUniverse = useMutation({
@@ -128,8 +140,8 @@ function CinematicUniverseCreate() {
         abi: universeGovernorAbi,
         args: [tokenAddress!],
         bytecode: universeGovernanceBytecode as `0x${string}`,
-        gas: 8000000n, // Increased gas limit for large contract
-        chainId: 11155111, // Force Sepolia
+        gas: 8000000n,
+        chainId: 11155111,
       });
       return 'triggered';
     },
@@ -147,8 +159,8 @@ function CinematicUniverseCreate() {
         abi: timelineAbi,
         args: [governorAddress!],
         bytecode: timelineBytecode as `0x${string}`,
-        gas: 3500000n, // Increased gas limit
-        chainId: 11155111, // Force Sepolia
+        gas: 3500000n,
+        chainId: 11155111,
       });
       return 'triggered';
     },
@@ -163,8 +175,7 @@ function CinematicUniverseCreate() {
     queryKey: ['create-universe-record', timelineAddress, tokenAddress, governorAddress],
     queryFn: async () => {
       setDeploymentStep("Timeline deployed! Saving cinematic universe...");
-      
-      // Save to localStorage for universes page (backup/cache)
+
       const universeData = {
         id: timelineAddress!,
         name: tokenName,
@@ -177,7 +188,6 @@ function CinematicUniverseCreate() {
         imageUrl: imageUrl
       };
 
-      // Save to localStorage (backup)
       const existing = localStorage.getItem('createdUniverses');
       const universes = existing ? JSON.parse(existing) : [];
       const existingIndex = universes.findIndex((u: any) => u.id === timelineAddress);
@@ -188,7 +198,6 @@ function CinematicUniverseCreate() {
 
       console.log("Universe saved to localStorage:", universeData);
 
-      // Save to database (primary storage)
       try {
         await createCinematicUniverse.mutateAsync({
           address: timelineAddress!,
@@ -203,7 +212,7 @@ function CinematicUniverseCreate() {
         console.log("Database save failed, but localStorage backup is available:", error);
       }
 
-      setDeploymentStep("Cinematic Universe created successfully! Check the Universes page.");
+      setDeploymentStep("Cinematic Universe created successfully!");
       setIsDeploying(false);
       setUniverseSaved(true);
       return 'triggered';
@@ -219,9 +228,8 @@ function CinematicUniverseCreate() {
       return;
     }
 
-    // Check if we're on Sepolia testnet
     if (chainId !== 11155111) {
-      alert(`⚠️ Wrong Network!\n\nYou're on Chain ID: ${chainId}\nPlease switch to Sepolia Testnet (Chain ID: 11155111)\n\nHow to switch:\n1. Open your wallet\n2. Click on network selector\n3. Choose "Sepolia Testnet"\n\nIf Sepolia isn't visible, refresh the page after connecting.`);
+      alert(`Wrong Network! Please switch to Sepolia Testnet (Chain ID: 11155111)`);
       return;
     }
 
@@ -234,128 +242,306 @@ function CinematicUniverseCreate() {
     setDeploymentStep("Deploying GovernanceERC20 token...");
 
     try {
-      console.log("Deploying token with:", { tokenName, tokenSymbol, address, chainId });
-      console.log("Balance:", balance?.value, balance?.symbol);
-      console.log("Bytecode length:", governanceERC20Bytecode.length);
-
-      // Step 1: Deploy GovernanceERC20 token
       deployToken({
         abi: governanceErc20Abi,
         bytecode: governanceERC20Bytecode as `0x${string}`,
         args: [tokenName, tokenSymbol],
-        gas: 3000000n, // Increased gas limit
-        chainId: 11155111, // Force Sepolia
+        gas: 3000000n,
+        chainId: 11155111,
       });
     } catch (error) {
       console.error("Token deployment failed:", error);
-      setDeploymentStep(`Token deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setDeploymentStep(`Deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsDeploying(false);
     }
   };
 
+  // Not connected state
+  if (!isConnected) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center space-y-4 p-8">
+            <Sparkles className="h-16 w-16 mx-auto mb-4 text-primary" />
+            <h2 className="text-2xl font-bold">Connect Your Wallet</h2>
+            <p className="text-muted-foreground">Please connect your wallet to create a universe.</p>
+            <WalletConnectButton size="lg" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-  return (
-    <div className="container mx-auto p-6 max-w-2xl">
-      <Card>
-        <CardHeader>
-          <CardTitle>Create Cinematic Universe</CardTitle>
-          {/* Network indicator */}
-          {isConnected && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Network:</span>
-              {chainId === 11155111 ? (
-                <span className="text-green-600 font-medium">✅ Sepolia Testnet</span>
-              ) : (
-                <span className="text-red-600 font-medium">❌ Wrong Network (Chain ID: {chainId})</span>
+  // Wrong network state
+  if (chainId !== 11155111) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 px-6 py-4 bg-yellow-900/90 backdrop-blur-md border border-yellow-700 rounded-lg shadow-2xl">
+          <p className="text-yellow-100 font-medium">
+            ⚠️ Wrong Network! Please switch to Sepolia Testnet.
+          </p>
+        </div>
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center space-y-4 p-8">
+            <AlertCircle className="h-16 w-16 mx-auto mb-4 text-yellow-600" />
+            <h2 className="text-2xl font-bold">Wrong Network</h2>
+            <p className="text-muted-foreground">Please switch to Sepolia Testnet</p>
+            <Button size="lg" onClick={handleSwitchNetwork}>
+              <Rocket className="h-5 w-5 mr-2" />
+              Switch to Sepolia
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Success state
+  if (universeSaved) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <Card className="w-full max-w-2xl">
+          <CardContent className="text-center space-y-6 p-10">
+            <CheckCircle2 className="h-20 w-20 mx-auto text-green-500" />
+            <h2 className="text-3xl font-bold">Universe Created!</h2>
+            <p className="text-muted-foreground text-lg">Your universe is now deployed on Sepolia</p>
+
+            <div className="space-y-3">
+              {timelineAddress && (
+                <div className="p-4 bg-muted rounded-lg flex items-center justify-between">
+                  <div className="text-left">
+                    <p className="text-xs text-muted-foreground mb-1 uppercase font-semibold">Timeline Contract</p>
+                    <code className="text-sm font-mono">{timelineAddress.slice(0, 16)}...{timelineAddress.slice(-14)}</code>
+                  </div>
+                  <a
+                    href={`https://sepolia.etherscan.io/address/${timelineAddress}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline text-sm flex items-center gap-1"
+                  >
+                    View <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               )}
             </div>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!isConnected ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">Connect your wallet to create a cinematic universe</p>
-              <WalletConnectButton size="lg" />
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="tokenName">Token Name</Label>
-                  <Input
-                    id="tokenName"
-                    placeholder="e.g., Marvel Universe Token"
-                    value={tokenName}
-                    onChange={(e) => setTokenName(e.target.value)}
-                    disabled={isDeploying}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="tokenSymbol">Token Symbol</Label>
-                  <Input
-                    id="tokenSymbol"
-                    placeholder="e.g., MARVEL"
-                    value={tokenSymbol}
-                    onChange={(e) => setTokenSymbol(e.target.value)}
-                    disabled={isDeploying}
-                  />
-                </div>
+
+            <Button size="lg" onClick={() => window.location.href = '/universes'}>
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              View All Universes
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Main form
+  return (
+    <div className="h-full bg-background overflow-hidden">
+      <div className="h-full max-w-6xl mx-auto p-8 flex flex-col">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-4xl font-bold mb-2">Create New Universe</h1>
+          <p className="text-muted-foreground text-lg">Deploy a new cinematic universe on Sepolia testnet</p>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
+          {/* Form Panel */}
+          <Card className="flex flex-col overflow-hidden">
+            <CardContent className="p-6 flex-1 overflow-y-auto space-y-4">
+              <div>
+                <Label htmlFor="tokenName" className="text-sm font-semibold mb-2 block">
+                  Universe Name
+                </Label>
+                <Input
+                  id="tokenName"
+                  placeholder="e.g., Marvel Cinematic Universe"
+                  value={tokenName}
+                  onChange={(e) => setTokenName(e.target.value)}
+                  disabled={isDeploying}
+                  className="h-11"
+                />
               </div>
 
               <div>
-                <Label htmlFor="imageUrl">Image URL</Label>
+                <Label htmlFor="tokenSymbol" className="text-sm font-semibold mb-2 block">
+                  Token Symbol
+                </Label>
+                <Input
+                  id="tokenSymbol"
+                  placeholder="e.g., MCU"
+                  value={tokenSymbol}
+                  onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
+                  disabled={isDeploying}
+                  maxLength={10}
+                  className="h-11"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="imageUrl" className="text-sm font-semibold mb-2 block">
+                  Cover Image URL
+                </Label>
                 <Input
                   id="imageUrl"
-                  placeholder="https://example.com/universe-image.jpg"
+                  placeholder="https://example.com/cover.jpg"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
                   disabled={isDeploying}
+                  className="h-11"
                 />
               </div>
 
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Input
+              <div className="flex-1 flex flex-col">
+                <Label htmlFor="description" className="text-sm font-semibold mb-2 block">
+                  Description
+                </Label>
+                <Textarea
                   id="description"
-                  placeholder="Describe your cinematic universe..."
+                  placeholder="Describe your universe and its narrative..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   disabled={isDeploying}
+                  className="flex-1 min-h-[100px] resize-none"
+                  maxLength={500}
                 />
+                <p className="text-xs text-muted-foreground text-right mt-1">{description.length}/500</p>
               </div>
 
               <Button
                 onClick={handleDeploy}
                 disabled={isDeploying || !tokenName || !tokenSymbol || !imageUrl || !description}
-                className="w-full"
+                className="w-full h-12 text-base font-bold"
+                size="lg"
               >
-                {isDeploying ? "Deploying..." : "Deploy Cinematic Universe"}
+                {isDeploying ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Deploying Contracts...
+                  </>
+                ) : (
+                  <>
+                    <Rocket className="h-5 w-5 mr-2" />
+                    Deploy Universe
+                  </>
+                )}
               </Button>
 
               {deploymentStep && (
-                <div className="mt-4 p-4 bg-muted rounded-lg">
-                  <p className="text-sm">{deploymentStep}</p>
-                </div>
-              )}
+                <div className="p-4 bg-muted rounded-lg space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Loader2 className="h-5 w-5 text-primary animate-spin flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold">{deploymentStep}</p>
+                      <p className="text-xs text-muted-foreground mt-1">This may take a few moments...</p>
+                    </div>
+                  </div>
 
-              {(tokenAddress || governorAddress || timelineAddress) && (
-                <div className="mt-4 space-y-2">
-                  <h3 className="font-semibold">Deployed Contracts:</h3>
-                  {tokenAddress && (
-                    <p className="text-sm">Token: {tokenAddress}</p>
-                  )}
-                  {governorAddress && (
-                    <p className="text-sm">Governor: {governorAddress}</p>
-                  )}
-                  {timelineAddress && (
-                    <p className="text-sm">Timeline: {timelineAddress}</p>
-                  )}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      {tokenAddress ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      ) : (
+                        <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
+                      )}
+                      <span className={tokenAddress ? "text-green-500 font-medium" : ""}>
+                        Token Contract
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {governorAddress ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      ) : (
+                        <Loader2 className={`h-4 w-4 flex-shrink-0 ${tokenAddress ? 'animate-spin text-primary' : 'opacity-40'}`} />
+                      )}
+                      <span className={governorAddress ? "text-green-500 font-medium" : tokenAddress ? "" : "opacity-40"}>
+                        Governor Contract
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {timelineAddress ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      ) : (
+                        <Loader2 className={`h-4 w-4 flex-shrink-0 ${governorAddress ? 'animate-spin text-primary' : 'opacity-40'}`} />
+                      )}
+                      <span className={timelineAddress ? "text-green-500 font-medium" : governorAddress ? "" : "opacity-40"}>
+                        Timeline Contract
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+          {/* Preview Panel */}
+          <Card className="flex flex-col overflow-hidden">
+            <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
+              {/* Preview Image */}
+              <div className="relative aspect-video bg-muted overflow-hidden flex-shrink-0">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
+                    <ImageIcon className="h-16 w-16 text-white/40" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-6">
+                  <h3 className="text-2xl font-bold text-white drop-shadow-2xl mb-2">
+                    {tokenName || "Your Universe Name"}
+                  </h3>
+                  {tokenSymbol && (
+                    <Badge className="bg-white/20 backdrop-blur-sm text-white border-0">
+                      ${tokenSymbol}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Preview Content */}
+              <div className="p-6 space-y-4 flex-1 overflow-y-auto">
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground mb-2 uppercase">About</p>
+                  <p className="text-sm text-foreground leading-relaxed">
+                    {description || "Your universe description will appear here. Share the vision and story of your cinematic world..."}
+                  </p>
+                </div>
+
+                {(tokenAddress || governorAddress || timelineAddress) && (
+                  <div className="pt-4 border-t space-y-2">
+                    <p className="text-xs font-bold text-muted-foreground uppercase mb-3">Smart Contracts</p>
+                    {tokenAddress && (
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-[10px] text-muted-foreground mb-1 uppercase font-semibold">Token</p>
+                        <code className="font-mono text-xs">{tokenAddress.slice(0, 16)}...{tokenAddress.slice(-14)}</code>
+                      </div>
+                    )}
+                    {governorAddress && (
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-[10px] text-muted-foreground mb-1 uppercase font-semibold">Governor</p>
+                        <code className="font-mono text-xs">{governorAddress.slice(0, 16)}...{governorAddress.slice(-14)}</code>
+                      </div>
+                    )}
+                    {timelineAddress && (
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-[10px] text-muted-foreground mb-1 uppercase font-semibold">Timeline</p>
+                        <code className="font-mono text-xs">{timelineAddress.slice(0, 16)}...{timelineAddress.slice(-14)}</code>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
