@@ -41,16 +41,7 @@ export default function Header() {
 
           {/* Right side - Wallet and Theme Toggle */}
           <div className="flex items-center gap-3">
-            {isAuthenticated ? (
-              <>
-                <Button asChild size="sm" variant="ghost">
-                  <Link to="/universes" className="font-medium">Dashboard</Link>
-                </Button>
-                <WalletConnectButton size="sm" />
-              </>
-            ) : (
-              <WalletConnectButton size="sm" />
-            )}
+            <WalletConnectButton size="sm" />
             <ModeToggle />
           </div>
         </div>
