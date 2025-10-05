@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Play, Sparkles, Database, Users, GitBranch, ChevronRight, Video } from "lucide-react";
+import { Play, Sparkles, Database, Users, GitBranch, ChevronRight } from "lucide-react";
 import { useAccount, useReadContract } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
 import { trpc } from "@/utils/trpc";
@@ -12,6 +12,128 @@ import { useMemo, useState } from "react";
 export const Route = createFileRoute("/")({
   component: HomeComponent,
 });
+
+// Timeline Events Section - fetches events from blockchain
+function TimelineEventsSection() {
+  // Fetch universes from database
+  const { data: universesResponse } = useQuery(trpc.cinematicUniverses.getAll.queryOptions());
+
+  // Get universe addresses from the database (limit to 3 to avoid too many calls)
+  const universeAddresses = useMemo(() => {
+    if (!universesResponse?.data) return [];
+    return universesResponse.data
+      .filter((u: any) => u.address && u.address.startsWith('0x'))
+      .slice(0, 3) // Limit to first 3 universes
+      .map((u: any) => u.address as `0x${string}`);
+  }, [universesResponse]);
+
+  // Fetch timeline data for each universe dynamically
+  const universe1Data = useReadContract({
+    abi: timelineAbi,
+    address: universeAddresses[0],
+    functionName: 'getFullGraph',
+    query: { enabled: !!universeAddresses[0], retry: 1 }
+  });
+
+  const universe2Data = useReadContract({
+    abi: timelineAbi,
+    address: universeAddresses[1],
+    functionName: 'getFullGraph',
+    query: { enabled: !!universeAddresses[1], retry: 1 }
+  });
+
+  const universe3Data = useReadContract({
+    abi: timelineAbi,
+    address: universeAddresses[2],
+    functionName: 'getFullGraph',
+    query: { enabled: !!universeAddresses[2], retry: 1 }
+  });
+
+  const events = useMemo(() => {
+    const allEvents: Array<{ videoUrl: string; description: string; eventId: string; universeId: string }> = [];
+
+    const processUniverse = (data: any, universeId: string) => {
+      if (!data) return;
+
+      const graphData = data as readonly [readonly bigint[], readonly string[], readonly string[], readonly bigint[], readonly (readonly bigint[])[], readonly boolean[]];
+      const [ids, links, plots] = graphData;
+
+      links.forEach((url, index) => {
+        if (url && url.startsWith('http')) {
+          allEvents.push({
+            videoUrl: url,
+            description: plots[index] || 'Timeline Event',
+            eventId: `${universeId}-${ids[index]?.toString() || index}`,
+            universeId,
+          });
+        }
+      });
+    };
+
+    // Process all universe data
+    if (universeAddresses[0]) processUniverse(universe1Data.data, universeAddresses[0]);
+    if (universeAddresses[1]) processUniverse(universe2Data.data, universeAddresses[1]);
+    if (universeAddresses[2]) processUniverse(universe3Data.data, universeAddresses[2]);
+
+    // Return up to 4 events total
+    return allEvents.slice(0, 4);
+  }, [universe1Data.data, universe2Data.data, universe3Data.data, universeAddresses]);
+
+  if (!events || events.length === 0) {
+    return null; // Don't show section if no events
+  }
+
+  return (
+    <section className="py-20 px-4 bg-muted/30">
+      <div className="container mx-auto max-w-7xl">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
+            <Play className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium text-primary">Timeline Events in Action</span>
+          </div>
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">See What's Possible</h2>
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            Real timeline events created by our community using AI video generation
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          {events.map((event, index) => (
+            <div key={event.eventId} className="group relative">
+              <div className={`absolute -inset-2 bg-gradient-to-r ${index % 2 === 0 ? 'from-primary/20 to-purple-500/20' : 'from-purple-500/20 to-pink-500/20'} rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity`} />
+              <div className="relative bg-card rounded-2xl border-2 border-border overflow-hidden">
+                <div className="aspect-video bg-black">
+                  <video
+                    className="w-full h-full object-cover"
+                    controls
+                    preload="metadata"
+                  >
+                    <source
+                      src={event.videoUrl}
+                      type="video/mp4"
+                    />
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-lg mb-1 line-clamp-1">{event.description}</h3>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">AI-generated timeline event</p>
+                    <Button variant="ghost" size="sm" asChild className="h-8 text-xs">
+                      <Link to="/universe/$id" params={{ id: event.universeId }}>
+                        View Universe →
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 // Universe Card Component (reused from universes page)
 function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
@@ -120,67 +242,44 @@ function HomeComponent() {
         <div className="absolute inset-0 bg-gradient-to-b from-background via-background/80 to-background" />
 
         <div className="relative container mx-auto max-w-7xl">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left side - Text */}
-            <div className="text-left space-y-8">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium text-primary">Blockchain-Powered Storytelling</span>
-              </div>
-
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight">
-                Rebuild Your Own{" "}
-                <span className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                  Narrative Path
-                </span>
-              </h1>
-
-              <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl">
-                Create collaborative cinematic universes where your community decides the canon.
-                Build branching timelines, vote on events, and own your stories forever.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" className="text-lg px-10 h-14 font-semibold shadow-lg shadow-primary/20" asChild>
-                  <Link to="/universes">
-                    <Play className="w-5 h-5 mr-2" />
-                    Explore Universes
-                  </Link>
-                </Button>
-                {isConnected && (
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="text-lg px-10 h-14 font-semibold border-2"
-                    asChild
-                  >
-                    <Link to="/cinematicuniversecreate">
-                      Create Universe
-                      <ChevronRight className="w-5 h-5 ml-2" />
-                    </Link>
-                  </Button>
-                )}
-              </div>
+          <div className="text-center space-y-8 max-w-4xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-primary">Blockchain-Powered Storytelling</span>
             </div>
 
-            {/* Right side - Video Example */}
-            <div className="relative">
-              <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 rounded-2xl blur-2xl" />
-              <div className="relative">
-                <div className="aspect-video bg-card rounded-2xl border-2 border-border shadow-2xl overflow-hidden backdrop-blur-sm">
-                  <video
-                    className="w-full h-full object-cover"
-                    controls
-                    poster="/loar-video-generation-preview.png"
-                  >
-                    <source
-                      src="https://aggregator.walrus-testnet.walrus.space/v1/blobs/SfYobs0IsGUYorA898m0k2mQxK4wud5HotOyysKGrs0"
-                      type="video/mp4"
-                    />
-                    Your browser does not support the video tag.
-                  </video>
-                </div>
-              </div>
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight">
+              Rebuild Your Own{" "}
+              <span className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                Narrative Path
+              </span>
+            </h1>
+
+            <p className="text-xl text-muted-foreground leading-relaxed">
+              Create collaborative cinematic universes where your community decides the canon.
+              Build branching timelines, vote on events, and own your stories forever.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" className="text-lg px-10 h-14 font-semibold shadow-lg shadow-primary/20" asChild>
+                <Link to="/universes">
+                  <Play className="w-5 h-5 mr-2" />
+                  Explore Universes
+                </Link>
+              </Button>
+              {isConnected && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="text-lg px-10 h-14 font-semibold border-2"
+                  asChild
+                >
+                  <Link to="/cinematicuniversecreate">
+                    Create Universe
+                    <ChevronRight className="w-5 h-5 ml-2" />
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -213,6 +312,9 @@ function HomeComponent() {
           </div>
         </section>
       )}
+
+      {/* Timeline Events Examples Section */}
+      <TimelineEventsSection />
 
       {/* How It Works Section */}
       <section className="py-24 px-4">
