@@ -1365,63 +1365,75 @@ function UniverseTimelineEditor() {
       </div>
 
       {/* Right Sidebar - Event Creation */}
-      {showVideoDialog && (
-        <EventCreationSidebar
-          showVideoDialog={showVideoDialog}
-          setShowVideoDialog={setShowVideoDialog}
-          videoTitle={videoTitle}
-          setVideoTitle={setVideoTitle}
-          videoDescription={videoDescription}
-          setVideoDescription={setVideoDescription}
-          additionType={additionType}
-          selectedCharacters={selectedCharacters}
-          setSelectedCharacters={setSelectedCharacters}
-          showCharacterSelector={showCharacterSelector}
-          setShowCharacterSelector={setShowCharacterSelector}
-          showCharacterGenerator={showCharacterGenerator}
-          setShowCharacterGenerator={setShowCharacterGenerator}
-          charactersData={charactersData}
-          isLoadingCharacters={isLoadingCharacters}
-          characterName={characterName}
-          setCharacterName={setCharacterName}
-          characterDescription={characterDescription}
-          setCharacterDescription={setCharacterDescription}
-          characterStyle={characterStyle}
-          setCharacterStyle={setCharacterStyle}
-          isGeneratingCharacter={isGeneratingCharacter}
-          generatedCharacter={generatedCharacter}
-          setGeneratedCharacter={setGeneratedCharacter}
-          generateCharacterMutation={generateCharacterMutation}
-          saveCharacterMutation={saveCharacterMutation}
-          generatedImageUrl={generatedImageUrl}
-          isGeneratingImage={isGeneratingImage}
-          imageFormat={imageFormat}
-          setImageFormat={setImageFormat}
-          handleGenerateEventImage={handleGenerateEventImage}
-          showVideoStep={showVideoStep}
-          uploadedUrl={uploadedUrl}
-          isUploading={isUploading}
-          uploadToTmpfiles={uploadToTmpfiles}
-          generatedVideoUrl={generatedVideoUrl}
-          isGeneratingVideo={isGeneratingVideo}
-          videoPrompt={videoPrompt}
-          setVideoPrompt={setVideoPrompt}
-          videoRatio={videoRatio}
-          setVideoRatio={setVideoRatio}
-          selectedVideoModel={selectedVideoModel}
-          setSelectedVideoModel={setSelectedVideoModel}
-          negativePrompt={negativePrompt}
-          setNegativePrompt={setNegativePrompt}
-          handleGenerateVideo={handleGenerateVideo}
-          isSavingToContract={isSavingToContract}
-          contractSaved={contractSaved}
-          isSavingToFilecoin={isSavingToFilecoin}
-          filecoinSaved={filecoinSaved}
-          pieceCid={pieceCid}
-          handleSaveToContract={handleSaveToContract}
-          handleCreateEvent={handleCreateEvent}
-        />
-      )}
+      {showVideoDialog && (() => {
+        // Find previous event's video URL
+        const sourceNode = sourceNodeId
+          ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
+          : null;
+        const previousEventVideoUrl = sourceNode?.data.videoUrl || null;
+
+        return (
+          <EventCreationSidebar
+            showVideoDialog={showVideoDialog}
+            setShowVideoDialog={setShowVideoDialog}
+            videoTitle={videoTitle}
+            setVideoTitle={setVideoTitle}
+            videoDescription={videoDescription}
+            setVideoDescription={setVideoDescription}
+            additionType={additionType}
+            selectedCharacters={selectedCharacters}
+            setSelectedCharacters={setSelectedCharacters}
+            showCharacterSelector={showCharacterSelector}
+            setShowCharacterSelector={setShowCharacterSelector}
+            showCharacterGenerator={showCharacterGenerator}
+            setShowCharacterGenerator={setShowCharacterGenerator}
+            charactersData={charactersData}
+            isLoadingCharacters={isLoadingCharacters}
+            characterName={characterName}
+            setCharacterName={setCharacterName}
+            characterDescription={characterDescription}
+            setCharacterDescription={setCharacterDescription}
+            characterStyle={characterStyle}
+            setCharacterStyle={setCharacterStyle}
+            isGeneratingCharacter={isGeneratingCharacter}
+            generatedCharacter={generatedCharacter}
+            setGeneratedCharacter={setGeneratedCharacter}
+            generateCharacterMutation={generateCharacterMutation}
+            saveCharacterMutation={saveCharacterMutation}
+            generatedImageUrl={generatedImageUrl}
+            isGeneratingImage={isGeneratingImage}
+            imageFormat={imageFormat}
+            setImageFormat={setImageFormat}
+            handleGenerateEventImage={handleGenerateEventImage}
+            showVideoStep={showVideoStep}
+            setShowVideoStep={setShowVideoStep}
+            uploadedUrl={uploadedUrl}
+            setUploadedUrl={setUploadedUrl}
+            isUploading={isUploading}
+            uploadToTmpfiles={uploadToTmpfiles}
+            generatedVideoUrl={generatedVideoUrl}
+            setGeneratedImageUrl={setGeneratedImageUrl}
+            isGeneratingVideo={isGeneratingVideo}
+            videoPrompt={videoPrompt}
+            setVideoPrompt={setVideoPrompt}
+            videoRatio={videoRatio}
+            setVideoRatio={setVideoRatio}
+            selectedVideoModel={selectedVideoModel}
+            setSelectedVideoModel={setSelectedVideoModel}
+            negativePrompt={negativePrompt}
+            setNegativePrompt={setNegativePrompt}
+            handleGenerateVideo={handleGenerateVideo}
+            isSavingToContract={isSavingToContract}
+            contractSaved={contractSaved}
+            isSavingToFilecoin={isSavingToFilecoin}
+            filecoinSaved={filecoinSaved}
+            pieceCid={pieceCid}
+            handleSaveToContract={handleSaveToContract}
+            handleCreateEvent={handleCreateEvent}
+            previousEventVideoUrl={previousEventVideoUrl}
+          />
+        );
+      })()}
 
       {/* Governance Sidebar */}
       <GovernanceSidebar
