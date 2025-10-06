@@ -9,7 +9,6 @@ import { characters } from "../db/schema/characters";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { walrusService } from "../services/walrus";
 import { falService } from "../services/fal";
 
 import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverses.index";
@@ -196,51 +195,6 @@ export const appRouter = router({
           ? 'https://your-domain.com' 
           : 'http://localhost:3000';
         return { url: `${baseUrl}/api/filecoin/${input.pieceCid}` };
-      }),
-  }),
-  walrus: router({
-    uploadFromUrl: publicProcedure
-      .input(z.object({
-        url: z.string().min(1, "URL is required")
-      }))
-      .mutation(async ({ input }) => {
-        try {
-          console.log(`🌐 Walrus upload request for: ${input.url}`);
-          const result = await walrusService.uploadFromUrl(input.url);
-          console.log(`✅ Walrus upload success: ${result.blobId}`);
-          return result;
-        } catch (error) {
-          console.error('❌ Walrus upload error:', error);
-          throw error;
-        }
-      }),
-    uploadBase64: publicProcedure
-      .input(z.object({
-        base64Data: z.string().min(1, "Base64 data is required"),
-        filename: z.string().optional().default("generated-image.png")
-      }))
-      .mutation(async ({ input }) => {
-        try {
-          console.log(`🌐 Walrus upload request for base64 data (${input.base64Data.length} chars)`);
-          // Convert base64 to buffer
-          const imageBuffer = Buffer.from(input.base64Data.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64');
-          const result = await walrusService.uploadFile(imageBuffer);
-          console.log(`✅ Walrus upload success: ${result.blobId}`);
-          return result;
-        } catch (error) {
-          console.error('❌ Walrus upload error:', error);
-          throw error;
-        }
-      }),
-    getBlobInfo: publicProcedure
-      .input(z.object({ blobId: z.string() }))
-      .query(async ({ input }) => {
-        return await walrusService.getBlobInfo(input.blobId);
-      }),
-    getFileUrl: publicProcedure
-      .input(z.object({ blobId: z.string() }))
-      .query(({ input }) => {
-        return { url: walrusService.getFileUrl(input.blobId) };
       }),
   }),
 });
