@@ -363,7 +363,7 @@ function UniverseTimelineEditor() {
     }
   });
 
-  // Image generation mutation using Qwen image-edit-plus for better quality and control
+  // Image generation mutation using Nano Banana for editing
   const generateImageMutation = useMutation({
     mutationFn: async (prompt: string) => {
       // Check if we have selected characters to edit into the scene
@@ -377,19 +377,18 @@ function UniverseTimelineEditor() {
           // Create edit prompt that places characters in the scene
           const editPrompt = `${characterNames} ${prompt}, cinematic scene, high quality, detailed environment`;
           
-          // Use character image URLs directly - don't over-process them
+          // Use character image URLs directly
           const processedImageUrls = selectedChars
-            .filter((char: any) => char.image_url && char.image_url.trim()) // Filter out empty URLs
-            .map((char: any) => char.image_url); // Use URLs directly without weserv processing
+            .filter((char: any) => char.image_url && char.image_url.trim())
+            .map((char: any) => char.image_url);
           
-          console.log('🎭 === CHARACTER SCENE EDITING WITH QWEN ===');
+          console.log('🎭 === CHARACTER SCENE EDITING WITH NANO BANANA ===');
           console.log('Selected characters:', selectedChars.map((c: any) => c.character_name));
           console.log('Number of characters:', selectedChars.length);
-          console.log('Original URLs:', selectedChars.map((c: any) => c.image_url));
-          console.log('Processed URLs:', processedImageUrls);
+          console.log('Image URLs:', processedImageUrls);
           console.log('Scene prompt:', editPrompt);
           console.log('Image format:', imageFormat);
-          console.log('🚀 Calling FAL imageToImage...');
+          console.log('🚀 Calling Nano Banana Edit...');
           
           // Validate we have at least one valid image URL
           if (processedImageUrls.length === 0) {
@@ -397,101 +396,67 @@ function UniverseTimelineEditor() {
           }
           
           try {
-            // ALWAYS use Qwen image-edit-plus for character frame generation
-            console.log('🎯 Using fal-ai/qwen-image-edit-plus for character frame generation');
+            // Use Nano Banana Edit for character frame generation
+            console.log('🎯 Using fal-ai/nano-banana/edit for character frame generation');
             
             const result = await trpcClient.fal.imageToImage.mutate({
               prompt: `Create a cinematic frame: ${editPrompt}. Professional photography, detailed environment, high quality composition`,
-              imageUrls: processedImageUrls, // Character images as reference for Qwen
-              imageSize: imageFormat, // Use selected format (landscape_16_9, portrait_16_9, etc.)
+              imageUrls: processedImageUrls,
+              imageSize: imageFormat,
               numImages: 1,
-              negativePrompt: "blurry, low quality, distorted, bad anatomy, deformed, ugly, amateur"
             });
             
-            console.log('✅ Qwen image-edit-plus result:', result);
+            console.log('✅ Nano Banana Edit result:', result);
             
             if (result.status !== 'completed' || !result.imageUrl) {
-              throw new Error(result.error || 'Qwen frame generation failed');
+              throw new Error(result.error || 'Nano Banana frame generation failed');
             }
             
-            console.log('🎉 QWEN CHARACTER FRAME GENERATION SUCCESSFUL!');
+            console.log('🎉 NANO BANANA CHARACTER FRAME GENERATION SUCCESSFUL!');
             return { success: true, imageUrl: result.imageUrl };
           } catch (imageToImageError) {
-            console.error('❌ QWEN IMAGE-EDIT-PLUS FAILED:', imageToImageError);
+            console.error('❌ NANO BANANA EDIT FAILED:', imageToImageError);
             console.error('Error details:', JSON.stringify(imageToImageError, null, 2));
             
-            // More specific error message for Qwen failures
             const errorMessage = imageToImageError instanceof Error 
               ? imageToImageError.message 
-              : 'Qwen image-edit-plus failed';
+              : 'Nano Banana edit failed';
             
             throw new Error(`Frame generation failed: ${errorMessage}. Please check character images and try again.`);
           }
         }
       }
       
-      // For scenes without characters, we need a base image to transform
-      // We'll create a simple base composition and then enhance it with Qwen
-      console.log('🎨 Generating scene without characters using Qwen image-edit-plus');
+      // For scenes without characters, generate directly with Nano Banana
+      console.log('🎨 Generating scene without characters using Nano Banana');
       
       try {
-        // First, generate a basic composition with Nano Banana
-        const baseResult = await trpcClient.fal.generateImage.mutate({
-          prompt: `simple basic composition for: ${prompt}, rough sketch, basic layout`,
-          model: 'fal-ai/nano-banana',
-          imageSize: imageFormat,
-          numImages: 1
-        });
-        
-        if (baseResult.status !== 'completed' || !baseResult.imageUrl) {
-          throw new Error('Failed to generate base composition');
-        }
-        
-        console.log('✅ Base composition generated, now enhancing with Qwen...');
-        
-        // Then enhance it with Qwen image-edit-plus for higher quality
-        const enhancedResult = await trpcClient.fal.imageToImage.mutate({
+        const result = await trpcClient.fal.generateImage.mutate({
           prompt: `${prompt}, cinematic scene, high quality, detailed environment, professional photography, dramatic lighting`,
-          imageUrls: [baseResult.imageUrl],
-          imageSize: imageFormat,
-          numImages: 1,
-          negativePrompt: "blurry, low quality, distorted, sketch, rough, unfinished"
-        });
-        
-        if (enhancedResult.status !== 'completed' || !enhancedResult.imageUrl) {
-          throw new Error(enhancedResult.error || 'Failed to enhance scene with Qwen');
-        }
-        
-        console.log('🎉 QWEN ENHANCED SCENE SUCCESSFUL!');
-        return { success: true, imageUrl: enhancedResult.imageUrl };
-      } catch (error) {
-        console.error('❌ QWEN ENHANCEMENT FAILED, falling back to basic generation:', error);
-        
-        // Fallback to basic Nano Banana generation
-        const fallbackResult = await trpcClient.fal.generateImage.mutate({
-          prompt: `${prompt}, cinematic scene, high quality, detailed environment`,
           model: 'fal-ai/nano-banana',
           imageSize: imageFormat,
           numImages: 1
         });
         
-        if (fallbackResult.status !== 'completed' || !fallbackResult.imageUrl) {
-          throw new Error(fallbackResult.error || 'Failed to generate scene image');
+        if (result.status !== 'completed' || !result.imageUrl) {
+          throw new Error(result.error || 'Failed to generate scene image');
         }
         
-        return { success: true, imageUrl: fallbackResult.imageUrl };
+        console.log('🎉 NANO BANANA SCENE GENERATION SUCCESSFUL!');
+        return { success: true, imageUrl: result.imageUrl };
+      } catch (error) {
+        console.error('❌ NANO BANANA GENERATION FAILED:', error);
+        throw error;
       }
     },
     onSuccess: (data) => {
       if (data.imageUrl) {
         console.log('=== GENERATED IMAGE URL ===');
         console.log('Image URL:', data.imageUrl);
-        console.log('Image URL Length:', data.imageUrl.length);
-        console.log('Starts with data:', data.imageUrl.startsWith('data:'));
         console.log('===========================');
         
         setGeneratedImageUrl(data.imageUrl);
-        setShowVideoStep(true); // Show video generation step after image is ready
+        setShowVideoStep(true);
       }
     },
     onError: (error) => {
@@ -503,7 +468,6 @@ function UniverseTimelineEditor() {
         charactersData: charactersData?.characters?.length
       });
       
-      // More specific error message
       let errorMessage = "Failed to generate image. ";
       if (selectedCharacters.length > 0) {
         errorMessage += "Character image editing failed. ";
@@ -513,7 +477,7 @@ function UniverseTimelineEditor() {
       if (error.message?.includes('FAL_KEY')) {
         errorMessage = "FAL API key is missing. Please configure FAL_KEY in environment variables.";
       } else if (error.message?.includes('nano-banana')) {
-        errorMessage = "Nano Banana model access issue. Falling back to regular generation.";
+        errorMessage = "Nano Banana API error. Please try again.";
       }
       
       alert(errorMessage);
@@ -1401,63 +1365,75 @@ function UniverseTimelineEditor() {
       </div>
 
       {/* Right Sidebar - Event Creation */}
-      {showVideoDialog && (
-        <EventCreationSidebar
-          showVideoDialog={showVideoDialog}
-          setShowVideoDialog={setShowVideoDialog}
-          videoTitle={videoTitle}
-          setVideoTitle={setVideoTitle}
-          videoDescription={videoDescription}
-          setVideoDescription={setVideoDescription}
-          additionType={additionType}
-          selectedCharacters={selectedCharacters}
-          setSelectedCharacters={setSelectedCharacters}
-          showCharacterSelector={showCharacterSelector}
-          setShowCharacterSelector={setShowCharacterSelector}
-          showCharacterGenerator={showCharacterGenerator}
-          setShowCharacterGenerator={setShowCharacterGenerator}
-          charactersData={charactersData}
-          isLoadingCharacters={isLoadingCharacters}
-          characterName={characterName}
-          setCharacterName={setCharacterName}
-          characterDescription={characterDescription}
-          setCharacterDescription={setCharacterDescription}
-          characterStyle={characterStyle}
-          setCharacterStyle={setCharacterStyle}
-          isGeneratingCharacter={isGeneratingCharacter}
-          generatedCharacter={generatedCharacter}
-          setGeneratedCharacter={setGeneratedCharacter}
-          generateCharacterMutation={generateCharacterMutation}
-          saveCharacterMutation={saveCharacterMutation}
-          generatedImageUrl={generatedImageUrl}
-          isGeneratingImage={isGeneratingImage}
-          imageFormat={imageFormat}
-          setImageFormat={setImageFormat}
-          handleGenerateEventImage={handleGenerateEventImage}
-          showVideoStep={showVideoStep}
-          uploadedUrl={uploadedUrl}
-          isUploading={isUploading}
-          uploadToTmpfiles={uploadToTmpfiles}
-          generatedVideoUrl={generatedVideoUrl}
-          isGeneratingVideo={isGeneratingVideo}
-          videoPrompt={videoPrompt}
-          setVideoPrompt={setVideoPrompt}
-          videoRatio={videoRatio}
-          setVideoRatio={setVideoRatio}
-          selectedVideoModel={selectedVideoModel}
-          setSelectedVideoModel={setSelectedVideoModel}
-          negativePrompt={negativePrompt}
-          setNegativePrompt={setNegativePrompt}
-          handleGenerateVideo={handleGenerateVideo}
-          isSavingToContract={isSavingToContract}
-          contractSaved={contractSaved}
-          isSavingToFilecoin={isSavingToFilecoin}
-          filecoinSaved={filecoinSaved}
-          pieceCid={pieceCid}
-          handleSaveToContract={handleSaveToContract}
-          handleCreateEvent={handleCreateEvent}
-        />
-      )}
+      {showVideoDialog && (() => {
+        // Find previous event's video URL - always use the last event or the source node
+        const sourceNode = sourceNodeId
+          ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
+          : nodes.filter((n: any) => n.data.nodeType === 'scene' && n.data.videoUrl).pop();
+        const previousEventVideoUrl = sourceNode?.data.videoUrl || null;
+
+        return (
+          <EventCreationSidebar
+            showVideoDialog={showVideoDialog}
+            setShowVideoDialog={setShowVideoDialog}
+            videoTitle={videoTitle}
+            setVideoTitle={setVideoTitle}
+            videoDescription={videoDescription}
+            setVideoDescription={setVideoDescription}
+            additionType={additionType}
+            selectedCharacters={selectedCharacters}
+            setSelectedCharacters={setSelectedCharacters}
+            showCharacterSelector={showCharacterSelector}
+            setShowCharacterSelector={setShowCharacterSelector}
+            showCharacterGenerator={showCharacterGenerator}
+            setShowCharacterGenerator={setShowCharacterGenerator}
+            charactersData={charactersData}
+            isLoadingCharacters={isLoadingCharacters}
+            characterName={characterName}
+            setCharacterName={setCharacterName}
+            characterDescription={characterDescription}
+            setCharacterDescription={setCharacterDescription}
+            characterStyle={characterStyle}
+            setCharacterStyle={setCharacterStyle}
+            isGeneratingCharacter={isGeneratingCharacter}
+            generatedCharacter={generatedCharacter}
+            setGeneratedCharacter={setGeneratedCharacter}
+            generateCharacterMutation={generateCharacterMutation}
+            saveCharacterMutation={saveCharacterMutation}
+            generatedImageUrl={generatedImageUrl}
+            isGeneratingImage={isGeneratingImage}
+            imageFormat={imageFormat}
+            setImageFormat={setImageFormat}
+            handleGenerateEventImage={handleGenerateEventImage}
+            showVideoStep={showVideoStep}
+            setShowVideoStep={setShowVideoStep}
+            uploadedUrl={uploadedUrl}
+            setUploadedUrl={setUploadedUrl}
+            isUploading={isUploading}
+            uploadToTmpfiles={uploadToTmpfiles}
+            generatedVideoUrl={generatedVideoUrl}
+            setGeneratedImageUrl={setGeneratedImageUrl}
+            isGeneratingVideo={isGeneratingVideo}
+            videoPrompt={videoPrompt}
+            setVideoPrompt={setVideoPrompt}
+            videoRatio={videoRatio}
+            setVideoRatio={setVideoRatio}
+            selectedVideoModel={selectedVideoModel}
+            setSelectedVideoModel={setSelectedVideoModel}
+            negativePrompt={negativePrompt}
+            setNegativePrompt={setNegativePrompt}
+            handleGenerateVideo={handleGenerateVideo}
+            isSavingToContract={isSavingToContract}
+            contractSaved={contractSaved}
+            isSavingToFilecoin={isSavingToFilecoin}
+            filecoinSaved={filecoinSaved}
+            pieceCid={pieceCid}
+            handleSaveToContract={handleSaveToContract}
+            handleCreateEvent={handleCreateEvent}
+            previousEventVideoUrl={previousEventVideoUrl}
+          />
+        );
+      })()}
 
       {/* Governance Sidebar */}
       <GovernanceSidebar

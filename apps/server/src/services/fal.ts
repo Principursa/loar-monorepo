@@ -58,6 +58,7 @@ export interface FalVideoGenerationOptions {
   cfgScale?: number;
   resolution?: '720p' | '1080p';
   enablePromptExpansion?: boolean;
+  generateAudio?: boolean; // New: for veo3 audio generation
 }
 
 export interface FalVideoGenerationResult {
@@ -191,30 +192,79 @@ export class FalService {
   }
 
   async imageToImage(options: FalImageToImageOptions): Promise<FalImageGenerationResult> {
-    console.log('🖼️ === FAL IMAGE TO IMAGE ===');
+    console.log('🖼️ === FAL IMAGE TO IMAGE (Nano Banana Edit) ===');
     console.log('Options:', JSON.stringify(options, null, 2));
 
     try {
-      const model = 'fal-ai/qwen-image-edit-plus';
-      const input: any = {
-        prompt: options.prompt,
-        image_urls: options.imageUrls,
-        num_images: options.numImages || 1,
+      const model = 'fal-ai/nano-banana/edit';
+      
+      // Map image size to aspect ratio for nano banana
+      const mapImageSizeToAspectRatio = (imageSize?: string | { width: number; height: number }): string | undefined => {
+        if (!imageSize || typeof imageSize === 'object') return undefined;
+        
+        const mapping: Record<string, string> = {
+          'landscape_16_9': '16:9',
+          'portrait_16_9': '9:16',
+          'landscape_4_3': '4:3',
+          'portrait_4_3': '3:4',
+          'landscape_2_3': '2:3',
+          'portrait_2_3': '3:2',
+          'square': '1:1',
+          'square_hd': '1:1',
+        };
+        
+        return mapping[imageSize];
       };
 
-      if (options.negativePrompt) {
-        input.negative_prompt = options.negativePrompt;
+      // Validate and process image URLs
+      console.log('Processing image URLs:', options.imageUrls);
+      const validImageUrls: string[] = [];
+      
+      for (const url of options.imageUrls) {
+        if (!url || typeof url !== 'string' || url.trim() === '') {
+          console.warn('Skipping empty URL');
+          continue;
+        }
+
+        const trimmedUrl = url.trim();
+        
+        // Check if it's a data URI (base64)
+        if (trimmedUrl.startsWith('data:')) {
+          console.log('✅ Data URI detected');
+          validImageUrls.push(trimmedUrl);
+          continue;
+        }
+        
+        // Check if it's a valid URL
+        try {
+          new URL(trimmedUrl);
+          console.log('✅ Valid URL:', trimmedUrl.substring(0, 80) + '...');
+          validImageUrls.push(trimmedUrl);
+        } catch (urlError) {
+          console.warn('⚠️ Invalid URL format, skipping');
+        }
       }
 
-      if (options.imageSize) {
-        input.image_size = options.imageSize;
+      if (validImageUrls.length === 0) {
+        throw new Error('No valid image URLs provided');
       }
 
-      if (options.seed !== undefined) {
-        input.seed = options.seed;
+      // Map aspect ratio if provided
+      const aspectRatio = mapImageSizeToAspectRatio(options.imageSize);
+
+      const input: any = {
+        prompt: options.prompt,
+        image_urls: validImageUrls,
+        num_images: options.numImages || 1,
+        output_format: 'jpeg',
+      };
+
+      // Only add aspect_ratio if it's provided (as per API docs)
+      if (aspectRatio) {
+        input.aspect_ratio = aspectRatio;
       }
 
-      console.log('Final input for FAL Image-to-Image:', JSON.stringify(input, null, 2));
+      console.log('📤 Sending to Nano Banana Edit with input:', JSON.stringify(input, null, 2));
 
       const result = await fal.subscribe(model, {
         input,
@@ -226,65 +276,50 @@ export class FalService {
         }
       });
 
-      console.log('📥 Raw FAL Image-to-Image Response:', JSON.stringify(result, null, 2));
+      console.log('📥 Raw Nano Banana Edit Response:', JSON.stringify(result, null, 2));
 
-      // Handle response structure - try different possible structures
-      const resultAny = result as any;
-      console.log('Result keys:', Object.keys(resultAny));
-
-      let imageUrl: string | undefined;
-      let images: Array<{ url: string; width?: number; height?: number; content_type?: string }> = [];
-
-      // Try different response structures
-      if (resultAny.data && resultAny.data.images && Array.isArray(resultAny.data.images)) {
-        images = resultAny.data.images;
-        imageUrl = images[0]?.url;
-      } else if (resultAny.images && Array.isArray(resultAny.images)) {
-        images = resultAny.images;
-        imageUrl = images[0]?.url;
-      } else if (resultAny.data && resultAny.data.image) {
-        imageUrl = resultAny.data.image;
-        if (imageUrl) images = [{ url: imageUrl }];
-      } else if (resultAny.image) {
-        imageUrl = resultAny.image;
-        if (imageUrl) images = [{ url: imageUrl }];
-      } else if (resultAny.url) {
-        imageUrl = resultAny.url;
-        if (imageUrl) images = [{ url: imageUrl }];
+      // Parse response using same strategy as generateImage (which works!)
+      let data: any;
+      if ((result as any).data) {
+        data = (result as any).data;
+      } else if ((result as any).images) {
+        data = result;
+      } else {
+        throw new Error(`No data in FAL response. Available keys: ${Object.keys(result as any).join(', ')}`);
       }
 
-      if (!imageUrl) {
-        console.error('No image URL found in response');
-        console.error('Available keys:', Object.keys(resultAny));
-        if (resultAny.data) {
-          console.error('Data keys:', Object.keys(resultAny.data));
-        }
-        throw new Error('No image URL found in FAL image-to-image response');
+      // Extract images using same strategy as generateImage
+      let images: Array<{ url: string; width?: number; height?: number; content_type?: string }> = [];
+      if (data.images && Array.isArray(data.images)) {
+        images = data.images;
+      } else if (data.image) {
+        images = [{ url: data.image }];
+      } else if (typeof data === 'string') {
+        images = [{ url: data }];
+      } else if (data.url) {
+        images = [{ url: data.url }];
+      }
+
+      if (images.length === 0 || !images[0]?.url) {
+        throw new Error(`No image URLs found. Response keys: ${Object.keys(data).join(', ')}`);
+      }
+
+      console.log('✅ Successfully extracted image:', images[0].url.substring(0, 80) + '...');
+      if (data.description) {
+        console.log('📝 AI Description:', data.description);
       }
 
       return {
-        id: resultAny.requestId || Date.now().toString(),
+        id: (result as any).requestId || Date.now().toString(),
         status: 'completed',
-        imageUrl: imageUrl,
-        images: images
+        imageUrl: images[0].url,
+        images,
+        seed: data.seed
       };
     } catch (error) {
-      console.error('🚨 Fal AI image-to-image failed:', error);
-
-      // Log detailed error information
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-      }
-
-      // If it's a response error, log the response details
-      if ((error as any).response) {
-        console.error('Response status:', (error as any).response.status);
-        console.error('Response data:', (error as any).response.data);
-      }
-
+      console.error('❌ Nano Banana Edit Failed:', error);
       return {
-        id: '',
+        id: Date.now().toString(),
         status: 'failed',
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
@@ -298,10 +333,42 @@ export class FalService {
 
       if (model === 'fal-ai/veo3/fast/image-to-video') {
         if (!options.imageUrl) throw new Error('Image URL is required for Veo3 image-to-video model');
+        
+        console.log('🔧 Building Veo3 input...');
+        
         input.image_url = options.imageUrl;
-        input.duration = options.duration || 5;
-        input.aspect_ratio = options.aspectRatio || "16:9";
-        input.motion_strength = options.motionStrength || 127;
+        
+        // Veo3 only supports 8s duration
+        input.duration = "8s";
+        console.log('Using duration: 8s (Veo3 requirement)');
+        
+        // If aspect_ratio is provided and NOT "auto", use it
+        // Otherwise let Veo3 auto-detect from image
+        if (options.aspectRatio && options.aspectRatio !== "auto") {
+          input.aspect_ratio = options.aspectRatio;
+          console.log(`Using aspect ratio: ${options.aspectRatio}`);
+        } else {
+          // For veo3, omit aspect_ratio to let it auto-detect
+          // or explicitly set to "auto"
+          input.aspect_ratio = "auto";
+          console.log('Using auto aspect ratio');
+        }
+        
+        // Resolution for veo3 - defaults to 720p
+        // Only include if specified
+        if (options.resolution) {
+          input.resolution = options.resolution;
+          console.log(`Using resolution: ${options.resolution}`);
+        }
+        
+        // Generate audio (optional) - only include if explicitly set
+        if (options.generateAudio === true) {
+          input.generate_audio = true;
+          console.log('Audio generation enabled');
+        }
+        
+        console.log('✅ Veo3 input prepared:', JSON.stringify(input, null, 2));
+        
       } else if (model === 'fal-ai/wan-25-preview/image-to-video') {
         if (!options.imageUrl) throw new Error('Image URL is required for wan25 image-to-video model');
         input.image_url = options.imageUrl;
@@ -326,50 +393,83 @@ export class FalService {
         if (options.imageUrl) input.image_url = options.imageUrl;
       }
 
-      console.log(`Starting Fal AI video generation with model: ${model}`);
-      console.log('Input parameters:', JSON.stringify(input, null, 2));
+      console.log(`🎬 Calling FAL API: ${model}`);
+      console.log('📤 Final input:', JSON.stringify(input, null, 2));
 
-      const result = await fal.subscribe(model, {
-        input,
-        logs: true,
-        onQueueUpdate: (update) => console.log('Fal AI queue update:', update)
+      let result;
+      try {
+        result = await fal.subscribe(model, {
+          input,
+          logs: true,
+          onQueueUpdate: (update) => {
+            console.log('📊 Status:', update.status);
+            if (update.status === "IN_PROGRESS" && update.logs) {
+              update.logs.map((log: any) => log.message).forEach(console.log);
+            }
+          }
+        });
+      } catch (subscribeError: any) {
+        console.error('❌ Subscribe error:', subscribeError);
+        
+        // Log detailed validation errors
+        if (subscribeError.body?.detail) {
+          console.error('Validation details:', JSON.stringify(subscribeError.body.detail, null, 2));
+        }
+        
+        throw subscribeError;
+      }
+
+      console.log('📥 Video generation completed!');
+
+      // Parse response - FAL returns result.data
+      const resultAny = result as any;
+      const data = resultAny.data || resultAny;
+
+      console.log('Response structure:', {
+        hasData: !!resultAny.data,
+        dataKeys: Object.keys(data).join(', ')
       });
 
-      console.log('📥 Raw FAL Video Response:', JSON.stringify(result, null, 2));
-
-      // Handle different response structures
-      let data: any;
+      // Try different possible video URL locations
       let videoUrl: string | undefined;
-
-      if ((result as any).data) {
-        data = (result as any).data;
-        // Try different possible video URL locations
-        videoUrl = data.video?.url || data.video_url || data.url;
-      } else if ((result as any).video) {
-        videoUrl = (result as any).video.url || (result as any).video;
-      } else if ((result as any).url) {
-        videoUrl = (result as any).url;
+      
+      if (data.video?.url) {
+        videoUrl = data.video.url;
+      } else if (data.video_url) {
+        videoUrl = data.video_url;
+      } else if (data.url) {
+        videoUrl = data.url;
+      } else if (typeof data.video === 'string') {
+        videoUrl = data.video;
       }
 
       if (!videoUrl) {
-        console.error('No video URL found in response. Available keys:', Object.keys(result as any));
-        if (data) {
-          console.error('Data keys:', Object.keys(data));
-        }
-        throw new Error('No video URL found in FAL response');
+        console.error('❌ No video URL in response');
+        console.error('Available data:', JSON.stringify(data, null, 2));
+        throw new Error(`No video URL found. Response keys: ${Object.keys(data).join(', ')}`);
       }
 
+      console.log('✅ Video generated:', videoUrl.substring(0, 100) + '...');
+
       return {
-        id: (result as any).requestId || Date.now().toString(),
+        id: resultAny.requestId || Date.now().toString(),
         status: 'completed',
         videoUrl: videoUrl
       };
-    } catch (error) {
-      console.error('Fal AI video generation failed:', error);
+    } catch (error: any) {
+      console.error('❌ Video generation failed');
+      console.error('Error:', error.message || error);
+      
+      // Log validation errors if present
+      if (error.body?.detail) {
+        console.error('API validation errors:');
+        console.error(JSON.stringify(error.body.detail, null, 2));
+      }
+      
       return {
         id: '',
         status: 'failed',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error.message || 'Video generation failed'
       };
     }
   }

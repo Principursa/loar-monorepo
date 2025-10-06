@@ -9,9 +9,10 @@ import {
   Image,
   Loader2,
   UserPlus,
-  Wand2
+  Wand2,
+  Video,
 } from "lucide-react";
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface EventCreationSidebarProps {
   showVideoDialog: boolean;
@@ -46,10 +47,13 @@ interface EventCreationSidebarProps {
   setImageFormat: (format: string) => void;
   handleGenerateEventImage: () => void;
   showVideoStep: boolean;
+  setShowVideoStep: (show: boolean) => void;
   uploadedUrl: string | null;
+  setUploadedUrl: (url: string | null) => void;
   isUploading: boolean;
   uploadToTmpfiles: () => void;
   generatedVideoUrl: string | null;
+  setGeneratedImageUrl: (url: string | null) => void;
   isGeneratingVideo: boolean;
   videoPrompt: string;
   setVideoPrompt: (prompt: string) => void;
@@ -67,6 +71,7 @@ interface EventCreationSidebarProps {
   pieceCid: string | null;
   handleSaveToContract: () => void;
   handleCreateEvent: () => void;
+  previousEventVideoUrl?: string | null;
 }
 
 export function EventCreationSidebar({
@@ -98,14 +103,18 @@ export function EventCreationSidebar({
   saveCharacterMutation,
   generatedImageUrl,
   isGeneratingImage,
+  previousEventVideoUrl,
   imageFormat,
   setImageFormat,
   handleGenerateEventImage,
   showVideoStep,
+  setShowVideoStep,
   uploadedUrl,
+  setUploadedUrl,
   isUploading,
   uploadToTmpfiles,
   generatedVideoUrl,
+  setGeneratedImageUrl,
   isGeneratingVideo,
   videoPrompt,
   setVideoPrompt,
@@ -124,6 +133,64 @@ export function EventCreationSidebar({
   handleSaveToContract,
   handleCreateEvent,
 }: EventCreationSidebarProps) {
+  const [extractedFrameUrl, setExtractedFrameUrl] = useState<string | null>(null);
+  const [isExtractingFrame, setIsExtractingFrame] = useState(false);
+  const [usePreviousFrame, setUsePreviousFrame] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [currentStep, setCurrentStep] = useState<'choose-frame' | 'generate-frame' | 'generate-video'>('choose-frame');
+
+  // Extract last frame from previous event video
+  const extractLastFrame = async () => {
+    if (!previousEventVideoUrl) return;
+
+    setIsExtractingFrame(true);
+
+    try {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.src = previousEventVideoUrl;
+
+      await new Promise((resolve, reject) => {
+        video.onloadedmetadata = () => {
+          // Seek to last frame (duration - 0.1 seconds)
+          video.currentTime = Math.max(0, video.duration - 0.1);
+        };
+        video.onseeked = resolve;
+        video.onerror = reject;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const frameUrl = canvas.toDataURL('image/png');
+        setExtractedFrameUrl(frameUrl);
+        setUsePreviousFrame(true);
+      }
+    } catch (error) {
+      console.error('Error extracting frame:', error);
+    } finally {
+      setIsExtractingFrame(false);
+    }
+  };
+
+  // Reset extracted frame and step when dialog closes
+  useEffect(() => {
+    if (!showVideoDialog) {
+      setExtractedFrameUrl(null);
+      setUsePreviousFrame(false);
+      setCurrentStep('choose-frame');
+    }
+  }, [showVideoDialog]);
+
+  // Debug: Log previous event video URL
+  useEffect(() => {
+    console.log('EventCreationSidebar - previousEventVideoUrl:', previousEventVideoUrl);
+  }, [previousEventVideoUrl]);
+
   if (!showVideoDialog) return null;
 
   return (
@@ -173,38 +240,158 @@ export function EventCreationSidebar({
             />
           </div>
 
-          {/* Character Selection Section */}
-          <div className="border rounded-lg p-4 bg-muted/20">
-            <div className="flex items-center justify-between mb-3">
-              <Label className="text-sm font-medium">Characters in Scene</Label>
-              <div className="flex gap-2">
+          {/* STEP 1: Choose Frame Source */}
+          {currentStep === 'choose-frame' && !generatedImageUrl && !extractedFrameUrl && (
+            <div className="border rounded-lg p-4 bg-gradient-to-br from-primary/5 to-primary/10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-base flex items-center justify-center font-bold">1</span>
+                <Label className="text-base font-bold">Choose Starting Frame</Label>
+              </div>
+
+              <div className="space-y-3">
+                {previousEventVideoUrl && (
+                  <Button
+                    onClick={async () => {
+                      await extractLastFrame();
+                      setCurrentStep('generate-video');
+                    }}
+                    disabled={isExtractingFrame}
+                    variant="outline"
+                    size="lg"
+                    className="w-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-950/60 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 h-auto py-4"
+                  >
+                    <div className="flex flex-col items-center gap-2 w-full">
+                      {isExtractingFrame ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <span className="font-semibold">Extracting Frame...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Video className="h-5 w-5" />
+                          <span className="font-semibold">Use Frame from Previous Event</span>
+                          <span className="text-xs opacity-70">Extract last frame and continue</span>
+                        </>
+                      )}
+                    </div>
+                  </Button>
+                )}
+
                 <Button
-                  type="button"
-                  size="sm"
+                  onClick={() => setCurrentStep('generate-frame')}
                   variant="outline"
-                  onClick={() => setShowCharacterSelector(!showCharacterSelector)}
-                  disabled={isLoadingCharacters}
+                  size="lg"
+                  className="w-full bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-950/60 border-purple-300 dark:border-purple-800 text-purple-700 dark:text-purple-300 h-auto py-4"
                 >
-                  <UserPlus className="h-3 w-3 mr-1" />
-                  Select
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setShowCharacterGenerator(true);
-                    setCharacterName('');
-                    setCharacterDescription('');
-                    setCharacterStyle('cute');
-                  }}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
-                >
-                  <Wand2 className="h-3 w-3 mr-1" />
-                  Generate
+                  <div className="flex flex-col items-center gap-2 w-full">
+                    <Sparkles className="h-5 w-5" />
+                    <span className="font-semibold">Generate New Frame with AI</span>
+                    <span className="text-xs opacity-70">Create custom scene with characters</span>
+                  </div>
                 </Button>
               </div>
             </div>
+          )}
+
+          {/* Show Extracted Frame Preview */}
+          {extractedFrameUrl && !generatedImageUrl && (
+            <div className="border rounded-lg p-4 bg-green-50 dark:bg-green-950/20">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-6 h-6 rounded-full bg-green-500 text-white text-sm flex items-center justify-center">✓</span>
+                <Label className="text-sm font-medium">Extracted Last Frame</Label>
+              </div>
+              <img
+                src={extractedFrameUrl}
+                alt="Extracted last frame"
+                className="w-full h-auto object-contain rounded-lg border max-h-48 mb-3"
+              />
+
+              {/* Video Generation Section */}
+              {!showVideoStep && (
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="video-prompt-extracted" className="text-xs font-medium">
+                      Video Prompt (Optional)
+                    </Label>
+                    <textarea
+                      id="video-prompt-extracted"
+                      value={videoPrompt}
+                      onChange={(e) => setVideoPrompt(e.target.value)}
+                      placeholder="Describe the motion/action in the video... Leave empty to use scene description"
+                      rows={3}
+                      className="mt-1 flex w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={() => {
+                        // Set the extracted frame as the generated image so normal flow works
+                        setGeneratedImageUrl(extractedFrameUrl);
+                        setShowVideoStep(true);
+                      }}
+                      disabled={isUploading || isGeneratingVideo}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Film className="h-3 w-3 mr-2" />
+                      Use This Frame
+                    </Button>
+
+                    <Button
+                      onClick={() => {
+                        setExtractedFrameUrl(null);
+                        setUsePreviousFrame(false);
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                    >
+                      Clear Frame
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 2: Generate Frame (only shown when in generate-frame step) */}
+          {currentStep === 'generate-frame' && !generatedImageUrl && (
+            <>
+              {/* Character Selection Section */}
+              <div className="border rounded-lg p-4 bg-gradient-to-br from-purple/5 to-purple/10">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-8 h-8 rounded-full bg-purple-600 text-white text-base flex items-center justify-center font-bold">2</span>
+                  <Label className="text-base font-bold">Add Characters (Optional)</Label>
+                </div>
+
+                <div className="flex gap-2 mb-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowCharacterSelector(!showCharacterSelector)}
+                    disabled={isLoadingCharacters}
+                    className="flex-1"
+                  >
+                    <UserPlus className="h-3 w-3 mr-1" />
+                    Select Existing
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setShowCharacterGenerator(true);
+                      setCharacterName('');
+                      setCharacterDescription('');
+                      setCharacterStyle('cute');
+                    }}
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
+                  >
+                    <Wand2 className="h-3 w-3 mr-1" />
+                    Generate New
+                  </Button>
+                </div>
 
             {/* Selected Characters Display */}
             {selectedCharacters.length > 0 && charactersData?.characters && (
@@ -399,9 +586,11 @@ export function EventCreationSidebar({
               )}
             </div>
           )}
+            </>
+          )}
 
           {/* Step 1: Generate Image */}
-          {!generatedImageUrl && (
+          {currentStep === 'generate-frame' && !generatedImageUrl && !extractedFrameUrl && (
             <div className="border rounded-lg p-4 bg-muted/20">
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">1</span>
@@ -758,24 +947,6 @@ export function EventCreationSidebar({
               </div>
             </div>
           )}
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowVideoDialog(false)}
-              className="flex-1"
-            >
-              Go Back
-            </Button>
-            <Button
-              onClick={handleCreateEvent}
-              disabled={!videoTitle.trim()}
-              className="flex-1 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create Scene
-            </Button>
-          </div>
         </div>
       </div>
     </div>

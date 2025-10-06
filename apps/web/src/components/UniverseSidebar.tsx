@@ -227,18 +227,18 @@ export function UniverseSidebar({
 
           {/* Enhanced Action Buttons */}
           <div className="space-y-3">
-            <Button 
-              onClick={() => handleAddEvent('after')} 
+            <Button
+              onClick={() => handleAddEvent('after')}
               className="w-full bg-gradient-to-r from-primary via-primary to-primary/90 hover:from-primary/90 hover:via-primary/80 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-300 group h-10"
               size="sm"
             >
               <Plus className="h-4 w-4 mr-2 group-hover:rotate-90 transition-transform duration-300" />
-              Create New Event
+              Create Event
             </Button>
-            
+
             {/* Govern button - only show for blockchain universes with governance configured */}
             {isBlockchainUniverse && onOpenGovernance && finalUniverse?.governanceAddress && finalUniverse?.tokenAddress && (
-              <Button 
+              <Button
                 onClick={onOpenGovernance}
                 className="w-full bg-gradient-to-r from-violet-600 via-violet-600 to-violet-700 hover:from-violet-700 hover:via-violet-800 hover:to-violet-800 shadow-lg hover:shadow-xl transition-all duration-300 group h-10"
                 size="sm"
@@ -247,10 +247,10 @@ export function UniverseSidebar({
                 Govern
               </Button>
             )}
-            
-            <Button 
-              onClick={handleRefreshTimeline} 
-              variant="outline" 
+
+            <Button
+              onClick={handleRefreshTimeline}
+              variant="outline"
               size="sm"
               className="w-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300 group h-9 border-slate-200 dark:border-slate-700"
               disabled={isLoadingAny}
@@ -277,25 +277,6 @@ export function UniverseSidebar({
                   <div className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed line-clamp-3 bg-amber-100/50 dark:bg-amber-900/20 p-2 rounded">
                     {selectedNode.data.description}
                   </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Button 
-                    onClick={() => handleAddEvent('after', selectedNode.data.eventId)} 
-                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-md hover:shadow-lg transition-all duration-300 group h-9"
-                    size="sm"
-                  >
-                    <ArrowRight className="h-3 w-3 mr-2 group-hover:translate-x-1 transition-transform duration-300" />
-                    Continue After
-                  </Button>
-                  <Button 
-                    onClick={() => handleAddEvent('branch', selectedNode.data.eventId)} 
-                    className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white shadow-md hover:shadow-lg transition-all duration-300 group h-9"
-                    size="sm"
-                  >
-                    <GitBranch className="h-3 w-3 mr-2 group-hover:rotate-12 transition-transform duration-300" />
-                    Create Branch
-                  </Button>
                 </div>
               </CardContent>
             </Card>

@@ -1,249 +1,417 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Play, Sparkles, Video, Shield, Coins, ShoppingBag } from "lucide-react";
-import { useAccount } from "wagmi";
-import { WalletConnectButton } from "@/components/wallet-connect-button";
-import Header from "@/components/header";
+import { Play, Sparkles, Database, Users, GitBranch, ChevronRight } from "lucide-react";
+import { useAccount, useReadContract } from "wagmi";
+import { useQuery } from "@tanstack/react-query";
+import { trpc } from "@/utils/trpc";
+import { timelineAbi } from "@/generated";
+import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/")({
   component: HomeComponent,
 });
 
-function HomeComponent() {
-  const { address: walletAddress, isConnected: isAuthenticated } = useAccount();
+// Timeline Events Section - fetches events from blockchain
+function TimelineEventsSection() {
+  // Fetch universes from database
+  const { data: universesResponse } = useQuery(trpc.cinematicUniverses.getAll.queryOptions());
 
+  // Get universe addresses from the database (limit to 3 to avoid too many calls)
+  const universeAddresses = useMemo(() => {
+    if (!universesResponse?.data) return [];
+    return universesResponse.data
+      .filter((u: any) => u.address && u.address.startsWith('0x'))
+      .slice(0, 3) // Limit to first 3 universes
+      .map((u: any) => u.address as `0x${string}`);
+  }, [universesResponse]);
+
+  // Fetch timeline data for each universe dynamically
+  const universe1Data = useReadContract({
+    abi: timelineAbi,
+    address: universeAddresses[0],
+    functionName: 'getFullGraph',
+    query: { enabled: !!universeAddresses[0], retry: 1 }
+  });
+
+  const universe2Data = useReadContract({
+    abi: timelineAbi,
+    address: universeAddresses[1],
+    functionName: 'getFullGraph',
+    query: { enabled: !!universeAddresses[1], retry: 1 }
+  });
+
+  const universe3Data = useReadContract({
+    abi: timelineAbi,
+    address: universeAddresses[2],
+    functionName: 'getFullGraph',
+    query: { enabled: !!universeAddresses[2], retry: 1 }
+  });
+
+  const events = useMemo(() => {
+    const allEvents: Array<{ videoUrl: string; description: string; eventId: string; universeId: string }> = [];
+
+    const processUniverse = (data: any, universeId: string) => {
+      if (!data) return;
+
+      const graphData = data as readonly [readonly bigint[], readonly string[], readonly string[], readonly bigint[], readonly (readonly bigint[])[], readonly boolean[]];
+      const [ids, links, plots] = graphData;
+
+      links.forEach((url, index) => {
+        if (url && url.startsWith('http')) {
+          allEvents.push({
+            videoUrl: url,
+            description: plots[index] || 'Timeline Event',
+            eventId: `${universeId}-${ids[index]?.toString() || index}`,
+            universeId,
+          });
+        }
+      });
+    };
+
+    // Process all universe data
+    if (universeAddresses[0]) processUniverse(universe1Data.data, universeAddresses[0]);
+    if (universeAddresses[1]) processUniverse(universe2Data.data, universeAddresses[1]);
+    if (universeAddresses[2]) processUniverse(universe3Data.data, universeAddresses[2]);
+
+    // Return up to 3 events total
+    return allEvents.slice(0, 3);
+  }, [universe1Data.data, universe2Data.data, universe3Data.data, universeAddresses]);
+
+  if (!events || events.length === 0) {
+    return null; // Don't show section if no events
+  }
+
+  return (
+    <section className="py-20 px-4 bg-muted/30">
+      <div className="container mx-auto max-w-7xl">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
+            <Play className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium text-primary">Timeline Events in Action</span>
+          </div>
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">See What's Possible</h2>
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            Real timeline events created by our community using AI video generation
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          {events.map((event, index) => (
+            <div key={event.eventId} className="group relative">
+              <div className={`absolute -inset-2 bg-gradient-to-r ${index % 3 === 0 ? 'from-primary/20 to-purple-500/20' : index % 3 === 1 ? 'from-purple-500/20 to-pink-500/20' : 'from-pink-500/20 to-primary/20'} rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity`} />
+              <div className="relative bg-card rounded-2xl border-2 border-border overflow-hidden">
+                <div className="aspect-video bg-black">
+                  <video
+                    className="w-full h-full object-cover"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    preload="metadata"
+                  >
+                    <source
+                      src={event.videoUrl}
+                      type="video/mp4"
+                    />
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-lg mb-1 line-clamp-1">{event.description}</h3>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">AI-generated timeline event</p>
+                    <Button variant="ghost" size="sm" asChild className="h-8 text-xs">
+                      <Link to="/universe/$id" params={{ id: event.universeId }}>
+                        View Universe →
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Universe Card Component (reused from universes page)
+function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  const { data: nodeCount } = useReadContract({
+    abi: timelineAbi,
+    address: universe.address as `0x${string}`,
+    functionName: 'latestNodeId',
+    query: {
+      enabled: !!universe.address && universe.address.startsWith('0x'),
+      select: (data) => data ? Number(data) : 0,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
+  });
+
+  return (
+    <div
+      className="relative flex-shrink-0 w-[320px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:z-30"
+      onClick={() => onSelect(universe.id)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="relative aspect-video rounded-lg overflow-hidden bg-muted shadow-2xl">
+        {universe.image_url ? (
+          <img
+            src={universe.image_url}
+            alt={universe.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500" />
+        )}
+
+        <div className={`absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
+            <h3 className="text-white font-bold text-lg truncate drop-shadow-lg">{universe.name}</h3>
+            <p className="text-gray-200 text-sm line-clamp-2 leading-relaxed">
+              {universe.description || "Explore this narrative universe"}
+            </p>
+            <div className="flex items-center gap-2 pt-1">
+              {universe.address && (
+                <Badge className="bg-white/30 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
+                  <Database className="h-3 w-3 mr-1" />
+                  {nodeCount || 0} nodes
+                </Badge>
+              )}
+              <Badge className="bg-primary/80 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
+                {universe.address ? 'On-chain' : 'Off-chain'}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="bg-white/30 backdrop-blur-md rounded-full p-3 border-2 border-white shadow-2xl">
+            <Play className="h-8 w-8 text-white fill-white" />
+          </div>
+        </div>
+
+        {!isHovered && universe.address && (
+          <div className="absolute top-2 right-2">
+            <Badge className="bg-black/70 backdrop-blur-sm text-white border-0 text-xs">
+              <Database className="h-2.5 w-2.5 mr-1" />
+              {nodeCount || 0}
+            </Badge>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HomeComponent() {
+  const { isConnected } = useAccount();
+  const navigate = Route.useNavigate();
+
+  // Fetch universes
+  const { data: universesResponse } = useQuery(trpc.cinematicUniverses.getAll.queryOptions());
+
+  const universes = useMemo(() => {
+    if (!universesResponse?.data) return [];
+    return universesResponse.data.map((universe: any) => ({
+      ...universe,
+      name: `Universe ${universe.id.slice(0, 8)}`,
+      createdAt: universe.created_at,
+    }));
+  }, [universesResponse]);
+
+  const recentUniverses = universes.slice(0, 6);
+
+  const selectUniverse = (universeId: string) => {
+    navigate({
+      to: "/universe/$id",
+      params: { id: universeId },
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <section className="py-20 px-4 text-center bg-gradient-to-br from-primary/10 via-background to-accent/5">
-        <div className="container mx-auto max-w-4xl">
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-          Join the LOAR Revolution
-          </h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
-          Create massive multiplayer narratives with friends. 
+      {/* Hero Section with Video */}
+      <section className="relative py-24 px-4 overflow-hidden">
+        {/* Background pattern */}
+        <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/80 to-background" />
+
+        <div className="relative container mx-auto max-w-7xl">
+          <div className="text-center space-y-8 max-w-4xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-primary">Blockchain-Powered Storytelling</span>
+            </div>
+
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight">
+              Rebuild Your Own{" "}
+              <span className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                Narrative Path
+              </span>
+            </h1>
+
+            <p className="text-xl text-muted-foreground leading-relaxed">
+              Create collaborative cinematic universes where your community decides the canon.
+              Build branching timelines, vote on events, and own your stories forever.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" className="text-lg px-10 h-14 font-semibold shadow-lg shadow-primary/20" asChild>
+                <Link to="/universes">
+                  <Play className="w-5 h-5 mr-2" />
+                  Explore Universes
+                </Link>
+              </Button>
+              {isConnected && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="text-lg px-10 h-14 font-semibold border-2"
+                  asChild
+                >
+                  <Link to="/cinematicuniversecreate">
+                    Create Universe
+                    <ChevronRight className="w-5 h-5 ml-2" />
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Recent Universes Section */}
+      {recentUniverses.length > 0 && (
+        <section className="py-20 px-4 bg-muted/30 border-y border-border">
+          <div className="container mx-auto max-w-7xl">
+            <div className="flex items-center justify-between mb-10 px-4">
+              <div>
+                <h2 className="text-3xl font-bold mb-2">Recent Universes</h2>
+                <p className="text-muted-foreground">Explore what the community is building</p>
+              </div>
+              <Button variant="ghost" className="font-semibold" asChild>
+                <Link to="/universes" className="text-primary">
+                  View All
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </div>
+
+            <div className="overflow-x-auto scrollbar-hide">
+              <div className="flex gap-4 px-4 pb-4">
+                {recentUniverses.map((universe) => (
+                  <UniverseCard key={universe.id} universe={universe} onSelect={selectUniverse} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Timeline Events Examples Section */}
+      <TimelineEventsSection />
+
+      {/* How It Works Section */}
+      <section className="py-24 px-4">
+        <div className="container mx-auto max-w-6xl">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold mb-4">Choose Your Own Path</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Create branching narratives where every decision matters
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <Card className="border-2 hover:border-primary/50 transition-all hover:shadow-lg text-center group">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-primary/5 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                  <Sparkles className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold mb-3">Deploy Universe</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Launch your narrative universe with governance tokens and immutable timeline contracts
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-2 hover:border-purple-500/50 transition-all hover:shadow-lg text-center group">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-purple-500/5 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                  <GitBranch className="w-8 h-8 text-purple-600" />
+                </div>
+                <h3 className="text-xl font-bold mb-3">Build Timeline</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Create branching story paths with AI characters, videos, and decentralized content storage
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-2 hover:border-pink-500/50 transition-all hover:shadow-lg text-center group">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-gradient-to-br from-pink-500/20 to-pink-500/5 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                  <Users className="w-8 h-8 text-pink-600" />
+                </div>
+                <h3 className="text-xl font-bold mb-3">Vote on Canon</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Community governance decides which story branches become the official timeline
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA Section */}
+      <section className="relative py-32 px-4 overflow-hidden">
+        {/* Background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-purple-500/5 to-pink-500/5" />
+        <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
+
+        <div className="relative container mx-auto max-w-4xl text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium text-primary">Start Your Story Today</span>
+          </div>
+
+          <h2 className="text-5xl md:text-6xl font-bold mb-6">
+            Ready to Build Your{" "}
+            <span className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
+              Universe?
+            </span>
+          </h2>
+
+          <p className="text-xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed">
+            {isConnected
+              ? "Deploy your universe and invite collaborators to shape the story together"
+              : "Connect your wallet to start creating collaborative narratives"
+            }
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Button size="lg" className="text-lg px-8 py-6" asChild>
-              <a href="/universes">
+
+          {isConnected ? (
+            <Button size="lg" className="text-lg px-12 h-16 font-bold shadow-2xl shadow-primary/20" asChild>
+              <Link to="/cinematicuniversecreate">
+                <Sparkles className="w-5 h-5 mr-2" />
+                Create Your Universe
+              </Link>
+            </Button>
+          ) : (
+            <Button size="lg" className="text-lg px-12 h-16 font-bold shadow-2xl shadow-primary/20" asChild>
+              <Link to="/universes">
                 <Play className="w-5 h-5 mr-2" />
-                Start Creating
-              </a>
+                Explore Universes
+              </Link>
             </Button>
-            <Button variant="outline" size="lg" className="text-lg px-8 py-6 bg-transparent">
-              <Video className="w-5 h-5 mr-2" />
-              Watch Demo
-            </Button>
-          </div>
-
-
-          {/* Wallet Connection Status */}
-          {!isAuthenticated && (
-            <div className="mb-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-blue-800 dark:text-blue-200 text-sm">
-                💡 <strong>Connect Your Wallet:</strong> Connect any wallet supported by RainbowKit to start creating.
-              </p>
-            </div>
           )}
-
-          {isAuthenticated && walletAddress && (
-            <div className="mb-8 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-              <p className="text-green-800 dark:text-green-200 text-sm">
-                ✅ <strong>Wallet Connected!</strong> Welcome to LOAR!
-              </p>
-              <div className="mt-2 p-2 bg-green-100 dark:bg-green-800/30 rounded border">
-                <p className="text-green-800 dark:text-green-200 text-sm font-semibold">
-                  🪙 Wallet Address:
-                </p>
-                <p className="text-green-700 dark:text-green-300 text-xs mt-1 font-mono break-all">
-                  {walletAddress}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Demo Video Placeholder */}
-          <div className="relative max-w-4xl mx-auto">
-            <div className="aspect-video bg-card rounded-xl border-2 border-border shadow-2xl overflow-hidden">
-              <video 
-                className="w-full h-full object-cover" 
-                controls 
-                autoPlay 
-                muted 
-                loop 
-                poster="/loar-video-generation-preview.png"
-              >
-                <source
-                  src="https://aggregator.walrus-testnet.walrus.space/v1/blobs/SfYobs0IsGUYorA898m0k2mQxK4wud5HotOyysKGrs0"
-                  type="video/mp4"
-                />
-                Your browser does not support the video tag.
-              </video>
-            </div>
-          </div>
         </div>
       </section>
-
-      {/* Video Example Section */}
-      <section className="py-20 px-4 bg-card/30">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">See LOAR in Action</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Watch real videos created with LOAR's AI technology.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="relative">
-              <div className="aspect-video bg-card rounded-xl border-2 border-border shadow-xl overflow-hidden">
-                <video 
-                  className="w-full h-full object-cover" 
-                  controls 
-                  autoPlay 
-                  muted 
-                  loop 
-                  poster="/ai-generated-video-example-1.png"
-                >
-                  <source
-                    src="https://aggregator.walrus-testnet.walrus.space/v1/blobs/SfYobs0IsGUYorA898m0k2mQxK4wud5HotOyysKGrs0"
-                    type="video/mp4"
-                  />
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-              <div className="mt-4 text-center">
-                <h3 className="font-semibold mb-2">AI Story Video</h3>
-                <p className="text-sm text-muted-foreground">Generated from text prompt</p>
-              </div>
-            </div>
-
-            <div className="relative">
-              <div className="aspect-video bg-card rounded-xl border-2 border-border shadow-xl overflow-hidden">
-                <video 
-                  className="w-full h-full object-cover" 
-                  controls 
-                  autoPlay 
-                  muted 
-                  loop 
-                  poster="/ai-generated-video-example-2.png"
-                >
-                  <source
-                    src="https://aggregator.walrus-testnet.walrus.space/v1/blobs/a-yeySpQFv6J0IwVNZZ3iCY2mN-vyIyb0A66oFuEiKc"
-                    type="video/mp4"
-                  />
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-              <div className="mt-4 text-center">
-                <h3 className="font-semibold mb-2">Product Demo</h3>
-                <p className="text-sm text-muted-foreground">Marketing video creation</p>
-              </div>
-            </div>
-
-            <div className="relative md:col-span-2 lg:col-span-1">
-              <div className="aspect-video bg-card rounded-xl border-2 border-border shadow-xl overflow-hidden">
-                <video 
-                  className="w-full h-full object-cover" 
-                  controls 
-                  autoPlay 
-                  muted 
-                  loop 
-                  poster="/ai-generated-video-example-3.png"
-                >
-                  <source
-                    src="https://aggregator.walrus-testnet.walrus.space/v1/blobs/Ns8IUy5XjhVJwUQ2Xptiv5ZWX4uIyqovVlWpEJDCX7M"
-                    type="video/mp4"
-                  />
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-              <div className="mt-4 text-center">
-                <h3 className="font-semibold mb-2">Creative Content</h3>
-                <p className="text-sm text-muted-foreground">Social media ready</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Workflow Section */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">Blockchain Video Timeline Workflow</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Create branching narratives with blockchain-verified video content across multiple timeline nodes.
-            </p>
-          </div>
-
-          <div className="relative max-w-5xl mx-auto">
-            <div className="aspect-[4/3] bg-card rounded-xl border-2 border-border shadow-xl overflow-hidden">
-              <img
-                src="/workflow-diagram.png"
-                alt="LOAR Blockchain Video Timeline Workflow showing 4 connected timeline nodes with video content and blockchain verification"
-                className="w-full h-full object-contain"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="py-20 px-4">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">Powerful Features for Every Creator</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Everything you need to create professional videos, powered by cutting-edge AI technology and Web3
-              innovation.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            <Card className="border-2 hover:border-primary/50 transition-colors">
-              <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                  <Shield className="w-6 h-6 text-primary" />
-                </div>
-                <CardTitle>Censorship Resistant</CardTitle>
-                <CardDescription>
-                  Your videos are stored on Filecoin's decentralized storage, ensuring permanent access and resistance to
-                  censorship.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-2 hover:border-primary/50 transition-colors">
-              <CardHeader>
-                <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center mb-4">
-                  <Coins className="w-6 h-6 text-accent" />
-                </div>
-                <CardTitle>Community Governance</CardTitle>
-                <CardDescription>
-                  Participate in canon decision-making through token incentives and earn rewards for contributing to universes.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-2 hover:border-primary/50 transition-colors">
-              <CardHeader>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                  <ShoppingBag className="w-6 h-6 text-primary" />
-                </div>
-                <CardTitle>Content Ownership</CardTitle>
-                <CardDescription>
-                  Own your videos as NFTs on OpenSea, enabling true digital ownership and monetization opportunities.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
-        </div>
-      </section>
-
     </div>
   );
 }

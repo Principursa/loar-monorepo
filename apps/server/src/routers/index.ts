@@ -9,13 +9,9 @@ import { characters } from "../db/schema/characters";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { videoService } from "../services/video";
-import { walrusService } from "../services/walrus";
-import { klingService } from "../services/kling";
 import { falService } from "../services/fal";
 
 import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverses.index";
-import { geminiRouter } from "./gemini/gemini.routes";
 import { falRouter } from "./fal/fal.routes";
 import { synapseService } from "../services/synapse";
 
@@ -31,7 +27,6 @@ export const appRouter = router({
     };
   }),
   cinematicUniverses: cinematicUniversesRouter,
-  gemini: geminiRouter,
   fal: falRouter,
   wiki: router({
     characters: publicProcedure.query(async () => {
@@ -99,147 +94,31 @@ export const appRouter = router({
       }),
   }),
   video: router({
-    generate: publicProcedure
-      .input(z.object({
-        prompt: z.string().min(1, "Prompt is required"),
-        model: z.enum(['ray-flash-2', 'ray-2', 'ray-1-6']).optional(),
-        resolution: z.enum(['540p', '720p', '1080p', '4k']).optional(),
-        duration: z.enum(['5s', '10s']).optional(),
-        imageUrl: z.string().url().optional() // For image-to-video generation
-      }))
-      .mutation(async ({ input }) => {
-        return await videoService.generateVideo(input);
-      }),
-    status: publicProcedure
-      .input(z.object({ id: z.string() }))
-      .query(async ({ input }) => {
-        return await videoService.getGenerationStatus(input.id);
-      }),
-    generateAndWait: publicProcedure
-      .input(z.object({
-        prompt: z.string().min(1, "Prompt is required"),
-        model: z.enum(['ray-flash-2', 'ray-2', 'ray-1-6']).optional(),
-        resolution: z.enum(['540p', '720p', '1080p', '4k']).optional(),
-        duration: z.enum(['5s', '10s']).optional(),
-        imageUrl: z.string().url().optional() // For image-to-video generation
-      }))
-      .mutation(async ({ input }) => {
-        const generation = await videoService.generateVideo(input);
-        return await videoService.waitForCompletion(generation.id);
-      }),
-    multiImageGenerate: publicProcedure
-      .input(z.object({
-        image_list: z.array(z.object({
-          image: z.string().min(1, "Image is required")
-        })).min(1, "At least one image is required").max(4, "Maximum 4 images allowed"),
-        prompt: z.string().optional(),
-        negative_prompt: z.string().optional(),
-        mode: z.enum(['std', 'pro']).optional(),
-        duration: z.enum(['5', '10']).optional(),
-        aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional(),
-        external_task_id: z.string().optional()
-      }))
-      .mutation(async ({ input }) => {
-        return await klingService.createMultiImageVideo(input);
-      }),
-    multiImageStatus: publicProcedure
-      .input(z.object({ task_id: z.string() }))
-      .query(async ({ input }) => {
-        return await klingService.getTaskStatus(input.task_id);
-      }),
-    multiImageGenerateAndWait: publicProcedure
-      .input(z.object({
-        image_list: z.array(z.object({
-          image: z.string().min(1, "Image is required")
-        })).min(1, "At least one image is required").max(4, "Maximum 4 images allowed"),
-        prompt: z.string().optional(),
-        negative_prompt: z.string().optional(),
-        mode: z.enum(['std', 'pro']).optional(),
-        duration: z.enum(['5', '10']).optional(),
-        aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional(),
-        external_task_id: z.string().optional()
-      }))
-      .mutation(async ({ input }) => {
-        const generation = await klingService.createMultiImageVideo(input);
-        return await klingService.waitForCompletion(generation.data.task_id);
-      }),
-    // Add provider selection for video generation
+    // Use Fal AI service for video generation
     generateWithProvider: publicProcedure
       .input(z.object({
-        provider: z.enum(['lumaai', 'kling', 'fal']),
+        provider: z.enum(['fal']),
         prompt: z.string().min(1, "Prompt is required"),
-        model: z.enum(['ray-flash-2', 'ray-2', 'ray-1-6']).optional(),
-        resolution: z.enum(['540p', '720p', '1080p', '4k']).optional(),
         duration: z.enum(['5s', '10s']).optional(),
-        imageUrl: z.string().url().optional(), // For single image (LumaAI)
-        imageUrls: z.array(z.string().url()).optional() // For multiple images (Kling)
+        imageUrl: z.string().url().optional(),
       }))
       .mutation(async ({ input }) => {
-        if (input.provider === 'lumaai') {
-          // Use existing LumaAI service
-          return await videoService.generateVideo({
-            prompt: input.prompt,
-            model: input.model,
-            resolution: input.resolution,
-            duration: input.duration,
-            imageUrl: input.imageUrl
-          });
-        } else if (input.provider === 'kling') {
-          // Use Kling service for multi-image
-          const imageUrls = input.imageUrls && input.imageUrls.length > 0 
-            ? input.imageUrls 
-            : [input.imageUrl].filter(Boolean);
-          
-          console.log('Kling generation - Processing image URLs:', {
-            inputImageUrls: input.imageUrls,
-            inputImageUrl: input.imageUrl,
-            finalImageUrls: imageUrls,
-            imageCount: imageUrls.length
-          });
-          
-          if (imageUrls.length === 0) {
-            throw new Error('No image URLs provided for Kling generation');
-          }
-          
-          const imageList = imageUrls.map(url => ({ 
-            image: `https://images.weserv.nl/?url=${encodeURIComponent(url!)}` 
-          }));
-          
-          console.log('Kling generation - Final image list:', imageList);
-          
-          const result = await klingService.createMultiImageVideo({
-            image_list: imageList,
-            prompt: input.prompt,
-            mode: 'std', // Cheapest mode
-            duration: '5', // Shortest duration
-            aspect_ratio: '16:9'
-          });
-          
-          return {
-            id: result.data.task_id,
-            status: result.data.task_status === 'submitted' ? 'pending' : 
-                   result.data.task_status === 'processing' ? 'dreaming' : 
-                   result.data.task_status === 'succeed' ? 'completed' : 'failed'
-          };
-        } else {
-          // Use Fal AI service
-          const duration = input.duration === '10s' ? 10 : 5;
-          const result = await falService.generateVideo({
-            prompt: input.prompt,
-            imageUrl: input.imageUrl,
-            duration,
-            model: 'fal-ai/ltx-video' // Default to LTX Video for good speed/quality balance
-          });
-          
-          return {
-            id: result.id,
-            status: result.status === 'completed' ? 'completed' :
-                   result.status === 'in_progress' ? 'dreaming' :
-                   result.status === 'failed' ? 'failed' : 'pending',
-            videoUrl: result.videoUrl,
-            failureReason: result.error
-          };
-        }
+        const duration = input.duration === '10s' ? 10 : 5;
+        const result = await falService.generateVideo({
+          prompt: input.prompt,
+          imageUrl: input.imageUrl,
+          duration,
+          model: 'fal-ai/ltx-video'
+        });
+
+        return {
+          id: result.id,
+          status: result.status === 'completed' ? 'completed' :
+                 result.status === 'in_progress' ? 'dreaming' :
+                 result.status === 'failed' ? 'failed' : 'pending',
+          videoUrl: result.videoUrl,
+          failureReason: result.error
+        };
       }),
   }),
   synapse: router({
@@ -316,51 +195,6 @@ export const appRouter = router({
           ? 'https://your-domain.com' 
           : 'http://localhost:3000';
         return { url: `${baseUrl}/api/filecoin/${input.pieceCid}` };
-      }),
-  }),
-  walrus: router({
-    uploadFromUrl: publicProcedure
-      .input(z.object({
-        url: z.string().min(1, "URL is required")
-      }))
-      .mutation(async ({ input }) => {
-        try {
-          console.log(`🌐 Walrus upload request for: ${input.url}`);
-          const result = await walrusService.uploadFromUrl(input.url);
-          console.log(`✅ Walrus upload success: ${result.blobId}`);
-          return result;
-        } catch (error) {
-          console.error('❌ Walrus upload error:', error);
-          throw error;
-        }
-      }),
-    uploadBase64: publicProcedure
-      .input(z.object({
-        base64Data: z.string().min(1, "Base64 data is required"),
-        filename: z.string().optional().default("generated-image.png")
-      }))
-      .mutation(async ({ input }) => {
-        try {
-          console.log(`🌐 Walrus upload request for base64 data (${input.base64Data.length} chars)`);
-          // Convert base64 to buffer
-          const imageBuffer = Buffer.from(input.base64Data.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64');
-          const result = await walrusService.uploadFile(imageBuffer);
-          console.log(`✅ Walrus upload success: ${result.blobId}`);
-          return result;
-        } catch (error) {
-          console.error('❌ Walrus upload error:', error);
-          throw error;
-        }
-      }),
-    getBlobInfo: publicProcedure
-      .input(z.object({ blobId: z.string() }))
-      .query(async ({ input }) => {
-        return await walrusService.getBlobInfo(input.blobId);
-      }),
-    getFileUrl: publicProcedure
-      .input(z.object({ blobId: z.string() }))
-      .query(({ input }) => {
-        return { url: walrusService.getFileUrl(input.blobId) };
       }),
   }),
 });

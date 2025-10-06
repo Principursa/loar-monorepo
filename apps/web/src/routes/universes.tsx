@@ -70,7 +70,7 @@ function HeroBanner({ universe, onSelect }: { universe: any; onSelect: (id: stri
           </h1>
 
           {/* Description */}
-          <p className="text-xl text-gray-100 max-w-2xl leading-relaxed drop-shadow-lg">
+          <p className="text-xl text-white/90 max-w-2xl leading-relaxed drop-shadow-lg">
             {universe.description || "Explore this narrative universe and discover its stories"}
           </p>
 
@@ -86,8 +86,7 @@ function HeroBanner({ universe, onSelect }: { universe: any; onSelect: (id: stri
             </Button>
             <Button
               size="lg"
-              variant="secondary"
-              className="bg-gray-600/70 backdrop-blur-md text-white hover:bg-gray-600/90 border-0 px-10 text-lg h-14 font-semibold"
+              className="bg-white/20 backdrop-blur-md text-white hover:bg-white/30 border border-white/20 px-10 text-lg h-14 font-semibold"
             >
               <Info className="h-6 w-6 mr-3" />
               More Info
@@ -154,12 +153,14 @@ function UniverseRow({ title, universes, onSelect }: { title: string; universes:
       {/* Scrollable Container */}
       <div
         ref={scrollRef}
-        className="flex gap-3 overflow-x-auto scrollbar-hide px-16"
+        className="overflow-x-auto scrollbar-hide"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
-        {universes.map((universe) => (
-          <UniverseCard key={universe.id} universe={universe} onSelect={onSelect} />
-        ))}
+        <div className="flex gap-4 px-16 py-6">
+          {universes.map((universe) => (
+            <UniverseCard key={universe.id} universe={universe} onSelect={onSelect} />
+          ))}
+        </div>
       </div>
 
       {/* Right Scroll Button */}
@@ -194,12 +195,13 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
 
   return (
     <div
-      className="relative flex-shrink-0 w-[320px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:z-30"
+      className="relative flex-shrink-0 w-[320px] cursor-pointer transition-transform duration-300 ease-out hover:scale-[1.08] hover:z-30"
       onClick={() => onSelect(universe.id)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      style={{ transformOrigin: 'center center' }}
     >
-      <div className="relative aspect-video rounded-lg overflow-hidden bg-muted shadow-2xl">
+      <div className="relative aspect-video rounded-lg overflow-hidden bg-black/20 shadow-2xl">
         {/* Thumbnail */}
         {universe.image_url ? (
           <img
@@ -212,20 +214,20 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
         )}
 
         {/* Hover Overlay with Info */}
-        <div className={`absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/40 transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
           <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
             <h3 className="text-white font-bold text-lg truncate drop-shadow-lg">{universe.name}</h3>
-            <p className="text-gray-200 text-sm line-clamp-2 leading-relaxed">
+            <p className="text-white/90 text-sm line-clamp-2 leading-relaxed">
               {universe.description || "Explore this narrative universe"}
             </p>
             <div className="flex items-center gap-2 pt-1">
               {universe.address && (
-                <Badge className="bg-white/30 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
+                <Badge className="bg-white/25 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
                   <Database className="h-3 w-3 mr-1" />
                   {nodeCount || 0} nodes
                 </Badge>
               )}
-              <Badge className="bg-primary/80 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
+              <Badge className="bg-primary/90 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
                 {universe.address ? 'On-chain' : 'Off-chain'}
               </Badge>
             </div>
@@ -310,7 +312,7 @@ function RouteComponent() {
         <Card className="w-full max-w-md">
           <CardContent className="text-center space-y-4 p-8">
             <h2 className="text-2xl font-bold">Connect Your Wallet</h2>
-            <p className="text-muted-foreground">Please connect your wallet to view universes.</p>
+            <p className="text-white/70">Please connect your wallet to view universes.</p>
             <WalletConnectButton size="lg" />
           </CardContent>
         </Card>
@@ -348,12 +350,12 @@ function RouteComponent() {
             <div>
               <div className="relative mb-8">
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 rounded-full blur-3xl"></div>
-                <div className="relative bg-muted/50 backdrop-blur-sm rounded-3xl p-12 inline-block">
-                  <Users className="h-24 w-24 mx-auto text-muted-foreground" />
+                <div className="relative bg-white/10 backdrop-blur-sm rounded-3xl p-12 inline-block">
+                  <Users className="h-24 w-24 mx-auto text-white/60" />
                 </div>
               </div>
               <h2 className="text-4xl font-bold mb-4">No universes yet</h2>
-              <p className="text-muted-foreground mb-10 text-xl max-w-lg mx-auto leading-relaxed">
+              <p className="text-white/70 mb-10 text-xl max-w-lg mx-auto leading-relaxed">
                 Create your first narrative universe to get started with collaborative storytelling
               </p>
               <Button
@@ -386,7 +388,7 @@ function RouteComponent() {
       {/* Fixed Search Bar at Bottom */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4">
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50" />
           <Input
             type="text"
             placeholder="Search universes by name, description, or address..."
