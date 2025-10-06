@@ -152,14 +152,15 @@ function UniverseRow({ title, universes, onSelect }: { title: string; universes:
       )}
 
       {/* Scrollable Container */}
-      <div
-        ref={scrollRef}
-        className="flex gap-3 overflow-x-auto scrollbar-hide px-16"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-      >
-        {universes.map((universe) => (
-          <UniverseCard key={universe.id} universe={universe} onSelect={onSelect} />
-        ))}
+      <div className="overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', overflowY: 'visible' }}>
+        <div
+          ref={scrollRef}
+          className="flex gap-3 px-16 py-4"
+        >
+          {universes.map((universe) => (
+            <UniverseCard key={universe.id} universe={universe} onSelect={onSelect} />
+          ))}
+        </div>
       </div>
 
       {/* Right Scroll Button */}
@@ -194,10 +195,11 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
 
   return (
     <div
-      className="relative flex-shrink-0 w-[320px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:z-30"
+      className="relative flex-shrink-0 w-[320px] cursor-pointer transition-transform duration-300 ease-out hover:scale-[1.08] hover:z-30"
       onClick={() => onSelect(universe.id)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      style={{ transformOrigin: 'center center' }}
     >
       <div className="relative aspect-video rounded-lg overflow-hidden bg-muted shadow-2xl">
         {/* Thumbnail */}
@@ -212,20 +214,20 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
         )}
 
         {/* Hover Overlay with Info */}
-        <div className={`absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/40 transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
           <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
             <h3 className="text-white font-bold text-lg truncate drop-shadow-lg">{universe.name}</h3>
-            <p className="text-gray-200 text-sm line-clamp-2 leading-relaxed">
+            <p className="text-white/90 text-sm line-clamp-2 leading-relaxed">
               {universe.description || "Explore this narrative universe"}
             </p>
             <div className="flex items-center gap-2 pt-1">
               {universe.address && (
-                <Badge className="bg-white/30 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
+                <Badge className="bg-white/25 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
                   <Database className="h-3 w-3 mr-1" />
                   {nodeCount || 0} nodes
                 </Badge>
               )}
-              <Badge className="bg-primary/80 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
+              <Badge className="bg-primary/90 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
                 {universe.address ? 'On-chain' : 'Off-chain'}
               </Badge>
             </div>
