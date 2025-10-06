@@ -198,7 +198,7 @@ export const falRouter = router({
         characterStyle: z.enum(["cute", "realistic", "anime", "fantasy", "cyberpunk"]).optional(),
         videoPrompt: z.string().min(1),
         videoDuration: z.number().min(5).max(10).optional(),
-        videoProvider: z.enum(["fal", "lumaai", "kling"]).optional().default("fal"),
+        videoProvider: z.enum(["fal"]).optional().default("fal"),
       })
     )
     .mutation(async ({ input }) => {
@@ -247,40 +247,14 @@ export const falRouter = router({
       });
 
       // Step 2: Video
-      let videoGenerationId: string;
-      let videoStatus: string;
-
-      if (input.videoProvider === "fal") {
-        const videoResult = await falService.generateVideo({
-          prompt: input.videoPrompt,
-          model: "fal-ai/veo3/fast/image-to-video",
-          imageUrl: imageResult.imageUrl,
-          duration: input.videoDuration || 5,
-          aspectRatio: "16:9",
-          motionStrength: 127,
-        });
-        videoGenerationId = videoResult.id;
-        videoStatus = videoResult.status;
-      } else if (input.videoProvider === "lumaai") {
-        const { videoService } = await import("../../services/video");
-        const videoResult = await videoService.generateVideo({
-          prompt: input.videoPrompt,
-          imageUrl: imageResult.imageUrl,
-        });
-        videoGenerationId = videoResult.id;
-        videoStatus = videoResult.status;
-      } else {
-        const { klingService } = await import("../../services/kling");
-        const videoResult = await klingService.createMultiImageVideo({
-          image_list: [{ image: `https://images.weserv.nl/?url=${encodeURIComponent(imageResult.imageUrl)}` }],
-          prompt: input.videoPrompt,
-          mode: "std",
-          duration: String(input.videoDuration || 5) as "5" | "10",
-          aspect_ratio: "16:9",
-        });
-        videoGenerationId = videoResult.data.task_id;
-        videoStatus = videoResult.data.task_status;
-      }
+      const videoResult = await falService.generateVideo({
+        prompt: input.videoPrompt,
+        model: "fal-ai/veo3/fast/image-to-video",
+        imageUrl: imageResult.imageUrl,
+        duration: input.videoDuration || 5,
+        aspectRatio: "16:9",
+        motionStrength: 127,
+      });
 
       return {
         success: true,
@@ -291,8 +265,8 @@ export const falRouter = router({
           localImageUrl,
         },
         video: {
-          generationId: videoGenerationId,
-          status: videoStatus,
+          generationId: videoResult.id,
+          status: videoResult.status,
           provider: input.videoProvider,
         },
       };

@@ -1,9 +1,10 @@
 import { useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
-import { trpc } from '../utils/trpc'
+import { trpcClient } from '../utils/trpc'
 
 interface GeneratedContent {
   imageUrl?: string
@@ -18,30 +19,58 @@ export function GenerativeMedia() {
   const [videoPrompt, setVideoPrompt] = useState('A cute cat gently swaying in a soft breeze')
   const [content, setContent] = useState<GeneratedContent>({ isGenerating: false })
 
-  const generateMutation = trpc.gemini.generateImageAndVideo.useMutation({
-    onSuccess: (data) => {
-      setContent({
-        isGenerating: false,
-        imageUrl: data.imageUrl,
-        videoUrl: data.videoUrl,
-        generationId: data.generationId
-      })
-    },
-    onError: (error) => {
-      setContent({
-        isGenerating: false,
-        error: error.message
-      })
-    }
+  const generateImageMutation = useMutation({
+    mutationFn: (input: {
+      prompt: string;
+      model: 'fal-ai/nano-banana' | 'fal-ai/flux/dev' | 'fal-ai/flux-pro' | 'fal-ai/flux/schnell';
+      imageSize: 'square_hd' | 'square' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9';
+      numImages: number
+    }) =>
+      trpcClient.fal.generateImage.mutate(input),
+  })
+
+  const generateVideoMutation = useMutation({
+    mutationFn: (input: { prompt: string; imageUrl: string; duration: 5 | 10; aspectRatio: '16:9' | '9:16' | '1:1'; motionStrength: number }) =>
+      trpcClient.fal.veo3ImageToVideo.mutate(input),
   })
 
   const handleGenerate = async () => {
     setContent({ isGenerating: true })
-    
-    generateMutation.mutate({
-      imagePrompt,
-      videoPrompt
-    })
+
+    try {
+      // Step 1: Generate image with Fal AI
+      const imageResult = await generateImageMutation.mutateAsync({
+        prompt: imagePrompt,
+        model: 'fal-ai/nano-banana',
+        imageSize: 'landscape_16_9',
+        numImages: 1,
+      })
+
+      if (imageResult.status !== 'completed' || !imageResult.imageUrl) {
+        throw new Error(imageResult.error || 'Failed to generate image')
+      }
+
+      // Step 2: Generate video with Veo3 using the image
+      const videoResult = await generateVideoMutation.mutateAsync({
+        prompt: videoPrompt,
+        imageUrl: imageResult.imageUrl,
+        duration: 5,
+        aspectRatio: '16:9',
+        motionStrength: 127,
+      })
+
+      setContent({
+        isGenerating: false,
+        imageUrl: imageResult.imageUrl,
+        videoUrl: videoResult.videoUrl,
+        generationId: videoResult.id
+      })
+    } catch (error) {
+      setContent({
+        isGenerating: false,
+        error: error instanceof Error ? error.message : 'An error occurred'
+      })
+    }
   }
 
   const downloadVideo = async () => {
@@ -68,7 +97,7 @@ export function GenerativeMedia() {
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle>AI Media Generation</CardTitle>
-        <p className="text-sm text-gray-600">Generate an image with Gemini, then create a video with LumaAI</p>
+        <p className="text-sm text-gray-600">Generate an image with Fal AI (Nano Banana), then create a video with Veo3</p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -114,9 +143,9 @@ export function GenerativeMedia() {
               Generating image and video... This may take a few minutes.
             </p>
             <div className="mt-4 text-xs text-gray-500 space-y-1">
-              <div>1. Generating image with Gemini...</div>
-              <div>2. Uploading image to public storage...</div>
-              <div>3. Creating video with LumaAI...</div>
+              <div>1. Generating image with Fal AI (Nano Banana)...</div>
+              <div>2. Processing image...</div>
+              <div>3. Creating video with Veo3...</div>
             </div>
           </div>
         )}

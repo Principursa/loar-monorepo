@@ -389,9 +389,7 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
   const [description, setDescription] = useState(data.description || '');
   const [videoPrompt, setVideoPrompt] = useState('');
   const [showPromptDialog, setShowPromptDialog] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<'lumaai' | 'kling'>('lumaai');
   const [generatedVideoId, setGeneratedVideoId] = useState<string | null>(null);
-  const [currentProvider, setCurrentProvider] = useState<'lumaai' | 'kling'>('lumaai');
   
   // Check if this node has existing blockchain video data
   const existingBlockchainVideo = data.videoUrl; // From timeline blockchain data
@@ -406,16 +404,13 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
     data.blockchainNodeCreated || hasExistingVideo // If it has blockchain video, it's already on blockchain
   );
   
-  // Video generation mutation with provider selection
+  // Video generation mutation with Fal AI
   const generateVideoMutation = useMutation({
-    mutationFn: (input: { 
-      provider: 'lumaai' | 'kling';
-      prompt: string; 
-      model?: 'ray-flash-2' | 'ray-2' | 'ray-1-6'; 
-      resolution?: '540p' | '720p' | '1080p' | '4k'; 
-      duration?: '5s' | '10s'; 
+    mutationFn: (input: {
+      provider: 'fal';
+      prompt: string;
+      duration?: '5s' | '10s';
       imageUrl?: string;
-      imageUrls?: string[];
     }) =>
       trpcClient.video.generateWithProvider.mutate(input),
   });
@@ -464,24 +459,13 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
     },
   });
   
-  // Video status query - LumaAI status checking
-  const { data: lumaVideoStatus } = useQuery({
+  // Video status query - Fal AI status checking
+  const { data: videoStatus } = useQuery({
     queryKey: ['plotVideoStatus', generatedVideoId],
-    queryFn: () => trpcClient.video.status.query({ id: generatedVideoId! }),
-    enabled: !!generatedVideoId && !generatedVideoUrl && currentProvider === 'lumaai',
+    queryFn: () => trpcClient.fal.getStatus.query({ id: generatedVideoId! }),
+    enabled: !!generatedVideoId && !generatedVideoUrl,
     refetchInterval: 3000, // Poll every 3 seconds
   });
-
-  // Kling status query - use multiImageStatus endpoint
-  const { data: klingVideoStatus } = useQuery({
-    queryKey: ['klingVideoStatus', generatedVideoId],
-    queryFn: () => trpcClient.video.multiImageStatus.query({ task_id: generatedVideoId! }),
-    enabled: !!generatedVideoId && !generatedVideoUrl && currentProvider === 'kling',
-    refetchInterval: 5000, // Poll every 5 seconds like the test
-  });
-
-  // Combine status checking
-  const videoStatus = currentProvider === 'lumaai' ? lumaVideoStatus : klingVideoStatus;
   
   // Update the node data when description changes
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -499,31 +483,16 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
   const checkVideoCompletion = useCallback(() => {
     if (!videoStatus) return;
 
-    // Handle LumaAI response format
-    if (currentProvider === 'lumaai' && 'status' in videoStatus) {
-      if (videoStatus.status === 'completed' && videoStatus.videoUrl) {
-        setGeneratedVideoUrl(videoStatus.videoUrl);
-        data.plotVideoUrl = videoStatus.videoUrl;
-        setGeneratedVideoId(null); // Stop polling
-      } else if (videoStatus.status === 'failed') {
-        alert(`Video generation failed: ${videoStatus.failureReason || 'Unknown error'}`);
-        setGeneratedVideoId(null); // Stop polling
-      }
+    // Handle Fal AI response format
+    if (videoStatus.status === 'completed' && videoStatus.videoUrl) {
+      setGeneratedVideoUrl(videoStatus.videoUrl);
+      data.plotVideoUrl = videoStatus.videoUrl;
+      setGeneratedVideoId(null); // Stop polling
+    } else if (videoStatus.status === 'failed') {
+      alert(`Video generation failed: ${videoStatus.error || 'Unknown error'}`);
+      setGeneratedVideoId(null); // Stop polling
     }
-    
-    // Handle Kling response format
-    if (currentProvider === 'kling' && 'data' in videoStatus) {
-      if (videoStatus.data.task_status === 'succeed' && videoStatus.data.task_result?.videos?.length) {
-        const videoUrl = videoStatus.data.task_result.videos[0].url;
-        setGeneratedVideoUrl(videoUrl);
-        data.plotVideoUrl = videoUrl;
-        setGeneratedVideoId(null); // Stop polling
-      } else if (videoStatus.data.task_status === 'failed') {
-        alert(`Video generation failed: ${videoStatus.data.task_status_msg || 'Unknown error'}`);
-        setGeneratedVideoId(null); // Stop polling
-      }
-    }
-  }, [videoStatus, data, currentProvider]);
+  }, [videoStatus, data]);
   
   // Check for video completion when status changes
   useEffect(() => {
@@ -576,28 +545,16 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
       });
       
       const generationInput = {
-        provider: selectedProvider,
+        provider: 'fal' as const,
         prompt: videoPrompt,
-        model: 'ray-flash-2' as const, // Use ray-flash-2 for fast/low quality generation
-        // Only include resolution/duration for text-to-video
-        ...(isImageToVideo ? {} : {
-          resolution: '540p' as const, // Lower resolution for faster generation
-          duration: '5s' as const
-        }),
-        // Add image URL for image-to-video generation (LumaAI)
-        ...(isImageToVideo && selectedProvider === 'lumaai' && { imageUrl: data.characterImageUrl }),
-        // Add image URLs for multi-image generation (Kling)
-        ...(isImageToVideo && selectedProvider === 'kling' && { 
-          imageUrls: data.characterImageUrls && data.characterImageUrls.length > 0 
-            ? data.characterImageUrls 
-            : [data.characterImageUrl].filter(Boolean) 
-        })
+        duration: '5s' as const,
+        // Add image URL for image-to-video generation
+        ...(isImageToVideo && data.characterImageUrl && { imageUrl: data.characterImageUrl }),
       };
-      
+
       const result = await generateVideoMutation.mutateAsync(generationInput) as { id: string; status: string };
-      
+
       setGeneratedVideoId(result.id);
-      setCurrentProvider(selectedProvider); // Track which provider was used
       setShowPromptDialog(false);
     } catch (error) {
       console.error('Error generating video:', error);
@@ -817,25 +774,11 @@ export const PlotPointNode = memo(({ data, isConnectable }: NodeProps) => {
           <div className="bg-white p-4 rounded-lg shadow-lg max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-semibold mb-3">Generate Plot Point Video</h3>
             
-            {/* Provider Selection */}
+            {/* Using Fal AI for video generation */}
             <div className="mb-3">
-              <label className="block text-sm font-medium mb-2">AI Provider:</label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedProvider('lumaai')}
-                  className={`px-3 py-1 text-xs rounded ${selectedProvider === 'lumaai' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-                >
-                  LumaAI (Single Image)
-                </button>
-                <button
-                  onClick={() => setSelectedProvider('kling')}
-                  className={`px-3 py-1 text-xs rounded ${selectedProvider === 'kling' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-                >
-                  Kling (Multi-Image)
-                </button>
-              </div>
+              <label className="block text-sm font-medium mb-2">AI Provider: Fal AI</label>
             </div>
-            
+
             <textarea
               value={videoPrompt}
               onChange={(e) => setVideoPrompt(e.target.value)}
@@ -886,10 +829,10 @@ export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(data.mediaUrl || null);
   const [walrusUrl, setWalrusUrl] = useState<string | null>(data.mediaWalrusUrl || null);
   
-  // Video generation mutation
+  // Video generation mutation with Fal AI
   const generateVideoMutation = useMutation({
-    mutationFn: (input: { prompt: string; model?: 'ray-flash-2' | 'ray-2' | 'ray-1-6'; resolution?: '540p' | '720p' | '1080p' | '4k'; duration?: '5s' | '10s' }) =>
-      trpcClient.video.generate.mutate(input),
+    mutationFn: (input: { provider: 'fal'; prompt: string; duration?: '5s' | '10s' }) =>
+      trpcClient.video.generateWithProvider.mutate(input),
   });
   
   // Walrus upload mutation
@@ -898,10 +841,10 @@ export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
       trpcClient.walrus.uploadFromUrl.mutate(input),
   });
   
-  // Video status query - only enabled when we have a video ID
+  // Video status query - only enabled when we have a video ID (using Fal AI)
   const { data: videoStatus } = useQuery({
     queryKey: ['videoStatus', generatedVideoId],
-    queryFn: () => trpcClient.video.status.query({ id: generatedVideoId! }),
+    queryFn: () => trpcClient.fal.getStatus.query({ id: generatedVideoId! }),
     enabled: !!generatedVideoId && !generatedVideoUrl,
     refetchInterval: 3000, // Poll every 3 seconds
   });
@@ -948,9 +891,8 @@ export const MediaNode = memo(({ data, isConnectable }: NodeProps) => {
     
     try {
       const result = await generateVideoMutation.mutateAsync({
+        provider: 'fal',
         prompt: videoPrompt,
-        model: 'ray-flash-2',
-        resolution: '720p',
         duration: '5s'
       }) as { id: string; status: string };
       
