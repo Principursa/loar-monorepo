@@ -75,8 +75,8 @@ function TimelineEventsSection() {
     if (universeAddresses[1]) processUniverse(universe2Data.data, universeAddresses[1]);
     if (universeAddresses[2]) processUniverse(universe3Data.data, universeAddresses[2]);
 
-    // Return up to 4 events total
-    return allEvents.slice(0, 4);
+    // Return up to 3 events total
+    return allEvents.slice(0, 3);
   }, [universe1Data.data, universe2Data.data, universe3Data.data, universeAddresses]);
 
   if (!events || events.length === 0) {
@@ -97,15 +97,18 @@ function TimelineEventsSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {events.map((event, index) => (
             <div key={event.eventId} className="group relative">
-              <div className={`absolute -inset-2 bg-gradient-to-r ${index % 2 === 0 ? 'from-primary/20 to-purple-500/20' : 'from-purple-500/20 to-pink-500/20'} rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity`} />
+              <div className={`absolute -inset-2 bg-gradient-to-r ${index % 3 === 0 ? 'from-primary/20 to-purple-500/20' : index % 3 === 1 ? 'from-purple-500/20 to-pink-500/20' : 'from-pink-500/20 to-primary/20'} rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity`} />
               <div className="relative bg-card rounded-2xl border-2 border-border overflow-hidden">
                 <div className="aspect-video bg-black">
                   <video
                     className="w-full h-full object-cover"
-                    controls
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
                     preload="metadata"
                   >
                     <source
