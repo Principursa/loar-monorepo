@@ -3,7 +3,6 @@ import { z } from "zod";
 import { falService } from "../../services/fal";
 import { db } from "../../db";
 import { characters } from "../../db/schema/characters";
-import { walrusService } from "../../services/walrus";
 
 export const falRouter = router({
   // Test FAL connection
