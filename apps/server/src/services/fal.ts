@@ -249,6 +249,9 @@ export class FalService {
         throw new Error('No valid image URLs provided');
       }
 
+      // Map aspect ratio if provided
+      const aspectRatio = mapImageSizeToAspectRatio(options.imageSize);
+
       const input: any = {
         prompt: options.prompt,
         image_urls: validImageUrls,
@@ -256,13 +259,12 @@ export class FalService {
         output_format: 'jpeg',
       };
 
-      // Map aspect ratio if provided
-      const aspectRatio = mapImageSizeToAspectRatio(options.imageSize);
+      // Only add aspect_ratio if it's provided (as per API docs)
       if (aspectRatio) {
         input.aspect_ratio = aspectRatio;
       }
 
-      console.log('📤 Sending to Nano Banana Edit');
+      console.log('📤 Sending to Nano Banana Edit with input:', JSON.stringify(input, null, 2));
 
       const result = await fal.subscribe(model, {
         input,

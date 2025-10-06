@@ -1366,10 +1366,10 @@ function UniverseTimelineEditor() {
 
       {/* Right Sidebar - Event Creation */}
       {showVideoDialog && (() => {
-        // Find previous event's video URL
+        // Find previous event's video URL - always use the last event or the source node
         const sourceNode = sourceNodeId
           ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
-          : null;
+          : nodes.filter((n: any) => n.data.nodeType === 'scene' && n.data.videoUrl).pop();
         const previousEventVideoUrl = sourceNode?.data.videoUrl || null;
 
         return (
