@@ -1,0 +1,50 @@
+name: deploy App
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log Docker version
+        run: docker version
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx.cache
+          key: Linux-docker-${{github.sha}}
+          restore-keys: |
+            Linux-docker
+
+      - name: Deploy via SSH
+        env:
+          SSH_HOST: ${{secrets.SSH_HOST}}
+          SSH_USER: ${{secrets.SSH_USER}}
+          WORK_DIR: ${{secrets.WORK_DIR}}
+          MAIN_BRANCH: ${{secrets.MAIN_BRANCH}}
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key.pem
+          chmod 600 private_key.pem
+
+          ssh -i private_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -tt $SSH_USER@$SSH_HOST << EOF
+            echo "✅ SSH connection successful"
+            cd $WORK_DIR
+            git pull origin $MAIN_BRANCH
+            docker compose down || true
+            docker compose build
+            docker compose up -d
+            echo "✅ Deployment complete"
+            exit
+          EOF
+
+
