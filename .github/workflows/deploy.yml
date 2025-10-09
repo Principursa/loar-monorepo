@@ -39,7 +39,7 @@ jobs:
           ssh -i private_key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -tt $SSH_USER@$SSH_HOST << EOF
             echo "✅ SSH connection successful"
             cd $WORK_DIR
-            git pull origin $MAIN_BRANCH
+            git pull origin
             docker compose down || true
             docker compose build
             docker compose up -d
