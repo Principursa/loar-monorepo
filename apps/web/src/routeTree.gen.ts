@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UniversesRouteImport } from './routes/universes'
 import { Route as TimelineRouteImport } from './routes/timeline'
+import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
@@ -28,6 +29,11 @@ const UniversesRoute = UniversesRouteImport.update({
 const TimelineRoute = TimelineRouteImport.update({
   id: '/timeline',
   path: '/timeline',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MarketRoute = MarketRouteImport.update({
+  id: '/market',
+  path: '/market',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/market': typeof MarketRoute
   '/timeline': typeof TimelineRoute
   '/universes': typeof UniversesRoute
   '/universe/$id': typeof UniverseIdRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/market': typeof MarketRoute
   '/timeline': typeof TimelineRoute
   '/universes': typeof UniversesRoute
   '/universe/$id': typeof UniverseIdRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/cinematicUniverseCreate': typeof CinematicUniverseCreateRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/market': typeof MarketRoute
   '/timeline': typeof TimelineRoute
   '/universes': typeof UniversesRoute
   '/universe/$id': typeof UniverseIdRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/cinematicUniverseCreate'
     | '/dashboard'
     | '/login'
+    | '/market'
     | '/timeline'
     | '/universes'
     | '/universe/$id'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/cinematicUniverseCreate'
     | '/dashboard'
     | '/login'
+    | '/market'
     | '/timeline'
     | '/universes'
     | '/universe/$id'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/cinematicUniverseCreate'
     | '/dashboard'
     | '/login'
+    | '/market'
     | '/timeline'
     | '/universes'
     | '/universe/$id'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   CinematicUniverseCreateRoute: typeof CinematicUniverseCreateRoute
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
+  MarketRoute: typeof MarketRoute
   TimelineRoute: typeof TimelineRoute
   UniversesRoute: typeof UniversesRoute
   UniverseIdRoute: typeof UniverseIdRoute
@@ -174,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/timeline'
       fullPath: '/timeline'
       preLoaderRoute: typeof TimelineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/market': {
+      id: '/market'
+      path: '/market'
+      fullPath: '/market'
+      preLoaderRoute: typeof MarketRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   CinematicUniverseCreateRoute: CinematicUniverseCreateRoute,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
+  MarketRoute: MarketRoute,
   TimelineRoute: TimelineRoute,
   UniversesRoute: UniversesRoute,
   UniverseIdRoute: UniverseIdRoute,
