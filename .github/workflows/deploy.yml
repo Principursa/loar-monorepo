@@ -40,6 +40,8 @@ jobs:
             echo "✅ SSH connection successful"
             cd $WORK_DIR
             git pull origin
+            bun install
+            bun run build
             docker compose down || true
             docker compose build
             docker compose up -d
