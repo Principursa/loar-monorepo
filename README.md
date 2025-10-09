@@ -35,7 +35,7 @@ We believe that LOAR has the potential for even higher amounts of usage through 
 ## 🚀 Core Features
 
 ### 🧩 Narrative Flow Editor
-- **Interactive Graph-Based Editor** - Create and visualize complex narrative structures
+- **Interactive Node-Based Editor** - Create and visualize complex narrative structures
 - **Character-Plot Connections** - Link characters to storylines with visual relationships
 - **Canonicity Management** - Track and vote on official universe canon
 
