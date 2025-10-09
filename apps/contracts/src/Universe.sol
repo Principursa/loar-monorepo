@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {Script, console} from "forge-std/Script.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
 
-contract Timeline is Ownable {
+contract Universe is Ownable {
     struct VideoNode {
         string link;
         uint id;
