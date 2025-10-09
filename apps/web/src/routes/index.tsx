@@ -252,7 +252,7 @@ function HomeComponent() {
             </div>
 
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight">
-              Rebuild Your Own{" "}
+              Build Your Own{" "}
               <span className="bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
                 Narrative Path
               </span>
