@@ -285,6 +285,7 @@ export const falRouter = router({
             "fal-ai/veo3/fast/image-to-video",
             "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
             "fal-ai/wan-25-preview/image-to-video",
+            "fal-ai/sora-2/image-to-video",
           ])
           .optional(),
         imageUrl: z.string().url().optional(),
@@ -294,11 +295,11 @@ export const falRouter = router({
         height: z.number().min(256).max(1080).optional(),
         guidanceScale: z.number().min(1).max(20).optional(),
         numInferenceSteps: z.number().min(10).max(50).optional(),
-        aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional(),
+        aspectRatio: z.enum(["16:9", "9:16", "1:1", "auto"]).optional(),
         motionStrength: z.number().min(1).max(255).optional(),
         negativePrompt: z.string().optional(),
         cfgScale: z.number().min(0.1).max(2.0).optional(),
-        resolution: z.enum(["720p", "1080p"]).optional(),
+        resolution: z.enum(["720p", "1080p", "auto"]).optional(),
         enablePromptExpansion: z.boolean().optional(),
       })
     )
@@ -378,7 +379,7 @@ export const falRouter = router({
         prompt: z.string().min(1),
         imageUrl: z.string().url(),
         duration: z.union([z.literal(5), z.literal(10)]).optional().default(5),
-        resolution: z.enum(["720p", "1080p"]).optional().default("1080p"),
+        resolution: z.enum(["720p", "1080p", "auto"]).optional().default("1080p"),
         negativePrompt: z.string().optional(),
         enablePromptExpansion: z.boolean().optional().default(true),
       })
@@ -392,6 +393,27 @@ export const falRouter = router({
         resolution: input.resolution,
         negativePrompt: input.negativePrompt,
         enablePromptExpansion: input.enablePromptExpansion,
+      });
+    }),
+
+  soraImageToVideo: publicProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1, "Prompt is required for Sora video generation"),
+        imageUrl: z.string().url("Valid image URL is required for Sora image-to-video"),
+        duration: z.number().min(1).max(10).optional().default(4),
+        aspectRatio: z.enum(["16:9", "9:16", "1:1", "auto"]).optional().default("auto"),
+        resolution: z.enum(["720p", "1080p", "auto"]).optional().default("auto"),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return await falService.generateVideo({
+        prompt: input.prompt,
+        imageUrl: input.imageUrl,
+        model: "fal-ai/sora-2/image-to-video",
+        duration: input.duration,
+        aspectRatio: input.aspectRatio,
+        resolution: input.resolution,
       });
     }),
 });

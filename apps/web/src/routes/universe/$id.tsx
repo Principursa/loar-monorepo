@@ -54,7 +54,7 @@ function UniverseTimelineEditor() {
   const [videoDescription, setVideoDescription] = useState("");
   const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
   const [additionType, setAdditionType] = useState<'after' | 'branch'>('after');
-  const [selectedVideoModel, setSelectedVideoModel] = useState<'fal-veo3' | 'fal-kling' | 'fal-wan25'>('fal-veo3');
+  const [selectedVideoModel, setSelectedVideoModel] = useState<'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora'>('fal-veo3');
   const [negativePrompt, setNegativePrompt] = useState("");
   const [videoPrompt, setVideoPrompt] = useState("");
   const [videoRatio, setVideoRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
@@ -543,6 +543,16 @@ function UniverseTimelineEditor() {
           enablePromptExpansion: true
         });
         console.log('Wan25 video result:', result);
+        return { videoUrl: result.videoUrl }; // Use actual video URL
+      } else if (selectedVideoModel === 'fal-sora') {
+        const result = await trpcClient.fal.soraImageToVideo.mutate({
+          prompt: finalPrompt,
+          imageUrl,
+          duration: 4,
+          aspectRatio: videoRatio === "1:1" ? "auto" : videoRatio,
+          resolution: "auto",
+        });
+        console.log('Sora video result:', result);
         return { videoUrl: result.videoUrl }; // Use actual video URL
       }
       

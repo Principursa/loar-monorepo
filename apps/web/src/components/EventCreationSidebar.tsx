@@ -59,8 +59,8 @@ interface EventCreationSidebarProps {
   setVideoPrompt: (prompt: string) => void;
   videoRatio: "16:9" | "9:16" | "1:1";
   setVideoRatio: (ratio: "16:9" | "9:16" | "1:1") => void;
-  selectedVideoModel: 'fal-veo3' | 'fal-kling' | 'fal-wan25';
-  setSelectedVideoModel: (model: 'fal-veo3' | 'fal-kling' | 'fal-wan25') => void;
+  selectedVideoModel: 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora';
+  setSelectedVideoModel: (model: 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora') => void;
   negativePrompt: string;
   setNegativePrompt: (prompt: string) => void;
   handleGenerateVideo: () => void;
@@ -837,11 +837,26 @@ export function EventCreationSidebar({
                       <span className="text-muted-foreground ml-1">(Premium, best quality)</span>
                     </label>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="fal-sora"
+                      name="videoModel"
+                      value="fal-sora"
+                      checked={selectedVideoModel === 'fal-sora'}
+                      onChange={(e) => setSelectedVideoModel(e.target.value as any)}
+                      className="w-4 h-4 text-primary"
+                    />
+                    <label htmlFor="fal-sora" className="text-sm">
+                      <span className="font-medium">OpenAI Sora 2</span>
+                      <span className="text-muted-foreground ml-1">(State-of-the-art, image-to-video)</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
               {/* Negative Prompt for all FAL models */}
-              {(selectedVideoModel === 'fal-wan25' || selectedVideoModel === 'fal-kling' || selectedVideoModel === 'fal-veo3') && (
+              {(selectedVideoModel === 'fal-wan25' || selectedVideoModel === 'fal-kling' || selectedVideoModel === 'fal-veo3' || selectedVideoModel === 'fal-sora') && (
                 <div className="mb-3">
                   <Label htmlFor="negative-prompt" className="text-xs font-medium text-muted-foreground">
                     Negative Prompt (optional)
@@ -864,12 +879,12 @@ export function EventCreationSidebar({
                 {isGeneratingVideo ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating with {selectedVideoModel === 'fal-veo3' ? 'Veo3 Fast' : selectedVideoModel === 'fal-kling' ? 'Kling 2.5' : 'Wan 2.5'}...
+                    Generating with {selectedVideoModel === 'fal-veo3' ? 'Veo3 Fast' : selectedVideoModel === 'fal-kling' ? 'Kling 2.5' : selectedVideoModel === 'fal-sora' ? 'Sora 2' : 'Wan 2.5'}...
                   </>
                 ) : (
                   <>
                     <Film className="h-4 w-4 mr-2" />
-                    Generate Video with {selectedVideoModel === 'fal-veo3' ? 'Veo3 Fast' : selectedVideoModel === 'fal-kling' ? 'Kling 2.5' : 'Wan 2.5'}
+                    Generate Video with {selectedVideoModel === 'fal-veo3' ? 'Veo3 Fast' : selectedVideoModel === 'fal-kling' ? 'Kling 2.5' : selectedVideoModel === 'fal-sora' ? 'Sora 2' : 'Wan 2.5'}
                   </>
                 )}
               </Button>
