@@ -41,32 +41,33 @@ function UniverseTimelineEditor() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node<TimelineNodeData> | null>(null);
   const [eventCounter, setEventCounter] = useState(1);
-  
+
   // Timeline parameters
   const [timelineTitle, setTimelineTitle] = useState("Universe Timeline");
   const [timelineDescription, setTimelineDescription] = useState("Blockchain-powered narrative timeline");
   const [selectedEventTitle, setSelectedEventTitle] = useState("");
   const [selectedEventDescription, setSelectedEventDescription] = useState("");
-  
+
   // Video generation dialog state
   const [showVideoDialog, setShowVideoDialog] = useState(false);
   const [videoTitle, setVideoTitle] = useState("");
   const [videoDescription, setVideoDescription] = useState("");
   const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
   const [additionType, setAdditionType] = useState<'after' | 'branch'>('after');
-  const [selectedVideoModel, setSelectedVideoModel] = useState<'fal-veo3' | 'fal-kling' | 'fal-wan25'>('fal-veo3');
+  const [selectedVideoModel, setSelectedVideoModel] = useState<'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora'>('fal-veo3');
+  const [selectedVideoDuration, setSelectedVideoDuration] = useState<number>(8);
   const [negativePrompt, setNegativePrompt] = useState("");
   const [videoPrompt, setVideoPrompt] = useState("");
   const [videoRatio, setVideoRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
   const [imageFormat, setImageFormat] = useState<'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3'>('landscape_16_9');
-  
+
   // Image generation state
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [showVideoStep, setShowVideoStep] = useState(false);
-  
+
   // Character selection state
   const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
   const [showCharacterSelector, setShowCharacterSelector] = useState(false);
@@ -82,23 +83,23 @@ function UniverseTimelineEditor() {
     imageUrl: string;
     characterId?: string;
   } | null>(null);
-  
+
   // File upload state  
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  
+
   // Contract integration state
   const [isSavingToContract, setIsSavingToContract] = useState(false);
   const [contractSaved, setContractSaved] = useState(false);
-  
+
   // Governance state
   const [showGovernanceSidebar, setShowGovernanceSidebar] = useState(false);
-  
+
   // Filecoin integration state
   const [isSavingToFilecoin, setIsSavingToFilecoin] = useState(false);
   const [filecoinSaved, setFilecoinSaved] = useState(false);
   const [pieceCid, setPieceCid] = useState<string | null>(null);
-  
+
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -112,21 +113,21 @@ function UniverseTimelineEditor() {
   const createFilecoinBlobUrl = useCallback(async (pieceCid: string, filename: string = 'video.mp4') => {
     try {
       console.log('Creating blob URL for PieceCID:', pieceCid);
-      
+
       // Download from Filecoin via tRPC
       const result = await trpcClient.synapse.download.query({ pieceCid });
-      
+
       // Convert base64 back to Uint8Array
       const binaryData = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
-      
+
       // Create blob with proper MIME type
       const mimeType = filename.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream';
       const blob = new Blob([binaryData], { type: mimeType });
-      
+
       // Create URL for the blob
       const blobUrl = URL.createObjectURL(blob);
       console.log('Created blob URL:', blobUrl);
-      
+
       return blobUrl;
     } catch (error) {
       console.error('Failed to create blob URL from Filecoin:', error);
@@ -141,11 +142,11 @@ function UniverseTimelineEditor() {
   const useUniverseLeaves = (contractAddress?: string) => {
     if (!contractAddress) {
       console.log('useUniverseLeaves - No contract address provided');
-      return { data: null, isLoading: false, refetch: async () => {} };
+      return { data: null, isLoading: false, refetch: async () => { } };
     }
-    
+
     console.log('useUniverseLeaves - Using address:', contractAddress, 'for universe:', id);
-    
+
     return useReadContract({
       abi: timelineAbi,
       address: contractAddress as Address,
@@ -159,11 +160,11 @@ function UniverseTimelineEditor() {
   const useUniverseFullGraph = (contractAddress?: string) => {
     if (!contractAddress) {
       console.log('useUniverseFullGraph - No contract address provided');
-      return { data: null, isLoading: false, refetch: async () => {} };
+      return { data: null, isLoading: false, refetch: async () => { } };
     }
-    
+
     console.log('useUniverseFullGraph - Using address:', contractAddress, 'for universe:', id);
-    
+
     return useReadContract({
       abi: timelineAbi,
       address: contractAddress as Address,
@@ -174,9 +175,10 @@ function UniverseTimelineEditor() {
     });
   };
 
-  // Try to get universe data from localStorage
+  // Try to get universe data from localStorage (skip for blockchain universes)
   const { data: universeFromStorage } = useQuery({
     queryKey: ['universe-metadata', id],
+    enabled: !id?.startsWith('0x'), // Don't run for blockchain universes
     queryFn: () => {
       const stored = localStorage.getItem('createdUniverses');
       const universes = stored ? JSON.parse(stored) : [];
@@ -190,10 +192,10 @@ function UniverseTimelineEditor() {
   // Use localStorage data if available
   const universe = universeFromStorage || null;
   const isLoadingUniverse = false;
-  
+
   // For blockchain universes (addresses starting with 0x), use blockchain data
   const isBlockchainUniverse = id?.startsWith('0x');
-  
+
   // For blockchain universes, create a default universe object if not found in localStorage
   const finalUniverse = universe || (isBlockchainUniverse ? {
     id: id,
@@ -207,18 +209,18 @@ function UniverseTimelineEditor() {
     tokenAddress: universe?.tokenAddress || null,
     governanceAddress: universe?.governanceAddress || null
   } : null);
-  
+
   // Each universe with a 0x address IS its own Timeline contract
   // So we use the universe ID as the contract address
-  const timelineContractAddress = isBlockchainUniverse 
+  const timelineContractAddress = isBlockchainUniverse
     ? id  // Use the universe ID as the contract address
     : universe?.address || undefined;  // For non-blockchain universes, use the stored address
-  
+
   console.log('Universe ID:', id);
   console.log('Is Blockchain Universe:', isBlockchainUniverse);
   console.log('Timeline Contract Address:', timelineContractAddress);
   console.log('Chain ID:', chainId);
-  
+
   // Blockchain data fetching hooks - use the universe's own contract address
   const { data: leavesData, isLoading: isLoadingLeaves, refetch: refetchLeaves } = useUniverseLeaves(timelineContractAddress);
   const { data: fullGraphData, isLoading: isLoadingFullGraph, refetch: refetchFullGraph } = useUniverseFullGraph(timelineContractAddress);
@@ -227,11 +229,11 @@ function UniverseTimelineEditor() {
   const useUniverseCanonChain = (contractAddress?: string) => {
     if (!contractAddress) {
       console.log('useUniverseCanonChain - No contract address provided');
-      return { data: null, isLoading: false, refetch: async () => {} };
+      return { data: null, isLoading: false, refetch: async () => { } };
     }
-    
+
     console.log('useUniverseCanonChain - Using address:', contractAddress, 'for universe:', id);
-    
+
     return useReadContract({
       abi: timelineAbi,
       address: contractAddress as Address,
@@ -243,7 +245,7 @@ function UniverseTimelineEditor() {
   };
 
   const { data: canonChainData, isLoading: isLoadingCanonChain, refetch: refetchCanonChain } = useUniverseCanonChain(timelineContractAddress);
-  
+
   // Get timeline data: use blockchain data if available, otherwise dummy data
   const graphData = useMemo(() => {
     console.log('=== GRAPH DATA DEBUG ===');
@@ -252,11 +254,11 @@ function UniverseTimelineEditor() {
     console.log('Full Graph Data:', fullGraphData);
     console.log('Canon Chain Data:', canonChainData);
     console.log('=========================');
-    
+
     if (timelineContractAddress && fullGraphData) {
       // Convert blockchain data to the expected format
       const [nodeIds, urls, descriptions, previousIds, nextIds, flags] = fullGraphData;
-      
+
       console.log('=== BLOCKCHAIN DATA PARSED ===');
       console.log('Node IDs:', nodeIds);
       console.log('URLs:', urls);
@@ -264,7 +266,7 @@ function UniverseTimelineEditor() {
       console.log('Previous IDs:', previousIds);
       console.log('Canon Chain:', canonChainData);
       console.log('==============================');
-      
+
       return {
         nodeIds: nodeIds || [],
         urls: urls || [],
@@ -275,7 +277,7 @@ function UniverseTimelineEditor() {
         canonChain: canonChainData || []
       };
     }
-    
+
     // Return empty data structure if no data found
     return {
       nodeIds: [], urls: [], descriptions: [], previousNodes: [], children: [], flags: [], canonChain: []
@@ -288,7 +290,7 @@ function UniverseTimelineEditor() {
       name: `Universe ${id.slice(0, 8)}...`,
       description: 'Blockchain-based cinematic universe'
     } : null);
-    
+
     if (universeToUse?.name) {
       setTimelineTitle(universeToUse.name);
       setTimelineDescription(universeToUse.description || "Blockchain-powered narrative timeline");
@@ -313,7 +315,7 @@ function UniverseTimelineEditor() {
     onSuccess: async (data) => {
       console.log('Character generated:', data);
       setIsGeneratingCharacter(false);
-      
+
       // Store generated character for preview
       setGeneratedCharacter({
         name: characterName,
@@ -333,7 +335,7 @@ function UniverseTimelineEditor() {
   const saveCharacterMutation = useMutation({
     mutationFn: async () => {
       if (!generatedCharacter) throw new Error('No character to save');
-      
+
       const result = await trpcClient.fal.generateCharacter.mutate({
         name: generatedCharacter.name,
         description: generatedCharacter.description,
@@ -344,16 +346,16 @@ function UniverseTimelineEditor() {
     },
     onSuccess: async (data) => {
       console.log('Character saved to database:', data);
-      
+
       // Add to selected characters
       if (data.characterId) {
         setSelectedCharacters(prev => [...prev, data.characterId!]);
       }
-      
+
       // Clear generated character and close dialog
       setGeneratedCharacter(null);
       setShowCharacterGenerator(false);
-      
+
       // Refetch characters to include the new one
       await refetchCharacters();
     },
@@ -369,19 +371,19 @@ function UniverseTimelineEditor() {
       // Check if we have selected characters to edit into the scene
       if (selectedCharacters.length > 0 && charactersData?.characters) {
         const selectedChars = charactersData.characters.filter((c: any) => selectedCharacters.includes(c.id));
-        
+
         if (selectedChars.length > 0) {
           // Process all selected character images
           const characterNames = selectedChars.map((c: any) => c.character_name).join(' and ');
-          
+
           // Create edit prompt that places characters in the scene
           const editPrompt = `${characterNames} ${prompt}, cinematic scene, high quality, detailed environment`;
-          
+
           // Use character image URLs directly
           const processedImageUrls = selectedChars
             .filter((char: any) => char.image_url && char.image_url.trim())
             .map((char: any) => char.image_url);
-          
+
           console.log('🎭 === CHARACTER SCENE EDITING WITH NANO BANANA ===');
           console.log('Selected characters:', selectedChars.map((c: any) => c.character_name));
           console.log('Number of characters:', selectedChars.length);
@@ -389,47 +391,47 @@ function UniverseTimelineEditor() {
           console.log('Scene prompt:', editPrompt);
           console.log('Image format:', imageFormat);
           console.log('🚀 Calling Nano Banana Edit...');
-          
+
           // Validate we have at least one valid image URL
           if (processedImageUrls.length === 0) {
             throw new Error('No valid character images found for editing');
           }
-          
+
           try {
             // Use Nano Banana Edit for character frame generation
             console.log('🎯 Using fal-ai/nano-banana/edit for character frame generation');
-            
+
             const result = await trpcClient.fal.imageToImage.mutate({
               prompt: `Create a cinematic frame: ${editPrompt}. Professional photography, detailed environment, high quality composition`,
               imageUrls: processedImageUrls,
               imageSize: imageFormat,
               numImages: 1,
             });
-            
+
             console.log('✅ Nano Banana Edit result:', result);
-            
+
             if (result.status !== 'completed' || !result.imageUrl) {
               throw new Error(result.error || 'Nano Banana frame generation failed');
             }
-            
+
             console.log('🎉 NANO BANANA CHARACTER FRAME GENERATION SUCCESSFUL!');
             return { success: true, imageUrl: result.imageUrl };
           } catch (imageToImageError) {
             console.error('❌ NANO BANANA EDIT FAILED:', imageToImageError);
             console.error('Error details:', JSON.stringify(imageToImageError, null, 2));
-            
-            const errorMessage = imageToImageError instanceof Error 
-              ? imageToImageError.message 
+
+            const errorMessage = imageToImageError instanceof Error
+              ? imageToImageError.message
               : 'Nano Banana edit failed';
-            
+
             throw new Error(`Frame generation failed: ${errorMessage}. Please check character images and try again.`);
           }
         }
       }
-      
+
       // For scenes without characters, generate directly with Nano Banana
       console.log('🎨 Generating scene without characters using Nano Banana');
-      
+
       try {
         const result = await trpcClient.fal.generateImage.mutate({
           prompt: `${prompt}, cinematic scene, high quality, detailed environment, professional photography, dramatic lighting`,
@@ -437,11 +439,11 @@ function UniverseTimelineEditor() {
           imageSize: imageFormat,
           numImages: 1
         });
-        
+
         if (result.status !== 'completed' || !result.imageUrl) {
           throw new Error(result.error || 'Failed to generate scene image');
         }
-        
+
         console.log('🎉 NANO BANANA SCENE GENERATION SUCCESSFUL!');
         return { success: true, imageUrl: result.imageUrl };
       } catch (error) {
@@ -454,7 +456,7 @@ function UniverseTimelineEditor() {
         console.log('=== GENERATED IMAGE URL ===');
         console.log('Image URL:', data.imageUrl);
         console.log('===========================');
-        
+
         setGeneratedImageUrl(data.imageUrl);
         setShowVideoStep(true);
       }
@@ -467,19 +469,19 @@ function UniverseTimelineEditor() {
         selectedCharacters,
         charactersData: charactersData?.characters?.length
       });
-      
+
       let errorMessage = "Failed to generate image. ";
       if (selectedCharacters.length > 0) {
         errorMessage += "Character image editing failed. ";
       }
       errorMessage += "Please try again.";
-      
+
       if (error.message?.includes('FAL_KEY')) {
         errorMessage = "FAL API key is missing. Please configure FAL_KEY in environment variables.";
       } else if (error.message?.includes('nano-banana')) {
         errorMessage = "Nano Banana API error. Please try again.";
       }
-      
+
       alert(errorMessage);
     }
   });
@@ -487,7 +489,7 @@ function UniverseTimelineEditor() {
   // Handle image generation for the event
   const handleGenerateEventImage = useCallback(async () => {
     if (!videoDescription.trim()) return;
-    
+
     setIsGeneratingImage(true);
     try {
       // Use the video description as the image prompt
@@ -507,15 +509,15 @@ function UniverseTimelineEditor() {
         prompt: prompt || videoDescription,
         model: selectedVideoModel
       });
-      
+
       const finalPrompt = videoPrompt.trim() || prompt || videoDescription;
-      
+
       if (selectedVideoModel === 'fal-veo3') {
         const result = await trpcClient.fal.generateVideo.mutate({
           prompt: finalPrompt,
           imageUrl,
           model: "fal-ai/veo3/fast/image-to-video",
-          duration: 5,
+          duration: selectedVideoDuration,
           aspectRatio: videoRatio,
           motionStrength: 127,
           negativePrompt: negativePrompt || undefined
@@ -526,7 +528,7 @@ function UniverseTimelineEditor() {
         const result = await trpcClient.fal.klingVideo.mutate({
           prompt: finalPrompt,
           imageUrl,
-          duration: 5,
+          duration: selectedVideoDuration,
           aspectRatio: videoRatio,
           negativePrompt: negativePrompt || undefined,
           cfgScale: 0.5
@@ -537,15 +539,25 @@ function UniverseTimelineEditor() {
         const result = await trpcClient.fal.wan25ImageToVideo.mutate({
           prompt: finalPrompt,
           imageUrl,
-          duration: 5,
+          duration: selectedVideoDuration,
           resolution: "1080p",
           negativePrompt: negativePrompt || undefined,
           enablePromptExpansion: true
         });
         console.log('Wan25 video result:', result);
         return { videoUrl: result.videoUrl }; // Use actual video URL
+      } else if (selectedVideoModel === 'fal-sora') {
+        const result = await trpcClient.fal.soraImageToVideo.mutate({
+          prompt: finalPrompt,
+          imageUrl,
+          duration: selectedVideoDuration,
+          aspectRatio: videoRatio === "1:1" ? "auto" : videoRatio,
+          resolution: "auto",
+        });
+        console.log('Sora video result:', result);
+        return { videoUrl: result.videoUrl }; // Use actual video URL
       }
-      
+
       throw new Error('Invalid video model selected');
     },
     onSuccess: (data) => {
@@ -603,10 +615,10 @@ function UniverseTimelineEditor() {
 
   const handleGenerateVideo = useCallback(async () => {
     if (!generatedImageUrl) return;
-    
+
     // Use uploaded URL if available, otherwise use the generated image URL
     const imageUrlToUse = uploadedUrl || generatedImageUrl;
-    
+
     console.log('=== VIDEO GENERATION DEBUG ===');
     console.log('Generated Image URL:', generatedImageUrl);
     console.log('Uploaded URL:', uploadedUrl);
@@ -614,7 +626,7 @@ function UniverseTimelineEditor() {
     console.log('Image URL type:', imageUrlToUse.startsWith('data:') ? 'Data URL' : 'HTTP URL');
     console.log('Video Description:', videoDescription);
     console.log('===============================');
-    
+
     setIsGeneratingVideo(true);
     try {
       await generateVideoMutation.mutateAsync({
@@ -637,42 +649,42 @@ function UniverseTimelineEditor() {
 
     setIsSavingToContract(true);
     setIsSavingToFilecoin(true);
-    
+
     try {
       // Step 1: Upload to Filecoin first
       console.log('Step 1: Uploading video to Filecoin via Synapse. URL being used:', generatedVideoUrl);
       console.log('Current state - videoTitle:', videoTitle, 'videoDescription:', videoDescription);
-      
+
       let filecoinPieceCid: string | null = null;
       try {
         const filecoinResult = await trpcClient.synapse.uploadFromUrl.mutate({
           url: generatedVideoUrl
         });
-        
+
         console.log('Filecoin upload successful. PieceCID:', filecoinResult);
         console.log('PieceCID type:', typeof filecoinResult);
         console.log('PieceCID stringified:', JSON.stringify(filecoinResult));
-        
+
         // Convert to string if it's an object
         let pieceCidString: string;
         if (typeof filecoinResult === 'string') {
           pieceCidString = filecoinResult;
         } else if (filecoinResult && typeof filecoinResult === 'object') {
           // Try different ways to extract the string value from the PieceCID object
-          pieceCidString = filecoinResult.toString?.() || 
-                          filecoinResult.value || 
-                          filecoinResult.cid || 
-                          filecoinResult._baseValue || 
-                          JSON.stringify(filecoinResult);
+          pieceCidString = filecoinResult.toString?.() ||
+            filecoinResult.value ||
+            filecoinResult.cid ||
+            filecoinResult._baseValue ||
+            JSON.stringify(filecoinResult);
           console.log('Extracted PieceCID string:', pieceCidString);
         } else {
           pieceCidString = String(filecoinResult);
         }
-        
+
         filecoinPieceCid = pieceCidString;
         setPieceCid(pieceCidString);
         setFilecoinSaved(true);
-        
+
         // Create blob URL from Filecoin for display
         try {
           const blobUrl = await createFilecoinBlobUrl(pieceCidString, 'video.mp4');
@@ -686,12 +698,12 @@ function UniverseTimelineEditor() {
         console.error('Filecoin upload failed, proceeding with original URL:', filecoinError);
         // Continue with original URL if Filecoin fails
       }
-      
+
       setIsSavingToFilecoin(false);
 
       // Step 2: Determine the previous node based on addition type
       let previousNodeId: number;
-      
+
       if (additionType === 'branch' && sourceNodeId) {
         // For branches, extract numeric part from sourceNodeId (e.g., "4c" -> 4)
         const numericPart = sourceNodeId.match(/^\d+/);
@@ -707,9 +719,9 @@ function UniverseTimelineEditor() {
         previousNodeId = Math.max(...(numericIds || [0]), 0);
         console.log('Creating linear continuation after event:', previousNodeId);
       }
-      
+
       // Step 3: Determine the video URL to store - prefer Filecoin PieceCID if available
-      const videoUrlForContract = filecoinPieceCid 
+      const videoUrlForContract = filecoinPieceCid
         ? filecoinPieceCid // Store raw PieceCID 
         : generatedVideoUrl;
 
@@ -725,12 +737,12 @@ function UniverseTimelineEditor() {
       });
 
       // Determine which contract address to use
-      const contractAddressToUse = isBlockchainUniverse 
+      const contractAddressToUse = isBlockchainUniverse
         ? id as Address  // Use universe ID as contract address
         : TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address;  // Fallback to default
-      
+
       console.log('Saving to contract address:', contractAddressToUse);
-      
+
       // Create new node in the universe's specific smart contract
       const txHash = await writeContractAsync({
         abi: timelineAbi,
@@ -741,13 +753,13 @@ function UniverseTimelineEditor() {
 
       console.log('Transaction submitted:', txHash);
       setContractSaved(true);
-      
+
       // Show success message
-      const successMessage = filecoinPieceCid 
+      const successMessage = filecoinPieceCid
         ? `Successfully saved to Filecoin and blockchain!\nPieceCID: ${filecoinPieceCid}\nTransaction: ${txHash}`
         : `Successfully saved to blockchain! Transaction: ${txHash}`;
       alert(successMessage);
-      
+
       // Refresh the blockchain data to show the new node
       setTimeout(async () => {
         if (isBlockchainUniverse) {
@@ -761,7 +773,7 @@ function UniverseTimelineEditor() {
         await queryClient.invalidateQueries();
         console.log('Refreshed blockchain data - new node should appear');
       }, 5000); // Wait 5 seconds for blockchain to update
-      
+
     } catch (error) {
       console.error('Error saving to contract:', error);
       alert('Failed to save to contract: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -792,8 +804,8 @@ function UniverseTimelineEditor() {
 
   // Handle showing video generation dialog
   const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
-    console.log('🔵 handleAddEvent called:', { 
-      type, 
+    console.log('🔵 handleAddEvent called:', {
+      type,
       nodeId
     });
     setAdditionType(type);
@@ -807,6 +819,7 @@ function UniverseTimelineEditor() {
     setContractSaved(false);
     setIsSavingToContract(false);
     setSelectedVideoModel('fal-veo3'); // Reset to default
+    setSelectedVideoDuration(8); // Reset video duration to default
     setNegativePrompt(""); // Reset negative prompt
     setVideoPrompt(""); // Reset video prompt
     setVideoRatio("16:9"); // Reset video ratio
@@ -819,12 +832,12 @@ function UniverseTimelineEditor() {
     if (!videoTitle.trim()) return;
 
     // Find source node if specified
-    const sourceNode = sourceNodeId 
+    const sourceNode = sourceNodeId
       ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
       : null;
     const lastEventNode = nodes.filter((n: any) => n.data.nodeType === 'scene').pop();
     const referenceNode = sourceNode || lastEventNode;
-    
+
     // Debug: Log what we found for the source node
     console.log('handleCreateEvent sourceNode lookup:', {
       sourceNodeId,
@@ -838,26 +851,26 @@ function UniverseTimelineEditor() {
         eventId: n.data.eventId
       }))
     });
-    
+
     // Generate appropriate event ID based on addition type - Keep universe branch logic
     let newEventId: string;
     let newAddId: string;
-    
+
     if (additionType === 'branch' && sourceNodeId) {
       // For branches, add a letter suffix to the source node ID
       const sourceEventId = sourceNodeId;
-      
+
       // Find all existing branches from this source node
       const existingBranches = nodes.filter((n: any) => {
         const eventId = n.data.eventId?.toString();
         return eventId && eventId.startsWith(sourceEventId) && /[a-z]/.test(eventId);
       });
-      
+
       // Determine the next branch letter
       const branchLetter = String.fromCharCode(98 + existingBranches.length); // 'b', 'c', 'd', etc.
       newEventId = `${sourceEventId}${branchLetter}`;
       newAddId = `add-${newEventId}`;
-      
+
       console.log('Creating branch:', {
         sourceEventId,
         existingBranches: existingBranches.map(n => n.data.eventId),
@@ -866,7 +879,7 @@ function UniverseTimelineEditor() {
     } else {
       // For linear continuation, determine if we're continuing a branch or main timeline
       const sceneNodes = nodes.filter((n: any) => n.data.nodeType === 'scene');
-      
+
       if (sceneNodes.length === 0) {
         // First event
         newEventId = "1";
@@ -877,10 +890,10 @@ function UniverseTimelineEditor() {
           // Compare positions to find the rightmost node
           return node.position.x > latest.position.x ? node : latest;
         }, null);
-        
+
         const lastEventId = lastNode?.data.eventId?.toString();
         console.log('Last event ID for continuation:', lastEventId);
-        
+
         if (lastEventId && /[a-z]/.test(lastEventId)) {
           // We're continuing a branch (e.g., from "1b" to "1c")
           const baseNumber = lastEventId.replace(/[a-z]/g, '');
@@ -903,19 +916,19 @@ function UniverseTimelineEditor() {
       }
       newAddId = `add-${newEventId}`;
     }
-    
-    console.log('handleCreateEvent debug:', { 
-      additionType, 
+
+    console.log('handleCreateEvent debug:', {
+      additionType,
       sourceNodeId,
       newEventId,
       sourceNode: sourceNode ? { id: sourceNode.id, position: sourceNode.position, eventId: sourceNode.data.eventId } : null,
       referenceNode: referenceNode ? { id: referenceNode.id, position: referenceNode.position } : null
     });
-    
+
     // Calculate position based on addition type
     let newEventPosition;
     let newAddPosition;
-    
+
     if (additionType === 'branch' && sourceNode) {
       // Create branch: forward and below the source node - increased spacing
       const branchY = sourceNode.position.y + 350; // Increased from 220 to 350
@@ -930,7 +943,7 @@ function UniverseTimelineEditor() {
 
     // Generate user-friendly display name - Keep it simple for universe branch
     const displayName = newEventId;
-    
+
     // Create new event node
     const newEventNode: Node<TimelineNodeData> = {
       id: newEventId,
@@ -991,7 +1004,7 @@ function UniverseTimelineEditor() {
     // For linear addition, remove old add nodes. For branches, keep everything
     let filteredNodes = nodes;
     let filteredEdges = edges;
-    
+
     if (additionType === 'after') {
       // Linear addition: remove all existing add nodes and their edges
       filteredNodes = nodes.filter((n: any) => n.data.nodeType !== 'add');
@@ -1002,7 +1015,7 @@ function UniverseTimelineEditor() {
     setNodes([...filteredNodes, newEventNode as any, newAddNode as any]);
     setEdges([...filteredEdges, ...newEdges]);
     setEventCounter(prev => prev + 1);
-    
+
     // Save event data to localStorage for ALL events (not just branched)
     console.log('🔍 Checking if should save event:', {
       newEventId,
@@ -1011,7 +1024,7 @@ function UniverseTimelineEditor() {
       hasVideo: !!generatedVideoUrl,
       hasImage: !!generatedImageUrl
     });
-    
+
     // Save ALL events to localStorage for now (easier debugging)
     const eventData = {
       eventId: newEventId,
@@ -1024,22 +1037,22 @@ function UniverseTimelineEditor() {
       timestamp: Date.now(),
       position: newEventPosition
     };
-    
+
     // Store in universe-specific localStorage
     const storageKey = `universe_events_${id}`;
     const existingEvents = localStorage.getItem(storageKey);
     const eventsData = existingEvents ? JSON.parse(existingEvents) : {};
-    
+
     eventsData[newEventId] = eventData;
     localStorage.setItem(storageKey, JSON.stringify(eventsData));
-    
+
     console.log('💾 Saved event to localStorage:', {
       key: storageKey,
       eventId: newEventId,
       eventData,
       allEvents: eventsData
     });
-    
+
     // Close dialog and reset
     setShowVideoDialog(false);
     setVideoTitle("");
@@ -1062,31 +1075,31 @@ function UniverseTimelineEditor() {
 
     // Colors for different types
     const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
-    
+
     // First pass: categorize nodes by their parent to detect branches
     const nodesByParent = new Map<number, number[]>();
     const nodePositions = new Map<number, { x: number; y: number }>();
-    
+
     graphData.nodeIds.forEach((nodeIdStr, index) => {
       const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
       const previousNode = graphData.previousNodes[index] || '';
-      const parentId = (previousNode && String(previousNode) !== '0') 
+      const parentId = (previousNode && String(previousNode) !== '0')
         ? (typeof previousNode === 'bigint' ? Number(previousNode) : parseInt(String(previousNode)))
         : 0;
-      
+
       if (!nodesByParent.has(parentId)) {
         nodesByParent.set(parentId, []);
       }
       nodesByParent.get(parentId)!.push(nodeId);
     });
-    
+
     // Generate proper event labels based on branching structure
     const getEventLabel = (nodeId: number, parentId: number): string => {
       if (parentId === 0) return nodeId.toString(); // Root nodes keep numeric ID
-      
+
       const siblings = nodesByParent.get(parentId) || [];
       const siblingIndex = siblings.indexOf(nodeId);
-      
+
       if (siblingIndex === 0) {
         // First child continues the main timeline
         return nodeId.toString();
@@ -1096,7 +1109,7 @@ function UniverseTimelineEditor() {
         return `${parentId}${branchLetter}`;
       }
     };
-    
+
     // Create nodes from blockchain data with proper branching layout
     graphData.nodeIds.forEach((nodeIdStr, index) => {
       const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
@@ -1104,22 +1117,22 @@ function UniverseTimelineEditor() {
       const description = graphData.descriptions[index] || '';
       const previousNode = graphData.previousNodes[index] || '';
       const isCanon = graphData.flags[index] || false;
-      const parentId = (previousNode && String(previousNode) !== '0') 
+      const parentId = (previousNode && String(previousNode) !== '0')
         ? (typeof previousNode === 'bigint' ? Number(previousNode) : parseInt(String(previousNode)))
         : 0;
-      
+
       // Check if this node is in the canon chain
       const isInCanonChain = graphData.canonChain && graphData.canonChain.some((canonId: any) => {
         const canonNodeId = typeof canonId === 'bigint' ? Number(canonId) : parseInt(String(canonId));
         return canonNodeId === nodeId;
       });
-      
+
       // Generate proper event label
       const eventLabel = getEventLabel(nodeId, parentId);
-      
+
       // Calculate position based on branching structure
       let x: number, y: number;
-      
+
       if (parentId === 0) {
         // Root node
         x = 100;
@@ -1127,10 +1140,10 @@ function UniverseTimelineEditor() {
       } else {
         const siblings = nodesByParent.get(parentId) || [];
         const siblingIndex = siblings.indexOf(nodeId);
-        const parentIndex = graphData.nodeIds.findIndex(id => 
+        const parentIndex = graphData.nodeIds.findIndex(id =>
           (typeof id === 'bigint' ? Number(id) : parseInt(String(id))) === parentId
         );
-        
+
         if (siblingIndex === 0) {
           // Main timeline continuation
           x = 100 + ((parentIndex + 1) * horizontalSpacing);
@@ -1141,22 +1154,22 @@ function UniverseTimelineEditor() {
           y = startY + (siblingIndex * verticalSpacing);
         }
       }
-      
+
       nodePositions.set(nodeId, { x, y });
-      
+
       const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
-      
+
       // Debug: Log the node creation data
-      console.log(`Creating node ${nodeId} (${eventLabel}):`, { 
+      console.log(`Creating node ${nodeId} (${eventLabel}):`, {
         url, description, previousNode, parentId, position: { x, y }
       });
-      
+
       blockchainNodes.push({
         id: `blockchain-node-${nodeId}`,
         type: 'timelineEvent',
         position: { x, y },
         data: {
-          label: description && description.length > 0 && description !== `Timeline event ${nodeId}` 
+          label: description && description.length > 0 && description !== `Timeline event ${nodeId}`
             ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
             : `Event ${eventLabel}`,
           description: description || `Timeline event ${eventLabel}`,
@@ -1173,16 +1186,16 @@ function UniverseTimelineEditor() {
         }
       });
     });
-    
+
     // Create edges based on previous node relationships
     graphData.nodeIds.forEach((nodeIdStr, index) => {
       const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
       const previousNodeStr = graphData.previousNodes[index];
-      
+
       if (previousNodeStr && String(previousNodeStr) !== '0') {
         const previousNodeId = typeof previousNodeStr === 'bigint' ? Number(previousNodeStr) : parseInt(String(previousNodeStr));
         const color = graphData.flags[index] ? colors[0] : colors[(index + 1) % colors.length];
-        
+
         blockchainEdges.push({
           id: `edge-${previousNodeId}-${nodeId}`,
           source: `blockchain-node-${previousNodeId}`,
@@ -1201,7 +1214,7 @@ function UniverseTimelineEditor() {
     if (blockchainNodes.length > 0) {
       const lastNode = blockchainNodes[blockchainNodes.length - 1];
       const addNodeId = `add-final`;
-      
+
       blockchainNodes.push({
         id: addNodeId,
         type: 'timelineEvent',
@@ -1250,11 +1263,11 @@ function UniverseTimelineEditor() {
     if (node.data.nodeType === 'scene') {
       setSelectedEventTitle(node.data.label);
       setSelectedEventDescription(node.data.description);
-      
+
       // Navigate to event detail page using new route structure
       const universeId = node.data.universeId || id;
       const eventId = node.data.eventId;
-      
+
       if (eventId && universeId) {
         // Use window.location for navigation with new route structure: /event/{universeId}/{eventId}
         const eventUrl = `/event/${universeId}/${eventId}`;
@@ -1266,17 +1279,17 @@ function UniverseTimelineEditor() {
   // Update selected node data
   const updateSelectedNode = useCallback(() => {
     if (selectedNode && selectedNode.data.nodeType === 'scene') {
-      setNodes((nds: any) => 
-        nds.map((node: any) => 
+      setNodes((nds: any) =>
+        nds.map((node: any) =>
           node.id === selectedNode.id
             ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  label: selectedEventTitle,
-                  description: selectedEventDescription,
-                },
-              }
+              ...node,
+              data: {
+                ...node.data,
+                label: selectedEventTitle,
+                description: selectedEventDescription,
+              },
+            }
             : node
         )
       );
@@ -1317,7 +1330,7 @@ function UniverseTimelineEditor() {
       {/* Left Sidebar Component */}
       <UniverseSidebar
         finalUniverse={finalUniverse}
-        graphData={graphData}
+        graphData={{ ...graphData, nodeIds: graphData.nodeIds as any[] }}
         leavesData={leavesData}
         nodes={nodes}
         isLoadingAny={isLoadingAny}
@@ -1345,7 +1358,7 @@ function UniverseTimelineEditor() {
             >
               <Background />
               <Controls />
-              
+
               <Panel position="top-center" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
                 <h2 className="text-lg font-semibold">{timelineTitle}</h2>
                 <p className="text-sm text-muted-foreground">{timelineDescription}</p>
@@ -1420,6 +1433,8 @@ function UniverseTimelineEditor() {
             setVideoRatio={setVideoRatio}
             selectedVideoModel={selectedVideoModel}
             setSelectedVideoModel={setSelectedVideoModel}
+            selectedVideoDuration={selectedVideoDuration}
+            setSelectedVideoDuration={setSelectedVideoDuration}
             negativePrompt={negativePrompt}
             setNegativePrompt={setNegativePrompt}
             handleGenerateVideo={handleGenerateVideo}
