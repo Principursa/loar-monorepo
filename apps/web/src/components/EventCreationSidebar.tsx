@@ -61,6 +61,8 @@ interface EventCreationSidebarProps {
   setVideoRatio: (ratio: "16:9" | "9:16" | "1:1") => void;
   selectedVideoModel: 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora';
   setSelectedVideoModel: (model: 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora') => void;
+  selectedVideoDuration: number;
+  setSelectedVideoDuration: (duration: number) => void;
   negativePrompt: string;
   setNegativePrompt: (prompt: string) => void;
   handleGenerateVideo: () => void;
@@ -122,6 +124,8 @@ export function EventCreationSidebar({
   setVideoRatio,
   selectedVideoModel,
   setSelectedVideoModel,
+  selectedVideoDuration,
+  setSelectedVideoDuration,
   negativePrompt,
   setNegativePrompt,
   handleGenerateVideo,
@@ -190,6 +194,32 @@ export function EventCreationSidebar({
   useEffect(() => {
     console.log('EventCreationSidebar - previousEventVideoUrl:', previousEventVideoUrl);
   }, [previousEventVideoUrl]);
+
+  // Set default duration based on selected model
+  useEffect(() => {
+    switch (selectedVideoModel) {
+      case 'fal-sora':
+        if (!selectedVideoDuration || ![4, 8, 12].includes(selectedVideoDuration)) {
+          setSelectedVideoDuration(8);
+        }
+        break;
+      case 'fal-kling':
+        if (selectedVideoDuration !== 5) {
+          setSelectedVideoDuration(5);
+        }
+        break;
+      case 'fal-wan25':
+        if (!selectedVideoDuration || ![5, 10].includes(selectedVideoDuration)) {
+          setSelectedVideoDuration(5);
+        }
+        break;
+      case 'fal-veo3':
+        if (selectedVideoDuration !== 8) {
+          setSelectedVideoDuration(8);
+        }
+        break;
+    }
+  }, [selectedVideoModel, selectedVideoDuration, setSelectedVideoDuration]);
 
   if (!showVideoDialog) return null;
 
@@ -852,6 +882,98 @@ export function EventCreationSidebar({
                       <span className="text-muted-foreground ml-1">(State-of-the-art, image-to-video)</span>
                     </label>
                   </div>
+                </div>
+              </div>
+
+              {/* Video Duration Selection */}
+              <div className="mb-3">
+                <Label className="text-xs font-medium text-muted-foreground">Video Duration</Label>
+                <div className="grid grid-cols-3 gap-2 mt-1">
+                  {selectedVideoModel === 'fal-sora' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVideoDuration(4)}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${selectedVideoDuration === 4
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-input bg-background hover:bg-muted"
+                          }`}
+                      >
+                        4 seconds
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVideoDuration(8)}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${selectedVideoDuration === 8
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-input bg-background hover:bg-muted"
+                          }`}
+                      >
+                        8 seconds
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVideoDuration(12)}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${selectedVideoDuration === 12
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-input bg-background hover:bg-muted"
+                          }`}
+                      >
+                        12 seconds
+                      </button>
+                    </>
+                  )}
+
+                  {selectedVideoModel === 'fal-kling' && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVideoDuration(5)}
+                      className={`px-3 py-2 text-sm rounded-md border transition-colors ${selectedVideoDuration === 5
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input bg-background hover:bg-muted"
+                        }`}
+                    >
+                      5 seconds
+                    </button>
+                  )}
+
+                  {selectedVideoModel === 'fal-wan25' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVideoDuration(5)}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${selectedVideoDuration === 5
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-input bg-background hover:bg-muted"
+                          }`}
+                      >
+                        5 seconds
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVideoDuration(10)}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors ${selectedVideoDuration === 10
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-input bg-background hover:bg-muted"
+                          }`}
+                      >
+                        10 seconds
+                      </button>
+                    </>
+                  )}
+
+                  {selectedVideoModel === 'fal-veo3' && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVideoDuration(8)}
+                      className={`px-3 py-2 text-sm rounded-md border transition-colors ${selectedVideoDuration === 8
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input bg-background hover:bg-muted"
+                        }`}
+                    >
+                      8 seconds
+                    </button>
+                  )}
                 </div>
               </div>
 

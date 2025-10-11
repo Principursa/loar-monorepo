@@ -401,7 +401,7 @@ export const falRouter = router({
       z.object({
         prompt: z.string().min(1, "Prompt is required for Sora video generation"),
         imageUrl: z.string().url("Valid image URL is required for Sora image-to-video"),
-        duration: z.number().min(1).max(10).optional().default(4),
+        duration: z.union([z.literal(4), z.literal(8), z.literal(12)]).optional().default(4),
         aspectRatio: z.enum(["16:9", "9:16", "1:1", "auto"]).optional().default("auto"),
         resolution: z.enum(["720p", "1080p", "auto"]).optional().default("auto"),
       })
