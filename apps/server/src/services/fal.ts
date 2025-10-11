@@ -44,7 +44,7 @@ export interface FalImageGenerationResult {
 
 export interface FalVideoGenerationOptions {
   prompt: string;
-  model?: 'fal-ai/hunyuan-video' | 'fal-ai/ltx-video' | 'fal-ai/cogvideox-5b' | 'fal-ai/runway-gen3' | 'fal-ai/veo3/fast/image-to-video' | 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video' | 'fal-ai/wan-25-preview/image-to-video';
+  model?: 'fal-ai/hunyuan-video' | 'fal-ai/ltx-video' | 'fal-ai/cogvideox-5b' | 'fal-ai/runway-gen3' | 'fal-ai/veo3/fast/image-to-video' | 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video' | 'fal-ai/wan-25-preview/image-to-video' | 'fal-ai/sora-2/image-to-video';
   imageUrl?: string;
   duration?: number;
   fps?: number;
@@ -52,11 +52,11 @@ export interface FalVideoGenerationOptions {
   height?: number;
   guidanceScale?: number;
   numInferenceSteps?: number;
-  aspectRatio?: string;
+  aspectRatio?: string; // can be "16:9", "9:16", "1:1", or "auto"
   motionStrength?: number;
   negativePrompt?: string;
   cfgScale?: number;
-  resolution?: '720p' | '1080p';
+  resolution?: '720p' | '1080p' | 'auto';
   enablePromptExpansion?: boolean;
   generateAudio?: boolean; // New: for veo3 audio generation
 }
@@ -383,6 +383,23 @@ export class FalService {
         input.aspect_ratio = options.aspectRatio || "16:9";
         if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
         if (options.cfgScale !== undefined) input.cfg_scale = options.cfgScale;
+      } else if (model === 'fal-ai/sora-2/image-to-video') {
+        if (!options.imageUrl) throw new Error('Image URL is required for Sora 2 image-to-video model');
+        input.image_url = options.imageUrl;
+
+        // Sora-specific parameters
+        input.duration = options.duration || 4; // Default to 4 seconds as shown in docs
+        if (options.aspectRatio && options.aspectRatio !== "auto") {
+          input.aspect_ratio = options.aspectRatio;
+        } else {
+          input.aspect_ratio = "auto";
+        }
+        if (options.resolution && options.resolution !== "auto") {
+          input.resolution = options.resolution;
+        } else {
+          input.resolution = "auto";
+        }
+        // Sora can generate audio naturally from prompts if needed
       } else {
         input.duration = options.duration || 5;
         input.fps = options.fps || 25;
