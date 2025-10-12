@@ -19,8 +19,8 @@ contract Timeline is Ownable {
     mapping(uint => VideoNode) public nodes;
     uint public latestNodeId;
 
-    event NodeCanonized(uint id);
-    event NodeCreated(uint id, uint previous);
+    event NodeCanonized(uint id,address canonizer);
+    event NodeCreated(uint id, uint previous, address creator);
     //either put an event here to emit user + node to make it indexable or create data structure that associates addy w user
     //for profile -> videos created by user
 
@@ -47,7 +47,7 @@ contract Timeline is Ownable {
             nodes[_previous].next.push(newId);
         }
 
-        emit NodeCreated(newId, _previous);
+        emit NodeCreated(newId, _previous, msg.sender);
         return newId;
     }
 
@@ -170,7 +170,7 @@ contract Timeline is Ownable {
         }
 
         nodes[id].canon = true;
-        emit NodeCanonized(id);
+        emit NodeCanonized(id, msg.sender);
     }
 
     // Get the canon chain (canon + all its ancestors)
