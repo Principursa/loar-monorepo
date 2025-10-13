@@ -304,7 +304,14 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return await falService.generateVideo(input);
+      const result = await falService.generateVideo(input);
+      
+      // Check if the generation failed
+      if (result.status === 'failed' || result.error) {
+        throw new Error(result.error || 'Video generation failed');
+      }
+      
+      return result;
     }),
 
   getStatus: publicProcedure
@@ -340,7 +347,7 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return await falService.generateVideo({
+      const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
         model: "fal-ai/veo3/fast/image-to-video",
@@ -348,6 +355,13 @@ export const falRouter = router({
         aspectRatio: input.aspectRatio,
         motionStrength: input.motionStrength,
       });
+      
+      // Check if the generation failed
+      if (result.status === 'failed' || result.error) {
+        throw new Error(result.error || 'Veo3 video generation failed');
+      }
+      
+      return result;
     }),
 
   klingVideo: publicProcedure
@@ -362,7 +376,7 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return await falService.generateVideo({
+      const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
         model: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
@@ -371,6 +385,13 @@ export const falRouter = router({
         negativePrompt: input.negativePrompt,
         cfgScale: input.cfgScale,
       });
+      
+      // Check if the generation failed
+      if (result.status === 'failed' || result.error) {
+        throw new Error(result.error || 'Kling video generation failed');
+      }
+      
+      return result;
     }),
 
   wan25ImageToVideo: publicProcedure
@@ -385,7 +406,7 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return await falService.generateVideo({
+      const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
         model: "fal-ai/wan-25-preview/image-to-video",
@@ -394,6 +415,13 @@ export const falRouter = router({
         negativePrompt: input.negativePrompt,
         enablePromptExpansion: input.enablePromptExpansion,
       });
+      
+      // Check if the generation failed
+      if (result.status === 'failed' || result.error) {
+        throw new Error(result.error || 'Wan25 video generation failed');
+      }
+      
+      return result;
     }),
 
   soraImageToVideo: publicProcedure
@@ -407,7 +435,7 @@ export const falRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      return await falService.generateVideo({
+      const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
         model: "fal-ai/sora-2/image-to-video",
@@ -415,5 +443,12 @@ export const falRouter = router({
         aspectRatio: input.aspectRatio,
         resolution: input.resolution,
       });
+      
+      // Check if the generation failed
+      if (result.status === 'failed' || result.error) {
+        throw new Error(result.error || 'Sora video generation failed');
+      }
+      
+      return result;
     }),
 });

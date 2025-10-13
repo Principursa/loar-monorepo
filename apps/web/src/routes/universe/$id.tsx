@@ -26,6 +26,7 @@ import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { UniverseSidebar } from '@/components/UniverseSidebar';
 import { EventCreationSidebar } from '@/components/EventCreationSidebar';
 import { GovernanceSidebar } from '@/components/GovernanceSidebar';
+import { toast } from 'sonner';
 
 // Register custom node types
 const nodeTypes = {
@@ -60,6 +61,17 @@ function UniverseTimelineEditor() {
   const [videoPrompt, setVideoPrompt] = useState("");
   const [videoRatio, setVideoRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
   const [imageFormat, setImageFormat] = useState<'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3'>('landscape_16_9');
+
+  // Status message for sidebar
+  const [statusMessage, setStatusMessage] = useState<{
+    type: 'error' | 'success' | 'info' | 'warning';
+    title: string;
+    description: string;
+    action?: {
+      label: string;
+      onClick: () => void;
+    };
+  } | null>(null);
 
   // Image generation state
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
@@ -178,7 +190,6 @@ function UniverseTimelineEditor() {
   // Try to get universe data from localStorage (skip for blockchain universes)
   const { data: universeFromStorage } = useQuery({
     queryKey: ['universe-metadata', id],
-    enabled: !id?.startsWith('0x'), // Don't run for blockchain universes
     queryFn: () => {
       const stored = localStorage.getItem('createdUniverses');
       const universes = stored ? JSON.parse(stored) : [];
@@ -459,6 +470,12 @@ function UniverseTimelineEditor() {
 
         setGeneratedImageUrl(data.imageUrl);
         setShowVideoStep(true);
+        
+        setStatusMessage({
+          type: 'success',
+          title: 'Image Generated Successfully!',
+          description: 'Your scene image has been generated. Now you can create a video animation from it.',
+        });
       }
     },
     onError: (error) => {
@@ -470,6 +487,7 @@ function UniverseTimelineEditor() {
         charactersData: charactersData?.characters?.length
       });
 
+      let errorTitle = "Image Generation Failed";
       let errorMessage = "Failed to generate image. ";
       if (selectedCharacters.length > 0) {
         errorMessage += "Character image editing failed. ";
@@ -477,12 +495,18 @@ function UniverseTimelineEditor() {
       errorMessage += "Please try again.";
 
       if (error.message?.includes('FAL_KEY')) {
+        errorTitle = "API Configuration Error";
         errorMessage = "FAL API key is missing. Please configure FAL_KEY in environment variables.";
       } else if (error.message?.includes('nano-banana')) {
-        errorMessage = "Nano Banana API error. Please try again.";
+        errorTitle = "Nano Banana API Error";
+        errorMessage = "The Nano Banana image generation service encountered an error. Please try again.";
       }
 
-      alert(errorMessage);
+      setStatusMessage({
+        type: 'error',
+        title: errorTitle,
+        description: errorMessage
+      });
     }
   });
 
@@ -490,6 +514,7 @@ function UniverseTimelineEditor() {
   const handleGenerateEventImage = useCallback(async () => {
     if (!videoDescription.trim()) return;
 
+    setStatusMessage(null); // Clear any previous messages
     setIsGeneratingImage(true);
     try {
       // Use the video description as the image prompt
@@ -528,7 +553,7 @@ function UniverseTimelineEditor() {
         const result = await trpcClient.fal.klingVideo.mutate({
           prompt: finalPrompt,
           imageUrl,
-          duration: selectedVideoDuration,
+          duration: (selectedVideoDuration === 5 || selectedVideoDuration === 10) ? selectedVideoDuration : 5,
           aspectRatio: videoRatio,
           negativePrompt: negativePrompt || undefined,
           cfgScale: 0.5
@@ -539,7 +564,7 @@ function UniverseTimelineEditor() {
         const result = await trpcClient.fal.wan25ImageToVideo.mutate({
           prompt: finalPrompt,
           imageUrl,
-          duration: selectedVideoDuration,
+          duration: (selectedVideoDuration === 5 || selectedVideoDuration === 10) ? selectedVideoDuration : 5,
           resolution: "1080p",
           negativePrompt: negativePrompt || undefined,
           enablePromptExpansion: true
@@ -550,7 +575,7 @@ function UniverseTimelineEditor() {
         const result = await trpcClient.fal.soraImageToVideo.mutate({
           prompt: finalPrompt,
           imageUrl,
-          duration: selectedVideoDuration,
+          duration: (selectedVideoDuration === 4 || selectedVideoDuration === 8 || selectedVideoDuration === 12) ? selectedVideoDuration : 4,
           aspectRatio: videoRatio === "1:1" ? "auto" : videoRatio,
           resolution: "auto",
         });
@@ -563,11 +588,107 @@ function UniverseTimelineEditor() {
     onSuccess: (data) => {
       if (data.videoUrl) {
         setGeneratedVideoUrl(data.videoUrl);
+        
+        const modelNames: Record<string, string> = {
+          'fal-veo3': 'Veo3',
+          'fal-kling': 'Kling 2.5',
+          'fal-wan25': 'Wan 2.5',
+          'fal-sora': 'Sora 2'
+        };
+        const modelName = modelNames[selectedVideoModel] || 'Video';
+        
+        setStatusMessage({
+          type: 'success',
+          title: 'Video Generated Successfully!',
+          description: `Your ${modelName} video animation has been created. You can now save it to the timeline.`,
+        });
       }
     },
     onError: (error) => {
       console.error("Error generating video:", error);
-      alert("Failed to generate video. Please try again.");
+      
+      // Extract error message
+      let errorMessage = "Failed to generate video. Please try again.";
+      let errorTitle = "Video Generation Failed";
+      let errorDescription = "";
+      let action = undefined;
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        
+        // Check for specific error cases to provide better user guidance
+        if (errorMessage.toLowerCase().includes('content checker') || 
+            errorMessage.toLowerCase().includes('flagged')) {
+          errorTitle = "Content Check Failed";
+          
+          // Check if it's Sora and provide specific guidance
+          if (selectedVideoModel === 'fal-sora') {
+            errorDescription = `OpenAI Sora has detected content that violates its usage policies. This often happens with:
+            
+• Certain aspect ratios (Sora works best with 16:9, 9:16, or 1:1)
+• Character images that contain copyrighted or unlicensed content
+• Generated images that include recognizable IP
+
+Try switching to Veo3, Kling 2.5, or Wan 2.5 which have more flexible content policies, or ensure all characters are original creations.`;
+            action = {
+              label: 'Switch to Veo3',
+              onClick: () => {
+                setSelectedVideoModel('fal-veo3');
+                setStatusMessage(null);
+              }
+            };
+          } else {
+            errorDescription = "The AI service detected content that violates its usage policies. Try using different characters or switching to another video model.";
+          }
+        } else if (errorMessage.toLowerCase().includes('unlicensed') || 
+            errorMessage.toLowerCase().includes('license')) {
+          errorTitle = "Unlicensed Content Detected";
+          errorDescription = "This request includes unlicensed characters or content. Please ensure all characters in your scene are properly licensed or use different characters.";
+        } else if (errorMessage.toLowerCase().includes('image') && 
+                   errorMessage.toLowerCase().includes('url')) {
+          errorTitle = "Image Access Error";
+          errorDescription = "The character image could not be accessed. Please try regenerating the character or use a different image.";
+        } else if (errorMessage.toLowerCase().includes('quota') || 
+                   errorMessage.toLowerCase().includes('limit')) {
+          errorTitle = "API Quota Exceeded";
+          errorDescription = "You've reached the API usage limit. Please try again later or contact support.";
+        } else if (errorMessage.toLowerCase().includes('validation error') ||
+                   errorMessage.toLowerCase().includes('invalid input')) {
+          errorTitle = "Invalid Input";
+          
+          // Provide Sora-specific guidance for validation errors
+          if (selectedVideoModel === 'fal-sora') {
+            errorDescription = `Sora has specific requirements:
+            
+• Aspect Ratio: 16:9 (landscape), 9:16 (portrait), or 1:1 (square) work best
+• Duration: 4, 8, or 12 seconds
+• Image Format: Must be a valid, accessible URL
+
+Current settings: ${videoRatio} aspect ratio, ${selectedVideoDuration || 4}s duration
+
+Try adjusting your settings or use a different video model like Veo3 or Kling 2.5.`;
+            action = {
+              label: 'Switch to Veo3',
+              onClick: () => {
+                setSelectedVideoModel('fal-veo3');
+                setStatusMessage(null);
+              }
+            };
+          } else {
+            errorDescription = errorMessage;
+          }
+        } else {
+          errorDescription = errorMessage;
+        }
+      }
+      
+      // Show inline status message in sidebar
+      setStatusMessage({
+        type: 'error',
+        title: errorTitle,
+        description: errorDescription,
+        action
+      });
     }
   });
 
@@ -616,6 +737,8 @@ function UniverseTimelineEditor() {
   const handleGenerateVideo = useCallback(async () => {
     if (!generatedImageUrl) return;
 
+    setStatusMessage(null); // Clear any previous messages
+    
     // Use uploaded URL if available, otherwise use the generated image URL
     const imageUrlToUse = uploadedUrl || generatedImageUrl;
 
@@ -671,10 +794,11 @@ function UniverseTimelineEditor() {
           pieceCidString = filecoinResult;
         } else if (filecoinResult && typeof filecoinResult === 'object') {
           // Try different ways to extract the string value from the PieceCID object
-          pieceCidString = filecoinResult.toString?.() ||
-            filecoinResult.value ||
-            filecoinResult.cid ||
-            filecoinResult._baseValue ||
+          const resultObj = filecoinResult as any;
+          pieceCidString = resultObj.toString?.() ||
+            resultObj.value ||
+            resultObj.cid ||
+            resultObj._baseValue ||
             JSON.stringify(filecoinResult);
           console.log('Extracted PieceCID string:', pieceCidString);
         } else {
@@ -755,10 +879,18 @@ function UniverseTimelineEditor() {
       setContractSaved(true);
 
       // Show success message
-      const successMessage = filecoinPieceCid
-        ? `Successfully saved to Filecoin and blockchain!\nPieceCID: ${filecoinPieceCid}\nTransaction: ${txHash}`
-        : `Successfully saved to blockchain! Transaction: ${txHash}`;
-      alert(successMessage);
+      // Show success toast
+      if (filecoinPieceCid) {
+        toast.success('Event Saved to Blockchain & Filecoin!', {
+          description: `Your timeline event has been permanently stored.\nFilecoin PieceCID: ${filecoinPieceCid.substring(0, 20)}...\nTransaction: ${txHash.substring(0, 10)}...${txHash.substring(txHash.length - 8)}`,
+          duration: 8000
+        });
+      } else {
+        toast.success('Event Saved to Blockchain!', {
+          description: `Your timeline event has been added to the chain.\nTransaction: ${txHash.substring(0, 10)}...${txHash.substring(txHash.length - 8)}`,
+          duration: 6000
+        });
+      }
 
       // Refresh the blockchain data to show the new node
       setTimeout(async () => {
@@ -776,7 +908,10 @@ function UniverseTimelineEditor() {
 
     } catch (error) {
       console.error('Error saving to contract:', error);
-      alert('Failed to save to contract: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('Contract Save Failed', {
+        description: 'Failed to save event to blockchain: ' + (error instanceof Error ? error.message : 'Unknown error'),
+        duration: 5000
+      });
     } finally {
       setIsSavingToContract(false);
       setIsSavingToFilecoin(false);
@@ -824,6 +959,7 @@ function UniverseTimelineEditor() {
     setVideoPrompt(""); // Reset video prompt
     setVideoRatio("16:9"); // Reset video ratio
     setImageFormat('landscape_16_9'); // Reset image format
+    setStatusMessage(null); // Clear any status messages
     setShowVideoDialog(true);
   }, []);
 
@@ -1416,7 +1552,7 @@ function UniverseTimelineEditor() {
             generatedImageUrl={generatedImageUrl}
             isGeneratingImage={isGeneratingImage}
             imageFormat={imageFormat}
-            setImageFormat={setImageFormat}
+            setImageFormat={(format: string) => setImageFormat(format as 'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3')}
             handleGenerateEventImage={handleGenerateEventImage}
             showVideoStep={showVideoStep}
             setShowVideoStep={setShowVideoStep}
@@ -1446,6 +1582,8 @@ function UniverseTimelineEditor() {
             handleSaveToContract={handleSaveToContract}
             handleCreateEvent={handleCreateEvent}
             previousEventVideoUrl={previousEventVideoUrl}
+            statusMessage={statusMessage}
+            setStatusMessage={setStatusMessage}
           />
         );
       })()}

@@ -426,14 +426,62 @@ export class FalService {
           }
         });
       } catch (subscribeError: any) {
-        console.error('❌ Subscribe error:', subscribeError);
+        console.error('❌ Subscribe error:', subscribeError.constructor.name);
+        console.error('Status:', subscribeError.status, subscribeError.statusText);
         
-        // Log detailed validation errors
+        // Helper to check for binary data
+        const hasBinaryData = (str: string): boolean => {
+          if (str.length > 500) return true;
+          const binaryIndicators = ['iVBOR', 'base64', '/9j/', 'data:image'];
+          return binaryIndicators.some(ind => str.includes(ind));
+        };
+        
+        // Extract clean message from detail
+        let cleanMessage = '';
         if (subscribeError.body?.detail) {
-          console.error('Validation details:', JSON.stringify(subscribeError.body.detail, null, 2));
+          if (Array.isArray(subscribeError.body.detail)) {
+            // Extract messages from validation error array, filtering out binary data
+            const messages = subscribeError.body.detail
+              .map((err: any) => {
+                if (err.msg && typeof err.msg === 'string' && !hasBinaryData(err.msg)) {
+                  return err.msg;
+                }
+                if (err.loc && Array.isArray(err.loc)) {
+                  return `Validation error in ${err.loc.join('.')}`;
+                }
+                return null;
+              })
+              .filter(Boolean);
+            
+            if (messages.length > 0) {
+              cleanMessage = messages.join('; ');
+            }
+          } else if (typeof subscribeError.body.detail === 'string' && !hasBinaryData(subscribeError.body.detail)) {
+            cleanMessage = subscribeError.body.detail;
+          }
         }
         
-        throw subscribeError;
+        // Build enhanced error
+        const enhancedError = new Error();
+        if (cleanMessage) {
+          enhancedError.message = cleanMessage;
+          console.error('Clean error message:', cleanMessage);
+        } else if (subscribeError.statusText) {
+          enhancedError.message = `${subscribeError.statusText}: Request failed`;
+          console.error('Using statusText:', enhancedError.message);
+        } else {
+          enhancedError.message = subscribeError.message || 'Video generation request failed';
+          console.error('Using original message');
+        }
+        
+        // Preserve other error properties
+        Object.assign(enhancedError, {
+          status: subscribeError.status,
+          statusText: subscribeError.statusText,
+          body: subscribeError.body
+        });
+        
+        throw enhancedError;
       }
 
       console.log('📥 Video generation completed!');
@@ -475,18 +523,100 @@ export class FalService {
       };
     } catch (error: any) {
       console.error('❌ Video generation failed');
-      console.error('Error:', error.message || error);
+      console.error('Error type:', error.constructor.name);
       
-      // Log validation errors if present
+      // Helper function to check if a string contains base64 or binary data
+      const containsBinaryData = (str: string): boolean => {
+        if (str.length > 500) return true;
+        // Check for common base64/binary indicators
+        const binaryIndicators = ['iVBOR', 'base64', '/9j/', 'data:image', 'AAAABmJLR0Q'];
+        return binaryIndicators.some(indicator => str.includes(indicator));
+      };
+      
+      // Helper function to extract clean error message from validation error object
+      const extractCleanMessage = (err: any): string => {
+        // Try to get the message field
+        if (err.msg && typeof err.msg === 'string' && !containsBinaryData(err.msg)) {
+          return err.msg;
+        }
+        if (err.message && typeof err.message === 'string' && !containsBinaryData(err.message)) {
+          return err.message;
+        }
+        // If the error has a loc (location) field, it's a validation error
+        if (err.loc && Array.isArray(err.loc)) {
+          return `Validation error in ${err.loc.join('.')}`;
+        }
+        return 'Invalid input data';
+      };
+      
+      // Extract meaningful error message
+      let errorMessage = 'Video generation failed';
+      
+      // Check for validation errors in error.body.detail
       if (error.body?.detail) {
-        console.error('API validation errors:');
-        console.error(JSON.stringify(error.body.detail, null, 2));
+        console.error('API returned detail field');
+        
+        // FAL API returns validation errors in various formats
+        if (Array.isArray(error.body.detail)) {
+          // Array of validation errors - extract clean messages only
+          const cleanMessages = error.body.detail
+            .map((err: any) => extractCleanMessage(err))
+            .filter((msg: string) => msg && msg !== 'Invalid input data');
+          
+          if (cleanMessages.length > 0) {
+            errorMessage = cleanMessages.join('; ');
+          } else {
+            errorMessage = 'Invalid input data provided to video generation API';
+          }
+        } else if (typeof error.body.detail === 'string') {
+          // String detail - check if it contains binary data
+          if (!containsBinaryData(error.body.detail)) {
+            errorMessage = error.body.detail;
+          } else {
+            errorMessage = 'Invalid input data provided to video generation API';
+          }
+        } else if (typeof error.body.detail === 'object') {
+          // Object detail - try to extract useful info
+          const msg = extractCleanMessage(error.body.detail);
+          if (msg !== 'Invalid input data') {
+            errorMessage = msg;
+          } else {
+            errorMessage = 'Invalid input data provided to video generation API';
+          }
+        }
+      } else if (error.message && typeof error.message === 'string') {
+        if (!containsBinaryData(error.message)) {
+          errorMessage = error.message;
+        }
       }
+      
+      // Final check - if error message still contains binary data or is too long, use generic message
+      if (containsBinaryData(errorMessage)) {
+        console.error('⚠️ Filtered out binary/base64 data from error message');
+        errorMessage = 'Video generation failed due to invalid input data. This may be caused by unlicensed characters, invalid image format, or API limitations. Please verify your inputs and try again.';
+      }
+      
+      // Check for common error patterns and make them user-friendly
+      if (errorMessage.toLowerCase().includes('unprocessable entity')) {
+        errorMessage = 'The video generation request could not be processed. This may be due to unlicensed characters, invalid image format, or API limitations. Please check your inputs and try again.';
+      } else if (errorMessage.toLowerCase().includes('unlicensed') || errorMessage.toLowerCase().includes('license')) {
+        errorMessage = 'Video generation failed: The request includes unlicensed characters or content. Please ensure all characters are properly licensed.';
+      } else if (errorMessage.toLowerCase().includes('image') && errorMessage.toLowerCase().includes('url')) {
+        errorMessage = 'Invalid image URL provided. Please check that the image is accessible and in a supported format.';
+      }
+      
+      // Truncate very long error messages as a final safeguard
+      if (errorMessage.length > 300) {
+        errorMessage = errorMessage.substring(0, 297) + '...';
+      }
+      
+      // Log clean error for debugging
+      console.error('📤 Returning error to client:', errorMessage);
       
       return {
         id: '',
         status: 'failed',
-        error: error.message || 'Video generation failed'
+        error: errorMessage
       };
     }
   }
