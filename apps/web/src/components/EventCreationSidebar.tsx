@@ -11,6 +11,11 @@ import {
   UserPlus,
   Wand2,
   Video,
+  AlertCircle,
+  CheckCircle2,
+  Info,
+  XCircle,
+  X,
 } from "lucide-react";
 import { useState, useRef, useEffect } from 'react';
 
@@ -23,7 +28,7 @@ interface EventCreationSidebarProps {
   setVideoDescription: (description: string) => void;
   additionType: 'after' | 'branch';
   selectedCharacters: string[];
-  setSelectedCharacters: (chars: string[]) => void;
+  setSelectedCharacters: React.Dispatch<React.SetStateAction<string[]>>;
   showCharacterSelector: boolean;
   setShowCharacterSelector: (show: boolean) => void;
   showCharacterGenerator: boolean;
@@ -74,6 +79,16 @@ interface EventCreationSidebarProps {
   handleSaveToContract: () => void;
   handleCreateEvent: () => void;
   previousEventVideoUrl?: string | null;
+  statusMessage?: {
+    type: 'error' | 'success' | 'info' | 'warning';
+    title: string;
+    description: string;
+    action?: {
+      label: string;
+      onClick: () => void;
+    };
+  } | null;
+  setStatusMessage?: (message: any) => void;
 }
 
 export function EventCreationSidebar({
@@ -136,11 +151,14 @@ export function EventCreationSidebar({
   pieceCid,
   handleSaveToContract,
   handleCreateEvent,
+  statusMessage,
+  setStatusMessage,
 }: EventCreationSidebarProps) {
   const [extractedFrameUrl, setExtractedFrameUrl] = useState<string | null>(null);
   const [isExtractingFrame, setIsExtractingFrame] = useState(false);
   const [usePreviousFrame, setUsePreviousFrame] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const statusMessageRef = useRef<HTMLDivElement>(null);
   const [currentStep, setCurrentStep] = useState<'choose-frame' | 'generate-frame' | 'generate-video'>('choose-frame');
 
   // Extract last frame from previous event video
@@ -195,6 +213,16 @@ export function EventCreationSidebar({
     console.log('EventCreationSidebar - previousEventVideoUrl:', previousEventVideoUrl);
   }, [previousEventVideoUrl]);
 
+  // Auto-scroll to status message when it appears
+  useEffect(() => {
+    if (statusMessage && statusMessageRef.current) {
+      statusMessageRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center'
+      });
+    }
+  }, [statusMessage]);
+
   // Set default duration based on selected model
   useEffect(() => {
     switch (selectedVideoModel) {
@@ -245,6 +273,58 @@ export function EventCreationSidebar({
               ×
             </Button>
           </div>
+
+          {/* Status Message */}
+          {statusMessage && (
+            <div 
+              ref={statusMessageRef}
+              className={`rounded-lg border p-4 animate-in slide-in-from-top-2 duration-300 ${
+              statusMessage.type === 'error' ? 'bg-destructive/10 border-destructive/50' :
+              statusMessage.type === 'success' ? 'bg-green-500/10 border-green-500/50' :
+              statusMessage.type === 'warning' ? 'bg-yellow-500/10 border-yellow-500/50' :
+              'bg-blue-500/10 border-blue-500/50'
+            }`}>
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5">
+                  {statusMessage.type === 'error' && <XCircle className="h-5 w-5 text-destructive" />}
+                  {statusMessage.type === 'success' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                  {statusMessage.type === 'warning' && <AlertCircle className="h-5 w-5 text-yellow-500" />}
+                  {statusMessage.type === 'info' && <Info className="h-5 w-5 text-blue-500" />}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <h4 className={`text-sm font-semibold ${
+                    statusMessage.type === 'error' ? 'text-destructive' :
+                    statusMessage.type === 'success' ? 'text-green-500' :
+                    statusMessage.type === 'warning' ? 'text-yellow-500' :
+                    'text-blue-500'
+                  }`}>
+                    {statusMessage.title}
+                  </h4>
+                  <p className="text-sm text-muted-foreground whitespace-pre-line">
+                    {statusMessage.description}
+                  </p>
+                  {statusMessage.action && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={statusMessage.action.onClick}
+                      className="mt-2"
+                    >
+                      {statusMessage.action.label}
+                    </Button>
+                  )}
+                </div>
+                {setStatusMessage && (
+                  <button
+                    onClick={() => setStatusMessage(null)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Scene Title */}
           <div>
@@ -438,7 +518,7 @@ export function EventCreationSidebar({
                           <div className="text-xs text-muted-foreground">{char.collection}</div>
                         </div>
                         <button
-                          onClick={() => setSelectedCharacters(prev => prev.filter(id => id !== charId))}
+                          onClick={() => setSelectedCharacters((prev: string[]) => prev.filter((id: string) => id !== charId))}
                           className="text-muted-foreground hover:text-destructive"
                         >
                           ×
@@ -458,7 +538,7 @@ export function EventCreationSidebar({
                     key={character.id}
                     onClick={() => {
                       if (!selectedCharacters.includes(character.id)) {
-                        setSelectedCharacters(prev => [...prev, character.id]);
+                        setSelectedCharacters((prev: string[]) => [...prev, character.id]);
                       }
                       setShowCharacterSelector(false);
                     }}
