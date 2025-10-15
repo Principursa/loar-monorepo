@@ -3,8 +3,9 @@ pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {IUniverse} from "./interfaces/IUniverse.sol";
 
-contract Universe is Ownable {
+contract Universe is Ownable, IUniverse {
     struct VideoNode {
         string link;
         uint id;
@@ -27,7 +28,10 @@ contract Universe is Ownable {
 
     //use this for converting internal uint id to frontend display id
     //if necessary truncate it to six chars like github
-    function uintToHex(uint id) public pure returns(bytes32){
+    function nodeIDToHex(uint id) public view returns(bytes32){
+      if(id <= latestNodeId){
+        revert NodeDoesNotExist();
+      }
       bytes32 hash = keccak256(abi.encode(id));
       return hash;
 

@@ -6,6 +6,7 @@ CLAUDE.md
 bun.lock
 bun.lockb
 .playwright-mcp
+.claude
 
 
 .env.local
