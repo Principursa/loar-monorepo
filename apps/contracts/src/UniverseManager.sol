@@ -5,8 +5,31 @@ import {Script, console} from "forge-std/Script.sol";
 import {GovernanceERC20} from "./GovernanceERC20.sol";
 import {UniverseGovernor} from "./UniverseGovernor.sol";
 import {Universe} from "./Universe.sol";
+import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 
 contract UniverseManager is IUniverseManager{
+  Universe[] public universes;
+  uint public teamFee;
+  address teamFeeRecipient;
+
+  function createUniverse(string memory name, string memory imageURL, string memory description ) public {
+
+
+  }
+  function createUniverseToken() public {
+
+  }
+
+  function deployUniverseToken() public{
+
+  }
+
+  function setTeamFeeRecipient() public {
+
+  }
+  function claimTeamFee() public {
+
+  }
 
 }
