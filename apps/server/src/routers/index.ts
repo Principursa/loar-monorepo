@@ -14,6 +14,7 @@ import { falService } from "../services/fal";
 import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverses.index";
 import { falRouter } from "./fal/fal.routes";
 import { synapseService } from "../services/synapse";
+import { wikiaService } from "../services/wikia";
 
 
 export const appRouter = router({
@@ -73,7 +74,7 @@ export const appRouter = router({
           if (result.length === 0) {
             throw new Error("Character not found");
           }
-          
+
           const char = result[0];
           return {
             id: char.id,
@@ -90,6 +91,61 @@ export const appRouter = router({
         } catch (error) {
           console.error("Failed to load character from database:", error);
           throw new Error("Could not load character");
+        }
+      }),
+    // Generate wikia entry for a video node/event
+    generateEventWikia: publicProcedure
+      .input(z.object({
+        nodeId: z.number(),
+        title: z.string(),
+        description: z.string(),
+        videoUrl: z.string(),
+        previousNodes: z.array(z.object({
+          title: z.string(),
+          plot: z.string(),
+        })).optional(),
+        nextNodes: z.array(z.object({
+          title: z.string(),
+          plot: z.string(),
+        })).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const wikiaEntry = await wikiaService.generateWikiaEntry(
+            input.nodeId,
+            input.title,
+            input.description,
+            input.videoUrl,
+            input.previousNodes,
+            input.nextNodes
+          );
+          return wikiaEntry;
+        } catch (error) {
+          console.error("Failed to generate wikia entry:", error);
+          throw new Error("Could not generate wikia entry");
+        }
+      }),
+    // Generate detailed storyline from simple user prompt (for event creation)
+    generateStoryline: publicProcedure
+      .input(z.object({
+        prompt: z.string().min(1, "Prompt is required"),
+        characters: z.array(z.string()).optional(),
+        previousEvents: z.array(z.object({
+          title: z.string(),
+          description: z.string(),
+        })).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const result = await wikiaService.generateStorylineFromPrompt(
+            input.prompt,
+            input.characters || [],
+            input.previousEvents
+          );
+          return result;
+        } catch (error) {
+          console.error("Failed to generate storyline:", error);
+          throw new Error("Could not generate storyline");
         }
       }),
   }),

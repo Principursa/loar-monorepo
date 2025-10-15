@@ -105,18 +105,18 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
 
   const handleClick = () => {
     if (data.eventId && data.universeId) {
-      console.log('Navigating to event:', {
+      console.log('Navigating to timeline:', {
         universeId: data.universeId,
         eventId: data.eventId
       });
-      // eventId is already numeric (e.g., "1", "2", "3")
-      const eventUrl = `/event/${data.universeId}/${data.eventId}`;
-      window.location.href = eventUrl;
+      // Navigate to timeline viewer with specific event
+      const timelineUrl = `/timeline?universe=${data.universeId}&event=${data.eventId}`;
+      window.location.href = timelineUrl;
     } else {
-      console.log('Missing navigation data:', { 
+      console.log('Missing navigation data:', {
         eventId: data.eventId,
         universeId: data.universeId,
-        data 
+        data
       });
     }
   };

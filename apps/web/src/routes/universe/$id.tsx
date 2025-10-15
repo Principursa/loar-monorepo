@@ -112,6 +112,10 @@ function UniverseTimelineEditor() {
   const [filecoinSaved, setFilecoinSaved] = useState(false);
   const [pieceCid, setPieceCid] = useState<string | null>(null);
 
+  // Music/soundtrack state
+  const [soundtrackUrl, setSoundtrackUrl] = useState<string>("");
+  const [soundtrackName, setSoundtrackName] = useState<string>("");
+
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -959,6 +963,9 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
     setVideoPrompt(""); // Reset video prompt
     setVideoRatio("16:9"); // Reset video ratio
     setImageFormat('landscape_16_9'); // Reset image format
+    setSoundtrackUrl(""); // Reset soundtrack URL
+    setSoundtrackName(""); // Reset soundtrack name
+    setSelectedCharacters([]); // Reset selected characters
     setStatusMessage(null); // Clear any status messages
     setShowVideoDialog(true);
   }, []);
@@ -1168,6 +1175,30 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
       description: videoDescription,
       videoUrl: generatedVideoUrl,
       imageUrl: generatedImageUrl,
+
+      // Characters used in this event
+      characterIds: selectedCharacters, // Array of character IDs
+      characterNames: selectedCharacters.length > 0 && charactersData?.characters
+        ? charactersData.characters
+            .filter((c: any) => selectedCharacters.includes(c.id))
+            .map((c: any) => c.character_name)
+        : [],
+
+      // Generation prompts and settings
+      imagePrompt: videoDescription, // The prompt used for image generation
+      videoPrompt: videoPrompt || videoDescription, // Video animation prompt
+      negativePrompt: negativePrompt || '', // Negative prompt for filtering unwanted content
+
+      // Model and settings used
+      videoModel: selectedVideoModel, // Which AI model was used (veo3, kling, wan25, sora)
+      videoDuration: selectedVideoDuration, // Video duration in seconds
+      videoRatio: videoRatio, // Aspect ratio (16:9, 9:16, 1:1)
+      imageFormat: imageFormat, // Image format used
+
+      // Music/Soundtrack
+      soundtrackUrl: soundtrackUrl || '', // Music track URL
+      soundtrackName: soundtrackName || '', // Track name/title
+
       sourceNodeId: sourceNodeId,
       additionType: additionType,
       timestamp: Date.now(),
@@ -1400,14 +1431,14 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
       setSelectedEventTitle(node.data.label);
       setSelectedEventDescription(node.data.description);
 
-      // Navigate to event detail page using new route structure
+      // Navigate to timeline viewer with specific event
       const universeId = node.data.universeId || id;
       const eventId = node.data.eventId;
 
       if (eventId && universeId) {
-        // Use window.location for navigation with new route structure: /event/{universeId}/{eventId}
-        const eventUrl = `/event/${universeId}/${eventId}`;
-        window.location.href = eventUrl;
+        // Navigate to timeline page with universe and event parameters
+        const timelineUrl = `/timeline?universe=${universeId}&event=${eventId}`;
+        window.location.href = timelineUrl;
       }
     }
   }, [id]);
