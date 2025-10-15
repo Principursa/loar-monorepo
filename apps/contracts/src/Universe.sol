@@ -25,6 +25,14 @@ contract Universe is Ownable {
     //either put an event here to emit user + node to make it indexable or create data structure that associates addy w user
     //for profile -> videos created by user
 
+    //use this for converting internal uint id to frontend display id
+    //if necessary truncate it to six chars like github
+    function uintToHex(uint id) public pure returns(bytes32){
+      bytes32 hash = keccak256(abi.encode(id));
+      return hash;
+
+    }
+
     function createNode(
         string memory _link,
         string memory _plot,
