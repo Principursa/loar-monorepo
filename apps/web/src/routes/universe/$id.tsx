@@ -24,7 +24,7 @@ import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-t
 import { type Address } from 'viem';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { UniverseSidebar } from '@/components/UniverseSidebar';
-import { EventCreationSidebar } from '@/components/EventCreationSidebar';
+import { FlowCreationPanel } from '@/components/FlowCreationPanel';
 import { GovernanceSidebar } from '@/components/GovernanceSidebar';
 import { toast } from 'sonner';
 
@@ -1544,8 +1544,8 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
         </ReactFlowProvider>
       </div>
 
-      {/* Right Sidebar - Event Creation */}
-      {showVideoDialog && (() => {
+      {/* Bottom Panel - Event Creation (Google Veo Flow Style) */}
+      {(() => {
         // Find previous event's video URL - always use the last event or the source node
         const sourceNode = sourceNodeId
           ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
@@ -1553,7 +1553,7 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
         const previousEventVideoUrl = sourceNode?.data.videoUrl || null;
 
         return (
-          <EventCreationSidebar
+          <FlowCreationPanel
             showVideoDialog={showVideoDialog}
             setShowVideoDialog={setShowVideoDialog}
             videoTitle={videoTitle}
