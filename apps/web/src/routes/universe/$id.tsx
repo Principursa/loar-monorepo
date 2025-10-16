@@ -545,13 +545,13 @@ function UniverseTimelineEditor() {
         const result = await trpcClient.fal.generateVideo.mutate({
           prompt: finalPrompt,
           imageUrl,
-          model: "fal-ai/veo3/fast/image-to-video",
+          model: "fal-ai/veo3.1/fast/image-to-video",
           duration: selectedVideoDuration,
           aspectRatio: videoRatio,
           motionStrength: 127,
           negativePrompt: negativePrompt || undefined
         });
-        console.log('Veo3 video result:', result);
+        console.log('Veo3.1 video result:', result);
         return { videoUrl: result.videoUrl };
       } else if (selectedVideoModel === 'fal-kling') {
         const result = await trpcClient.fal.klingVideo.mutate({
@@ -743,47 +743,57 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
 
     setIsGeneratingVideo(true);
     try {
-      let imageUrlToUse = uploadedUrl || generatedImageUrl;
+      const hasImage = uploadedUrl || generatedImageUrl;
 
-      // If no image exists (text-to-video mode), generate one first
-      if (!imageUrlToUse) {
-        console.log('🎨 Text-to-video mode: Generating image first...');
+      // Determine if we're in text-to-video or image-to-video mode
+      const isTextToVideo = !hasImage;
+
+      if (isTextToVideo) {
+        // Text-to-video mode: Use fal-ai/veo3.1/fast
+        console.log('🎬 Text-to-video mode: Generating video directly from text...');
         setStatusMessage({
           type: 'info',
-          title: 'Generating Frame',
-          description: 'Creating the first frame of your video...',
+          title: 'Generating Video',
+          description: 'Creating your video from text prompt...',
         });
 
-        // Generate image first
-        const imageResult = await generateImageMutation.mutateAsync(videoDescription);
+        const result = await trpcClient.fal.generateVideo.mutate({
+          prompt: videoDescription,
+          model: "fal-ai/veo3.1/fast", // Text-to-video model
+          duration: selectedVideoDuration,
+          aspectRatio: videoRatio,
+          negativePrompt: negativePrompt || undefined
+        });
 
-        if (imageResult?.imageUrl) {
-          imageUrlToUse = imageResult.imageUrl;
-          // Also set it in state for preview
-          setGeneratedImageUrl(imageResult.imageUrl);
-        } else {
-          throw new Error('Failed to generate image for video');
+        if (result.videoUrl) {
+          setGeneratedVideoUrl(result.videoUrl);
+          setStatusMessage({
+            type: 'success',
+            title: 'Video Generated Successfully!',
+            description: 'Your Veo 3.1 video has been created. You can now save it to the timeline.',
+          });
         }
+      } else {
+        // Image-to-video mode: Use image-to-video models
+        const imageUrlToUse = uploadedUrl || generatedImageUrl;
+
+        console.log('=== IMAGE-TO-VIDEO GENERATION DEBUG ===');
+        console.log('Image URL:', imageUrlToUse);
+        console.log('Video Description:', videoDescription);
+        console.log('Model:', selectedVideoModel);
+        console.log('===============================');
+
+        setStatusMessage({
+          type: 'info',
+          title: 'Animating Video',
+          description: 'Creating your video animation...',
+        });
+
+        await generateVideoMutation.mutateAsync({
+          imageUrl: imageUrlToUse!,
+          prompt: `Animate this scene: ${videoDescription}`
+        });
       }
-
-      console.log('=== VIDEO GENERATION DEBUG ===');
-      console.log('Generated Image URL:', generatedImageUrl);
-      console.log('Uploaded URL:', uploadedUrl);
-      console.log('Using URL for video:', imageUrlToUse);
-      console.log('Image URL type:', imageUrlToUse?.startsWith('data:') ? 'Data URL' : 'HTTP URL');
-      console.log('Video Description:', videoDescription);
-      console.log('===============================');
-
-      setStatusMessage({
-        type: 'info',
-        title: 'Animating Video',
-        description: 'Creating your video animation...',
-      });
-
-      await generateVideoMutation.mutateAsync({
-        imageUrl: imageUrlToUse!,
-        prompt: `Animate this scene: ${videoDescription}`
-      });
     } catch (error) {
       console.error("Error:", error);
       setStatusMessage({
@@ -794,7 +804,7 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
     } finally {
       setIsGeneratingVideo(false);
     }
-  }, [generatedImageUrl, uploadedUrl, videoDescription, generateVideoMutation, generateImageMutation, setStatusMessage]);
+  }, [generatedImageUrl, uploadedUrl, videoDescription, generateVideoMutation, selectedVideoModel, selectedVideoDuration, videoRatio, negativePrompt, setStatusMessage]);
 
   // Save to contract function (now includes Filecoin upload)
   const handleSaveToContract = useCallback(async () => {
