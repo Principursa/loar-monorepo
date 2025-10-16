@@ -21,6 +21,7 @@ import {
   Image as ImageIcon,
   Type,
   Plus,
+  Scissors,
 } from "lucide-react";
 import { useState, useEffect } from 'react';
 import {
@@ -30,6 +31,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { SceneEditor } from "@/components/SceneEditor";
 
 interface FlowCreationPanelProps {
   showVideoDialog: boolean;
@@ -70,6 +72,7 @@ interface FlowCreationPanelProps {
   isUploading: boolean;
   uploadToTmpfiles: () => void;
   generatedVideoUrl: string | null;
+  setGeneratedVideoUrl: (url: string | null) => void;
   setGeneratedImageUrl: (url: string | null) => void;
   isGeneratingVideo: boolean;
   videoPrompt: string;
@@ -127,6 +130,7 @@ export function FlowCreationPanel({
   previousEventVideoUrl,
   handleGenerateEventImage,
   generatedVideoUrl,
+  setGeneratedVideoUrl,
   setGeneratedImageUrl,
   isGeneratingVideo,
   videoRatio,
@@ -156,6 +160,7 @@ export function FlowCreationPanel({
   // Multi-segment state
   const [segments, setSegments] = useState<VideoSegment[]>([]);
   const [currentSegmentPrompt, setCurrentSegmentPrompt] = useState("");
+  const [showSceneEditor, setShowSceneEditor] = useState(false);
 
   // Extract last frame from previous event video
   const extractLastFrame = async () => {
@@ -468,29 +473,39 @@ export function FlowCreationPanel({
                       {segments.length} segment{segments.length !== 1 ? 's' : ''} • Total: {Math.floor(totalDuration / 60)}:{(totalDuration % 60).toString().padStart(2, '0')}
                     </p>
                   </div>
-                  <Button
-                    onClick={handleSaveToContract}
-                    disabled={isSavingToContract || contractSaved}
-                    size="sm"
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                  >
-                    {isSavingToContract ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : contractSaved ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Saved
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Save to Timeline
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => setShowSceneEditor(true)}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Scissors className="h-4 w-4 mr-2" />
+                      Edit Scene
+                    </Button>
+                    <Button
+                      onClick={handleSaveToContract}
+                      disabled={isSavingToContract || contractSaved}
+                      size="sm"
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                    >
+                      {isSavingToContract ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : contractSaved ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Saved
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Save to Timeline
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Segment Thumbnails */}
@@ -740,27 +755,8 @@ export function FlowCreationPanel({
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
               />
 
-              {/* Preview Area - Only show for text-to-video mode or when video is generated */}
-              {generationMode === 'text-to-video' && (generatedImageUrl || generatedVideoUrl) && (
-                <div className="rounded-lg border p-2 bg-muted/30">
-                  {generatedVideoUrl ? (
-                    <video
-                      src={generatedVideoUrl}
-                      controls
-                      className="w-full rounded border max-h-48 object-contain bg-black"
-                    />
-                  ) : generatedImageUrl ? (
-                    <img
-                      src={generatedImageUrl}
-                      alt="Generated frame"
-                      className="w-full rounded border max-h-48 object-contain bg-black"
-                    />
-                  ) : null}
-                </div>
-              )}
-
-              {/* Video preview for image-to-video mode */}
-              {generationMode === 'image-to-video' && generatedVideoUrl && (
+              {/* Video preview for both modes after generation */}
+              {generatedVideoUrl && (
                 <div className="rounded-lg border p-2 bg-muted/30">
                   <video
                     src={generatedVideoUrl}
@@ -771,164 +767,114 @@ export function FlowCreationPanel({
               )}
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  {/* Only show "Use Last Frame" for text-to-video mode */}
-                  {generationMode === 'text-to-video' && previousEventVideoUrl && !generatedImageUrl && (
+              <div className="flex items-center justify-end gap-2">
+                {/* Text-to-video workflow: Generate video directly */}
+                {generationMode === 'text-to-video' && !generatedVideoUrl && (
+                  <>
                     <Button
-                      onClick={extractLastFrame}
-                      disabled={isExtractingFrame}
                       variant="ghost"
                       size="sm"
-                      className="h-9 text-sm"
+                      className="h-9"
+                      disabled
                     >
-                      {isExtractingFrame ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Extracting...
-                        </>
-                      ) : (
-                        <>
-                          <Video className="h-4 w-4 mr-2" />
-                          Use Last Frame
-                        </>
-                      )}
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Expand
                     </Button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* Text-to-video workflow: Generate frame first */}
-                  {generationMode === 'text-to-video' && !generatedImageUrl && !generatedVideoUrl && (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-9"
-                        disabled
-                      >
-                        <Wand2 className="h-4 w-4 mr-2" />
-                        Expand
-                      </Button>
-                      <Button
-                        onClick={handleGenerateEventImage}
-                        disabled={!videoDescription.trim() || isGeneratingImage}
-                        size="sm"
-                        className="h-9"
-                      >
-                        {isGeneratingImage ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Generating...
-                          </>
-                        ) : (
-                          <>
-                            <ArrowRight className="h-4 w-4 mr-2" />
-                            Create
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  )}
-
-                  {/* Image-to-video workflow: Generate video directly */}
-                  {generationMode === 'image-to-video' && uploadedImageUrl && !generatedVideoUrl && (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-9"
-                        disabled
-                      >
-                        <Wand2 className="h-4 w-4 mr-2" />
-                        Expand
-                      </Button>
-                      <Button
-                        onClick={handleGenerateVideo}
-                        disabled={!videoDescription.trim() || isGeneratingVideo}
-                        size="sm"
-                        className="h-9"
-                      >
-                        {isGeneratingVideo ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Generating...
-                          </>
-                        ) : (
-                          <>
-                            <ArrowRight className="h-4 w-4 mr-2" />
-                            Create Video
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  )}
-
-                  {/* Animate button for text-to-video after frame is generated */}
-                  {generationMode === 'text-to-video' && generatedImageUrl && !generatedVideoUrl && (
                     <Button
                       onClick={handleGenerateVideo}
-                      disabled={isGeneratingVideo}
+                      disabled={!videoDescription.trim() || isGeneratingVideo}
                       size="sm"
-                      className="h-9 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                      className="h-9"
                     >
                       {isGeneratingVideo ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Animating...
+                          Generating...
                         </>
                       ) : (
                         <>
-                          <Film className="h-4 w-4 mr-2" />
-                          Animate
-                          <ArrowRight className="h-4 w-4 ml-2" />
+                          <ArrowRight className="h-4 w-4 mr-2" />
+                          Create
                         </>
                       )}
                     </Button>
-                  )}
+                  </>
+                )}
 
-                  {/* Add to Scene - available for both modes after video is generated */}
-                  {generatedVideoUrl && (
-                    <>
-                      <Button
-                        onClick={handleAddSegmentToQueue}
-                        size="sm"
-                        variant="outline"
-                        className="h-9"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Segment
-                      </Button>
-
-                      {/* Only show direct save if no segments in queue */}
-                      {segments.length === 0 && (
-                        <Button
-                          onClick={handleSaveToContract}
-                          disabled={isSavingToContract || contractSaved}
-                          size="sm"
-                          className="h-9 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                        >
-                          {isSavingToContract ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              {isSavingToFilecoin ? "Uploading..." : "Saving..."}
-                            </>
-                          ) : contractSaved ? (
-                            <>
-                              <CheckCircle2 className="h-4 w-4 mr-2" />
-                              Saved
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-4 w-4 mr-2" />
-                              Save to Timeline
-                            </>
-                          )}
-                        </Button>
+                {/* Image-to-video workflow: Generate video directly */}
+                {generationMode === 'image-to-video' && uploadedImageUrl && !generatedVideoUrl && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9"
+                      disabled
+                    >
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Expand
+                    </Button>
+                    <Button
+                      onClick={handleGenerateVideo}
+                      disabled={!videoDescription.trim() || isGeneratingVideo}
+                      size="sm"
+                      className="h-9"
+                    >
+                      {isGeneratingVideo ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <ArrowRight className="h-4 w-4 mr-2" />
+                          Create Video
+                        </>
                       )}
-                    </>
-                  )}
-                </div>
+                    </Button>
+                  </>
+                )}
+
+                {/* Add to Scene - available for both modes after video is generated */}
+                {generatedVideoUrl && (
+                  <>
+                    <Button
+                      onClick={handleAddSegmentToQueue}
+                      size="sm"
+                      variant="outline"
+                      className="h-9"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Segment
+                    </Button>
+
+                    {/* Only show direct save if no segments in queue */}
+                    {segments.length === 0 && (
+                      <Button
+                        onClick={handleSaveToContract}
+                        disabled={isSavingToContract || contractSaved}
+                        size="sm"
+                        className="h-9 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                      >
+                        {isSavingToContract ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            {isSavingToFilecoin ? "Uploading..." : "Saving..."}
+                          </>
+                        ) : contractSaved ? (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Save to Timeline
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Success Footer */}
@@ -953,6 +899,23 @@ export function FlowCreationPanel({
           </p>
         </div>
       </div>
+
+      {/* Scene Editor */}
+      <SceneEditor
+        isOpen={showSceneEditor}
+        onClose={() => setShowSceneEditor(false)}
+        onSave={(editedSegments) => {
+          setSegments(editedSegments);
+          setShowSceneEditor(false);
+          setStatusMessage?.({
+            type: 'success',
+            title: 'Scene Updated!',
+            description: `Your scene with ${editedSegments.length} segments is ready to save to the timeline.`,
+          });
+        }}
+        initialSegments={segments}
+        charactersData={charactersData}
+      />
     </>
   );
 }

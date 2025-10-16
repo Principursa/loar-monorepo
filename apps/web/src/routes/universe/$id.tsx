@@ -739,33 +739,62 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
   }, [generatedImageUrl]);
 
   const handleGenerateVideo = useCallback(async () => {
-    if (!generatedImageUrl) return;
-
     setStatusMessage(null); // Clear any previous messages
-    
-    // Use uploaded URL if available, otherwise use the generated image URL
-    const imageUrlToUse = uploadedUrl || generatedImageUrl;
-
-    console.log('=== VIDEO GENERATION DEBUG ===');
-    console.log('Generated Image URL:', generatedImageUrl);
-    console.log('Uploaded URL:', uploadedUrl);
-    console.log('Using URL for video:', imageUrlToUse);
-    console.log('Image URL type:', imageUrlToUse.startsWith('data:') ? 'Data URL' : 'HTTP URL');
-    console.log('Video Description:', videoDescription);
-    console.log('===============================');
 
     setIsGeneratingVideo(true);
     try {
+      let imageUrlToUse = uploadedUrl || generatedImageUrl;
+
+      // If no image exists (text-to-video mode), generate one first
+      if (!imageUrlToUse) {
+        console.log('🎨 Text-to-video mode: Generating image first...');
+        setStatusMessage({
+          type: 'info',
+          title: 'Generating Frame',
+          description: 'Creating the first frame of your video...',
+        });
+
+        // Generate image first
+        const imageResult = await generateImageMutation.mutateAsync(videoDescription);
+
+        if (imageResult?.imageUrl) {
+          imageUrlToUse = imageResult.imageUrl;
+          // Also set it in state for preview
+          setGeneratedImageUrl(imageResult.imageUrl);
+        } else {
+          throw new Error('Failed to generate image for video');
+        }
+      }
+
+      console.log('=== VIDEO GENERATION DEBUG ===');
+      console.log('Generated Image URL:', generatedImageUrl);
+      console.log('Uploaded URL:', uploadedUrl);
+      console.log('Using URL for video:', imageUrlToUse);
+      console.log('Image URL type:', imageUrlToUse?.startsWith('data:') ? 'Data URL' : 'HTTP URL');
+      console.log('Video Description:', videoDescription);
+      console.log('===============================');
+
+      setStatusMessage({
+        type: 'info',
+        title: 'Animating Video',
+        description: 'Creating your video animation...',
+      });
+
       await generateVideoMutation.mutateAsync({
-        imageUrl: imageUrlToUse,
+        imageUrl: imageUrlToUse!,
         prompt: `Animate this scene: ${videoDescription}`
       });
     } catch (error) {
       console.error("Error:", error);
+      setStatusMessage({
+        type: 'error',
+        title: 'Generation Failed',
+        description: error instanceof Error ? error.message : 'Failed to generate video',
+      });
     } finally {
       setIsGeneratingVideo(false);
     }
-  }, [generatedImageUrl, uploadedUrl, videoDescription, generateVideoMutation]);
+  }, [generatedImageUrl, uploadedUrl, videoDescription, generateVideoMutation, generateImageMutation, setStatusMessage]);
 
   // Save to contract function (now includes Filecoin upload)
   const handleSaveToContract = useCallback(async () => {
@@ -1592,6 +1621,7 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
             isUploading={isUploading}
             uploadToTmpfiles={uploadToTmpfiles}
             generatedVideoUrl={generatedVideoUrl}
+            setGeneratedVideoUrl={setGeneratedVideoUrl}
             setGeneratedImageUrl={setGeneratedImageUrl}
             isGeneratingVideo={isGeneratingVideo}
             videoPrompt={videoPrompt}
