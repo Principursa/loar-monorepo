@@ -8,6 +8,8 @@ import {Nonces} from "@openzeppelin/utils/Nonces.sol";
 
 contract GovernanceERC20 is ERC20, ERC20Permit, ERC20Votes {
   string public imageUrl;
+  string public metadata;
+  string public context;
     constructor(string memory _name, string memory _symbol ,uint _maxSupply) ERC20(_name,_symbol) ERC20Permit(_name) {
         // Mint initial supply to the deployer (1 million tokens with 18 decimals)
         _mint(msg.sender, 1_000_000 * 10**decimals());
