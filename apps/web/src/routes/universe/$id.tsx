@@ -628,8 +628,8 @@ function UniverseTimelineEditor() {
           // Check if it's Sora and provide specific guidance
           if (selectedVideoModel === 'fal-sora') {
             errorDescription = `OpenAI Sora has detected content that violates its usage policies. This often happens with:
-            
-• Certain aspect ratios (Sora works best with 16:9, 9:16, or 1:1)
+
+• Certain aspect ratios (Sora ONLY supports 16:9 or 9:16, NOT 1:1)
 • Character images that contain copyrighted or unlicensed content
 • Generated images that include recognizable IP
 
@@ -662,15 +662,16 @@ Try switching to Veo3, Kling 2.5, or Wan 2.5 which have more flexible content po
           
           // Provide Sora-specific guidance for validation errors
           if (selectedVideoModel === 'fal-sora') {
-            errorDescription = `Sora has specific requirements:
-            
-• Aspect Ratio: 16:9 (landscape), 9:16 (portrait), or 1:1 (square) work best
-• Duration: 4, 8, or 12 seconds
+            errorDescription = `Sora 2 has STRICT requirements:
+
+• Aspect Ratio: ONLY 16:9 or 9:16 (1:1 is NOT supported!)
+• Duration: ONLY 4, 8, or 12 seconds
+• Resolution: ONLY 720p
 • Image Format: Must be a valid, accessible URL
 
 Current settings: ${videoRatio} aspect ratio, ${selectedVideoDuration || 4}s duration
 
-Try adjusting your settings or use a different video model like Veo3 or Kling 2.5.`;
+${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support! Change to 16:9 or 9:16.\n\n" : ""}Try adjusting your settings or use a different video model like Veo3 or Kling 2.5.`;
             action = {
               label: 'Switch to Veo3',
               onClick: () => {
@@ -749,17 +750,41 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
       const isTextToVideo = !hasImage;
 
       if (isTextToVideo) {
-        // Text-to-video mode: Use fal-ai/veo3.1/fast
-        console.log('🎬 Text-to-video mode: Generating video directly from text...');
+        // Text-to-video mode: Use selected model for text-to-video
+        const modelMap: Record<string, string> = {
+          'fal-veo3': 'fal-ai/veo3.1/fast',
+          'fal-sora': 'fal-ai/sora-2/text-to-video',
+          'fal-kling': 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
+          'fal-wan25': 'fal-ai/wan-25-preview/text-to-video'
+        };
+
+        const modelNames: Record<string, string> = {
+          'fal-veo3': 'Veo 3.1',
+          'fal-kling': 'Kling 2.5',
+          'fal-wan25': 'Wan 2.5',
+          'fal-sora': 'Sora 2'
+        };
+
+        const textToVideoModel = modelMap[selectedVideoModel] || 'fal-ai/veo3.1/fast';
+        const modelName = modelNames[selectedVideoModel] || 'AI';
+
+        console.log('🎬 Text-to-video mode:', {
+          selectedModel: selectedVideoModel,
+          actualModel: textToVideoModel,
+          prompt: videoDescription,
+          duration: selectedVideoDuration,
+          aspectRatio: videoRatio
+        });
+
         setStatusMessage({
           type: 'info',
           title: 'Generating Video',
-          description: 'Creating your video from text prompt...',
+          description: `Creating your video with ${modelName}...`,
         });
 
         const result = await trpcClient.fal.generateVideo.mutate({
           prompt: videoDescription,
-          model: "fal-ai/veo3.1/fast", // Text-to-video model
+          model: textToVideoModel,
           duration: selectedVideoDuration,
           aspectRatio: videoRatio,
           negativePrompt: negativePrompt || undefined
@@ -770,7 +795,7 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
           setStatusMessage({
             type: 'success',
             title: 'Video Generated Successfully!',
-            description: 'Your Veo 3.1 video has been created. You can now save it to the timeline.',
+            description: `Your ${modelName} video has been created. You can now save it to the timeline.`,
           });
         }
       } else {

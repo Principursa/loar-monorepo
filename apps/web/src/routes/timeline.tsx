@@ -7,6 +7,10 @@ import { ChevronLeft, ChevronRight, Maximize2, Sparkles, BookOpen, Users as User
 import { useQuery } from "@tanstack/react-query";
 import { trpcClient } from "@/utils/trpc";
 import { useGetFullGraph } from "@/hooks/useTimeline";
+import { SegmentPlayer, VideoTimeline, AddSegmentDialog } from "@/components/segments";
+import { useSegments } from "@/hooks/useSegments";
+import type { MultiSegmentEvent, LegacyEvent } from "@/types/segments";
+import { isMultiSegmentEvent } from "@/types/segments";
 
 interface TimelineSearch {
   universe?: string;
@@ -219,28 +223,11 @@ function TimelineWatchPage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-8 max-w-6xl">
-        {/* Video Player */}
-        <Card className="mb-8 shadow-lg">
-          <CardContent className="p-0">
-            <div className="aspect-video bg-black rounded-lg overflow-hidden">
-              {currentEvent.videoUrl ? (
-                <video
-                  key={currentEvent.id}
-                  className="w-full h-full"
-                  controls
-                  autoPlay
-                  src={currentEvent.videoUrl}
-                >
-                  Your browser does not support the video tag.
-                </video>
-              ) : (
-                <div className="flex items-center justify-center h-full text-white">
-                  <p>No video available for this event</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Video Player - Multi-Segment Support */}
+        <VideoPlayerSection universeId={universeId} currentEvent={currentEvent} />
+
+        {/* Inline Segment Editor (Google Flow-style) */}
+        <SegmentEditorSection universeId={universeId} currentEvent={currentEvent} />
 
         {/* Event Title & Summary */}
         <div className="mb-8">
@@ -451,6 +438,170 @@ function TimelineWatchPage() {
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+/**
+ * VideoPlayerSection Component
+ *
+ * Handles both legacy single-video events and new multi-segment events
+ */
+function VideoPlayerSection({ universeId, currentEvent }: { universeId: string; currentEvent: EventNode }) {
+  const [eventData, setEventData] = useState<MultiSegmentEvent | LegacyEvent | null>(null);
+
+  // Load event data from localStorage
+  useEffect(() => {
+    const storageKey = `universe_events_${universeId}`;
+    const stored = localStorage.getItem(storageKey);
+
+    if (stored) {
+      try {
+        const eventsData = JSON.parse(stored);
+        const eventId = currentEvent.id.toString();
+        const data = eventsData[eventId];
+
+        if (data) {
+          setEventData(data);
+        }
+      } catch (error) {
+        console.error('Failed to load event data:', error);
+      }
+    }
+  }, [universeId, currentEvent.id]);
+
+  // Check if this is a multi-segment event
+  const isMultiSegment = eventData && isMultiSegmentEvent(eventData);
+  const segments = isMultiSegment ? eventData.segments : null;
+
+  // If we have segments, use SegmentPlayer
+  if (segments && segments.length > 0) {
+    return (
+      <div className="mb-8">
+        <SegmentPlayer
+          segments={segments}
+          autoPlay={true}
+          className="shadow-lg"
+        />
+      </div>
+    );
+  }
+
+  // Fall back to traditional single video player
+  return (
+    <Card className="mb-8 shadow-lg">
+      <CardContent className="p-0">
+        <div className="aspect-video bg-black rounded-lg overflow-hidden">
+          {currentEvent.videoUrl ? (
+            <video
+              key={currentEvent.id}
+              className="w-full h-full"
+              controls
+              autoPlay
+              src={currentEvent.videoUrl}
+            >
+              Your browser does not support the video tag.
+            </video>
+          ) : (
+            <div className="flex items-center justify-center h-full text-white">
+              <p>No video available for this event</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * SegmentEditorSection Component
+ *
+ * Inline segment editor inspired by Google Flow
+ * Shows segment timeline at the bottom for direct editing
+ */
+function SegmentEditorSection({ universeId, currentEvent }: { universeId: string; currentEvent: EventNode }) {
+  const [eventData, setEventData] = useState<MultiSegmentEvent | LegacyEvent | null>(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0);
+
+  const eventId = currentEvent.id.toString();
+  const { segments, deleteSegment, reorderSegments } = useSegments({ universeId, eventId });
+
+  // Load event data from localStorage
+  useEffect(() => {
+    const storageKey = `universe_events_${universeId}`;
+    const stored = localStorage.getItem(storageKey);
+
+    if (stored) {
+      try {
+        const eventsData = JSON.parse(stored);
+        const data = eventsData[eventId];
+        if (data) {
+          setEventData(data);
+        }
+      } catch (error) {
+        console.error('Failed to load event data:', error);
+      }
+    }
+  }, [universeId, eventId]);
+
+  // Check if this is a multi-segment event
+  const isMultiSegment = eventData && isMultiSegmentEvent(eventData);
+
+  // Only show segment editor if event has segments or could have segments
+  if (!isMultiSegment && segments.length === 0) {
+    return null;
+  }
+
+  const handlePlaySegments = () => {
+    setIsPlaying(!isPlaying);
+    // Scroll to top to show video player
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSegmentDelete = (segmentId: string) => {
+    deleteSegment(segmentId);
+  };
+
+  const handleAddSegment = () => {
+    setShowAddDialog(true);
+  };
+
+  const handleGenerateSegment = async (config: any) => {
+    // TODO: Implement segment generation
+    console.log('Generate segment:', config);
+    setShowAddDialog(false);
+  };
+
+  const handleSegmentTrim = (segmentId: string, startTrim: number, endTrim: number) => {
+    // TODO: Implement trimming
+    console.log('Trim segment:', segmentId, startTrim, endTrim);
+  };
+
+  return (
+    <div className="mb-8">
+      <VideoTimeline
+        segments={segments}
+        onSegmentsReorder={reorderSegments}
+        onSegmentTrim={handleSegmentTrim}
+        onSegmentDelete={handleSegmentDelete}
+        onAddSegment={handleAddSegment}
+        onPlaySegments={handlePlaySegments}
+        isPlaying={isPlaying}
+        currentTime={currentTime}
+        currentSegmentIndex={currentSegmentIndex}
+      />
+
+      {/* Add Segment Dialog */}
+      <AddSegmentDialog
+        isOpen={showAddDialog}
+        onClose={() => setShowAddDialog(false)}
+        onGenerate={handleGenerateSegment}
+        isGenerating={false}
+        eventDescription={eventData?.description}
+      />
     </div>
   );
 }

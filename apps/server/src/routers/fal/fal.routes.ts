@@ -278,11 +278,16 @@ export const falRouter = router({
         prompt: z.string().min(1),
         model: z
           .enum([
+            // Text-to-Video models
             "fal-ai/hunyuan-video",
             "fal-ai/ltx-video",
             "fal-ai/cogvideox-5b",
             "fal-ai/runway-gen3",
             "fal-ai/veo3.1/fast",
+            "fal-ai/sora-2/text-to-video",
+            "fal-ai/kling-video/v2.5-turbo/pro/text-to-video",
+            "fal-ai/wan-25-preview/text-to-video",
+            // Image-to-Video models
             "fal-ai/veo3.1/fast/image-to-video",
             "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
             "fal-ai/wan-25-preview/image-to-video",

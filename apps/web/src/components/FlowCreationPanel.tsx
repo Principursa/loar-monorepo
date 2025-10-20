@@ -21,7 +21,6 @@ import {
   Image as ImageIcon,
   Type,
   Plus,
-  Scissors,
 } from "lucide-react";
 import { useState, useEffect } from 'react';
 import {
@@ -31,7 +30,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { SceneEditor } from "@/components/SceneEditor";
+import { VideoTimeline } from "@/components/segments";
+import type { VideoModel } from "@/types/segments";
 
 interface FlowCreationPanelProps {
   showVideoDialog: boolean;
@@ -159,8 +159,6 @@ export function FlowCreationPanel({
 
   // Multi-segment state
   const [segments, setSegments] = useState<VideoSegment[]>([]);
-  const [currentSegmentPrompt, setCurrentSegmentPrompt] = useState("");
-  const [showSceneEditor, setShowSceneEditor] = useState(false);
 
   // Extract last frame from previous event video
   const extractLastFrame = async () => {
@@ -270,7 +268,6 @@ export function FlowCreationPanel({
       setGenerationMode('text-to-video');
       setUploadedImageUrl(null);
       setSegments([]);
-      setCurrentSegmentPrompt("");
     }
   }, [showVideoDialog]);
 
@@ -407,35 +404,23 @@ export function FlowCreationPanel({
 
       {/* Main Bottom Panel */}
       <div className="fixed inset-x-0 bottom-0 z-50 pointer-events-none">
-        <div className="max-w-4xl mx-auto px-6 pb-6 pointer-events-auto">
+        <div className="max-w-2xl mx-auto px-4 pb-4 pointer-events-auto">
           {/* Status Message - Above the main panel */}
           {statusMessage && (
-            <div className="mb-3 animate-in slide-in-from-bottom-2 duration-300">
-              <div
-                className={`rounded-lg border p-3 bg-background/95 backdrop-blur-sm shadow-lg ${
-                  statusMessage.type === 'error' ? 'border-destructive/50' :
-                  statusMessage.type === 'success' ? 'border-green-500/50' :
-                  statusMessage.type === 'warning' ? 'border-yellow-500/50' :
-                  'border-blue-500/50'
-                }`}
-              >
+            <div className="mb-2 animate-in slide-in-from-bottom-2 duration-300">
+              <div className="rounded border-0 p-2 bg-black/80 backdrop-blur-sm shadow-lg">
                 <div className="flex items-start gap-2">
                   <div className="mt-0.5">
-                    {statusMessage.type === 'error' && <XCircle className="h-4 w-4 text-destructive" />}
-                    {statusMessage.type === 'success' && <CheckCircle2 className="h-4 w-4 text-green-500" />}
-                    {statusMessage.type === 'warning' && <AlertCircle className="h-4 w-4 text-yellow-500" />}
-                    {statusMessage.type === 'info' && <Info className="h-4 w-4 text-blue-500" />}
+                    {statusMessage.type === 'error' && <XCircle className="h-3.5 w-3.5 text-red-400" />}
+                    {statusMessage.type === 'success' && <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />}
+                    {statusMessage.type === 'warning' && <AlertCircle className="h-3.5 w-3.5 text-yellow-400" />}
+                    {statusMessage.type === 'info' && <Info className="h-3.5 w-3.5 text-blue-400" />}
                   </div>
-                  <div className="flex-1 space-y-1">
-                    <h4 className={`text-sm font-semibold ${
-                      statusMessage.type === 'error' ? 'text-destructive' :
-                      statusMessage.type === 'success' ? 'text-green-500' :
-                      statusMessage.type === 'warning' ? 'text-yellow-500' :
-                      'text-blue-500'
-                    }`}>
+                  <div className="flex-1 space-y-0.5">
+                    <h4 className="text-xs font-medium text-white">
                       {statusMessage.title}
                     </h4>
-                    <p className="text-xs text-muted-foreground whitespace-pre-line">
+                    <p className="text-[10px] text-white/60 whitespace-pre-line">
                       {statusMessage.description}
                     </p>
                     {statusMessage.action && (
@@ -443,7 +428,7 @@ export function FlowCreationPanel({
                         size="sm"
                         variant="outline"
                         onClick={statusMessage.action.onClick}
-                        className="mt-2 h-7 text-xs"
+                        className="mt-1.5 h-6 text-[10px] border-white/20 text-white hover:bg-white/10"
                       >
                         {statusMessage.action.label}
                       </Button>
@@ -452,7 +437,7 @@ export function FlowCreationPanel({
                   {setStatusMessage && (
                     <button
                       onClick={() => setStatusMessage(null)}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="text-white/50 hover:text-white"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -462,64 +447,53 @@ export function FlowCreationPanel({
             </div>
           )}
 
-          {/* Segment Queue - Show if segments exist */}
+          {/* Compact Timeline - Show if segments exist */}
           {segments.length > 0 && (
-            <Card className="bg-background/95 backdrop-blur-sm shadow-lg border mb-3">
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h3 className="text-sm font-semibold">Scene Segments</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {segments.length} segment{segments.length !== 1 ? 's' : ''} • Total: {Math.floor(totalDuration / 60)}:{(totalDuration % 60).toString().padStart(2, '0')}
-                    </p>
-                  </div>
+            <Card className="bg-black/80 backdrop-blur-sm shadow-lg border-0 mb-2">
+              <div className="p-2">
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => setShowSceneEditor(true)}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Scissors className="h-4 w-4 mr-2" />
-                      Edit Scene
-                    </Button>
-                    <Button
-                      onClick={handleSaveToContract}
-                      disabled={isSavingToContract || contractSaved}
-                      size="sm"
-                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                    >
-                      {isSavingToContract ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : contractSaved ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
-                          Saved
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Save to Timeline
-                        </>
-                      )}
-                    </Button>
+                    <span className="text-[10px] text-white/50">
+                      {segments.length} clip{segments.length !== 1 ? 's' : ''} • {Math.floor(totalDuration / 60)}:{(totalDuration % 60).toString().padStart(2, '0')}
+                    </span>
                   </div>
+                  <Button
+                    onClick={handleSaveToContract}
+                    disabled={isSavingToContract || contractSaved}
+                    size="sm"
+                    className="h-6 text-[10px] bg-white text-black hover:bg-white/90 px-2"
+                  >
+                    {isSavingToContract ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Saving...
+                      </>
+                    ) : contractSaved ? (
+                      <>
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Saved
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        Save
+                      </>
+                    )}
+                  </Button>
                 </div>
 
-                {/* Segment Thumbnails */}
-                <div className="flex gap-2 overflow-x-auto pb-2">
+                {/* Minimal Segment Thumbnails */}
+                <div className="flex gap-1 overflow-x-auto">
                   {segments.map((segment, index) => (
                     <div
                       key={segment.id}
-                      className="relative flex-shrink-0 w-32 group"
+                      className="relative flex-shrink-0 w-20 group"
                     >
-                      <div className="aspect-video rounded-lg border-2 border-primary/20 overflow-hidden bg-black">
+                      <div className="aspect-video rounded overflow-hidden bg-black border border-white/10">
                         {segment.imageUrl ? (
                           <img
                             src={segment.imageUrl}
-                            alt={`Segment ${index + 1}`}
+                            alt={`${index + 1}`}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -529,25 +503,16 @@ export function FlowCreationPanel({
                             muted
                           />
                         )}
-                        {/* Segment number badge */}
-                        <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/80 text-white text-xs rounded">
-                          {index + 1}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-1">
+                          <span className="text-[10px] text-white">{segment.duration}s</span>
+                          <button
+                            onClick={() => handleRemoveSegment(segment.id)}
+                            className="p-0.5 bg-red-500/80 hover:bg-red-500 text-white rounded"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
                         </div>
-                        {/* Duration badge */}
-                        <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/80 text-white text-xs rounded">
-                          {segment.duration}s
-                        </div>
-                        {/* Remove button */}
-                        <button
-                          onClick={() => handleRemoveSegment(segment.id)}
-                          className="absolute top-1 right-1 p-1 bg-red-500/80 hover:bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                        {segment.prompt}
-                      </p>
                     </div>
                   ))}
                 </div>
@@ -556,144 +521,78 @@ export function FlowCreationPanel({
           )}
 
           {/* Compact Main Panel */}
-          <Card className="bg-background/95 backdrop-blur-sm shadow-2xl border">
-            <div className="p-4 space-y-3">
-              {/* Top Bar: Mode Selector + Model + Settings + Close */}
+          <Card className="bg-black/90 backdrop-blur-sm shadow-2xl border-0">
+            <div className="p-3 space-y-2">
+              {/* Minimal Top Bar */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  {/* Mode Selector Dropdown (Text to Video / Image to Video) */}
-                  <div className="relative">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowModeDropdown(!showModeDropdown)}
-                      className="h-8 gap-2 text-sm font-medium border-muted-foreground/20 hover:bg-muted"
-                    >
-                      {generationMode === 'text-to-video' ? (
-                        <Type className="h-4 w-4" />
-                      ) : (
-                        <ImageIcon className="h-4 w-4" />
-                      )}
-                      <span>{modeNames[generationMode]}</span>
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-
-                    {/* Dropdown Menu */}
-                    {showModeDropdown && (
-                      <div className="absolute top-full left-0 mt-1 w-48 bg-background border rounded-md shadow-lg z-50 overflow-hidden">
-                        <button
-                          onClick={() => {
-                            setGenerationMode('text-to-video');
-                            setShowModeDropdown(false);
-                            setUploadedImageUrl(null);
-                          }}
-                          className={`w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2 ${
-                            generationMode === 'text-to-video' ? 'bg-muted font-medium' : ''
-                          }`}
-                        >
-                          <Type className="h-4 w-4" />
-                          Text to Video
-                        </button>
-                        <button
-                          onClick={() => {
-                            setGenerationMode('image-to-video');
-                            setShowModeDropdown(false);
-                          }}
-                          className={`w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2 ${
-                            generationMode === 'image-to-video' ? 'bg-muted font-medium' : ''
-                          }`}
-                        >
-                          <ImageIcon className="h-4 w-4" />
-                          Image to Video
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 gap-2 text-sm font-medium"
-                    disabled
-                  >
-                    <Volume2 className="h-4 w-4" />
-                    {modelNames[selectedVideoModel]}
-                  </Button>
-                  <span className="text-xs px-2 py-1 rounded-md bg-muted">×1</span>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowSettingsDialog(true)}
-                    className="h-8 gap-2"
+                    className="h-7 px-2 text-white/70 hover:text-white hover:bg-white/10"
                   >
-                    <Settings2 className="h-4 w-4" />
-                    Settings
+                    <Settings2 className="h-3.5 w-3.5 mr-1.5" />
+                    <span className="text-xs">{modelNames[selectedVideoModel]}</span>
                   </Button>
-                  <span className="text-xs text-muted-foreground">
-                    {additionType === 'branch' ? '🌿 Branch' : '→ Continue'}
-                  </span>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowVideoDialog(false)}
-                  className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                  className="h-7 w-7 p-0 text-white/70 hover:text-white hover:bg-white/10"
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
 
-              {/* Image Selection for Image-to-Video Mode */}
+              {/* Source Image Preview - Image-to-Video Mode */}
+              {generationMode === 'image-to-video' && uploadedImageUrl && (
+                <div className="relative rounded overflow-hidden bg-black aspect-video">
+                  <img
+                    src={uploadedImageUrl}
+                    alt="Source"
+                    className="w-full h-full object-contain"
+                  />
+                  <button
+                    onClick={() => {
+                      setUploadedImageUrl(null);
+                      setGeneratedImageUrl(null);
+                    }}
+                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Image Selection - Image-to-Video Mode */}
               {generationMode === 'image-to-video' && !uploadedImageUrl && (
-                <div className="space-y-3">
-                  {/* Character Selector */}
+                <div className="space-y-2">
                   {charactersData?.characters && charactersData.characters.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-xs font-medium">Select a Character</Label>
-                      <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto p-2 border rounded-lg bg-muted/20">
-                        {charactersData.characters.map((char: any) => (
-                          <button
-                            key={char.id}
-                            onClick={() => {
-                              setUploadedImageUrl(char.image_url);
-                              setGeneratedImageUrl(char.image_url);
-                            }}
-                            className="group relative aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-primary transition-colors"
-                          >
-                            <img
-                              src={char.image_url}
-                              alt={char.character_name}
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <p className="text-xs text-white font-medium text-center px-1">
-                                {char.character_name}
-                              </p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
+                    <div className="grid grid-cols-6 gap-1.5 max-h-20 overflow-y-auto">
+                      {charactersData.characters.map((char: any) => (
+                        <button
+                          key={char.id}
+                          onClick={() => {
+                            setUploadedImageUrl(char.image_url);
+                            setGeneratedImageUrl(char.image_url);
+                          }}
+                          className="aspect-square rounded overflow-hidden border border-white/10 hover:border-white/40 transition-colors"
+                        >
+                          <img
+                            src={char.image_url}
+                            alt={char.character_name}
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      ))}
                     </div>
                   )}
-
-                  {/* Divider */}
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-muted"></div>
-                    </div>
-                    <div className="relative flex justify-center text-xs">
-                      <span className="bg-background px-2 text-muted-foreground">or</span>
-                    </div>
-                  </div>
-
-                  {/* File Upload */}
-                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 hover:border-muted-foreground/50 transition-colors">
-                    <label htmlFor="image-upload" className="cursor-pointer flex flex-col items-center gap-2">
-                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                      <div className="text-center">
-                        <p className="text-sm font-medium">Upload an image</p>
-                        <p className="text-xs text-muted-foreground">Click to browse or drag and drop</p>
-                      </div>
+                  <div className="border border-dashed border-white/20 rounded p-3 hover:border-white/40 transition-colors">
+                    <label htmlFor="image-upload" className="cursor-pointer flex flex-col items-center gap-1">
+                      <ImageIcon className="h-5 w-5 text-white/50" />
+                      <p className="text-xs text-white/70">Upload image</p>
                       <input
                         id="image-upload"
                         type="file"
@@ -706,39 +605,19 @@ export function FlowCreationPanel({
                 </div>
               )}
 
-              {/* Show selected image preview with character name if available */}
-              {generationMode === 'image-to-video' && uploadedImageUrl && (
-                <div className="space-y-2">
-                  {/* Show character name if it's from character library */}
-                  {charactersData?.characters && (() => {
-                    const selectedChar = charactersData.characters.find((c: any) => c.image_url === uploadedImageUrl);
-                    if (selectedChar) {
-                      return (
-                        <div className="flex items-center gap-2 text-sm">
-                          <UserPlus className="h-4 w-4 text-primary" />
-                          <span className="font-medium">{selectedChar.character_name}</span>
-                          <span className="text-muted-foreground">• {selectedChar.character_style || 'Custom Style'}</span>
-                        </div>
-                      );
-                    }
-                  })()}
-
-                  <div className="relative rounded-lg border p-2 bg-muted/30">
-                    <img
-                      src={uploadedImageUrl}
-                      alt="Selected frame"
-                      className="w-full rounded border max-h-48 object-contain bg-black"
-                    />
-                    <button
-                      onClick={() => {
-                        setUploadedImageUrl(null);
-                        setGeneratedImageUrl(null);
-                      }}
-                      className="absolute top-3 right-3 p-1 rounded-full bg-background/80 hover:bg-background transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
+              {/* Large Video Preview */}
+              {generatedVideoUrl && (
+                <div className="relative rounded overflow-hidden bg-black aspect-video">
+                  <video
+                    key={generatedVideoUrl}
+                    controls
+                    className="w-full h-full object-contain pointer-events-auto"
+                    playsInline
+                    preload="auto"
+                  >
+                    <source src={generatedVideoUrl} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
                 </div>
               )}
 
@@ -748,132 +627,76 @@ export function FlowCreationPanel({
                 onChange={(e) => setVideoDescription(e.target.value)}
                 placeholder={
                   generationMode === 'text-to-video'
-                    ? "Generate a video with text..."
-                    : "Describe how to animate this image..."
+                    ? "Describe your scene..."
+                    : "How should this image animate..."
                 }
                 rows={2}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                className="w-full rounded border-0 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 resize-none"
               />
 
-              {/* Video preview for both modes after generation */}
-              {generatedVideoUrl && (
-                <div className="rounded-lg border p-2 bg-muted/30">
-                  <video
-                    src={generatedVideoUrl}
-                    controls
-                    className="w-full rounded border max-h-48 object-contain bg-black"
-                  />
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2">
-                {/* Text-to-video workflow: Generate video directly */}
-                {generationMode === 'text-to-video' && !generatedVideoUrl && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-9"
-                      disabled
-                    >
-                      <Wand2 className="h-4 w-4 mr-2" />
-                      Expand
-                    </Button>
-                    <Button
-                      onClick={handleGenerateVideo}
-                      disabled={!videoDescription.trim() || isGeneratingVideo}
-                      size="sm"
-                      className="h-9"
-                    >
-                      {isGeneratingVideo ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <ArrowRight className="h-4 w-4 mr-2" />
-                          Create
-                        </>
-                      )}
-                    </Button>
-                  </>
-                )}
-
-                {/* Image-to-video workflow: Generate video directly */}
-                {generationMode === 'image-to-video' && uploadedImageUrl && !generatedVideoUrl && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-9"
-                      disabled
-                    >
-                      <Wand2 className="h-4 w-4 mr-2" />
-                      Expand
-                    </Button>
-                    <Button
-                      onClick={handleGenerateVideo}
-                      disabled={!videoDescription.trim() || isGeneratingVideo}
-                      size="sm"
-                      className="h-9"
-                    >
-                      {isGeneratingVideo ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <ArrowRight className="h-4 w-4 mr-2" />
-                          Create Video
-                        </>
-                      )}
-                    </Button>
-                  </>
-                )}
-
-                {/* Add to Scene - available for both modes after video is generated */}
-                {generatedVideoUrl && (
-                  <>
+              {/* Compact Action Buttons */}
+              <div className="flex items-center justify-between gap-2">
+                {/* Generate/Add buttons */}
+                {!generatedVideoUrl ? (
+                  <Button
+                    onClick={handleGenerateVideo}
+                    disabled={
+                      !videoDescription.trim() ||
+                      isGeneratingVideo ||
+                      (generationMode === 'image-to-video' && !uploadedImageUrl)
+                    }
+                    size="sm"
+                    className="h-8 bg-white text-black hover:bg-white/90 text-xs"
+                  >
+                    {isGeneratingVideo ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                        Generate
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
                     <Button
                       onClick={handleAddSegmentToQueue}
                       size="sm"
                       variant="outline"
-                      className="h-9"
+                      className="h-8 border-white/20 text-white hover:bg-white/10 text-xs"
                     >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Segment
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />
+                      Add to Timeline
                     </Button>
-
-                    {/* Only show direct save if no segments in queue */}
                     {segments.length === 0 && (
                       <Button
                         onClick={handleSaveToContract}
                         disabled={isSavingToContract || contractSaved}
                         size="sm"
-                        className="h-9 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                        className="h-8 bg-white text-black hover:bg-white/90 text-xs"
                       >
                         {isSavingToContract ? (
                           <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            {isSavingToFilecoin ? "Uploading..." : "Saving..."}
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            Saving...
                           </>
                         ) : contractSaved ? (
                           <>
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                             Saved
                           </>
                         ) : (
                           <>
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            Save to Timeline
+                            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                            Save
                           </>
                         )}
                       </Button>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
 
@@ -900,22 +723,6 @@ export function FlowCreationPanel({
         </div>
       </div>
 
-      {/* Scene Editor */}
-      <SceneEditor
-        isOpen={showSceneEditor}
-        onClose={() => setShowSceneEditor(false)}
-        onSave={(editedSegments) => {
-          setSegments(editedSegments);
-          setShowSceneEditor(false);
-          setStatusMessage?.({
-            type: 'success',
-            title: 'Scene Updated!',
-            description: `Your scene with ${editedSegments.length} segments is ready to save to the timeline.`,
-          });
-        }}
-        initialSegments={segments}
-        charactersData={charactersData}
-      />
     </>
   );
 }

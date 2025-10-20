@@ -44,7 +44,21 @@ export interface FalImageGenerationResult {
 
 export interface FalVideoGenerationOptions {
   prompt: string;
-  model?: 'fal-ai/hunyuan-video' | 'fal-ai/ltx-video' | 'fal-ai/cogvideox-5b' | 'fal-ai/runway-gen3' | 'fal-ai/veo3.1/fast' | 'fal-ai/veo3.1/fast/image-to-video' | 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video' | 'fal-ai/wan-25-preview/image-to-video' | 'fal-ai/sora-2/image-to-video';
+  model?:
+    // Text-to-Video models
+    | 'fal-ai/hunyuan-video'
+    | 'fal-ai/ltx-video'
+    | 'fal-ai/cogvideox-5b'
+    | 'fal-ai/runway-gen3'
+    | 'fal-ai/veo3.1/fast'
+    | 'fal-ai/sora-2/text-to-video'
+    | 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video'
+    | 'fal-ai/wan-25-preview/text-to-video'
+    // Image-to-Video models
+    | 'fal-ai/veo3.1/fast/image-to-video'
+    | 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video'
+    | 'fal-ai/wan-25-preview/image-to-video'
+    | 'fal-ai/sora-2/image-to-video';
   imageUrl?: string;
   duration?: number;
   fps?: number;
@@ -429,6 +443,41 @@ export class FalService {
           input.resolution = "auto";
         }
         // Sora can generate audio naturally from prompts if needed
+      } else if (model === 'fal-ai/sora-2/text-to-video') {
+        // Sora 2 text-to-video (no image required)
+        console.log('🔧 Building Sora 2 text-to-video input...');
+
+        // Duration: 4, 8, or 12 seconds (as number)
+        const validDurations = [4, 8, 12];
+        input.duration = validDurations.includes(options.duration || 0) ? options.duration : 4;
+
+        // Aspect ratio: Only "16:9" or "9:16" supported (NOT "1:1" or "auto")
+        if (options.aspectRatio === "9:16" || options.aspectRatio === "16:9") {
+          input.aspect_ratio = options.aspectRatio;
+        } else {
+          input.aspect_ratio = "16:9"; // Default to 16:9 if invalid
+        }
+
+        // Resolution: Only "720p" supported
+        input.resolution = "720p";
+
+        console.log('✅ Sora 2 text-to-video input prepared:', JSON.stringify(input, null, 2));
+      } else if (model === 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video') {
+        // Kling text-to-video (no image required)
+        console.log('🔧 Building Kling text-to-video input...');
+        input.duration = String(options.duration || 5); // 5 or 10 seconds
+        input.aspect_ratio = options.aspectRatio || "16:9";
+        if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+        if (options.cfgScale !== undefined) input.cfg_scale = options.cfgScale;
+        console.log('✅ Kling text-to-video input prepared:', JSON.stringify(input, null, 2));
+      } else if (model === 'fal-ai/wan-25-preview/text-to-video') {
+        // Wan 2.5 text-to-video (no image required)
+        console.log('🔧 Building Wan 2.5 text-to-video input...');
+        input.duration = String(options.duration || 5); // 5 or 10 seconds
+        input.resolution = options.resolution || "1080p";
+        if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+        if (options.enablePromptExpansion !== undefined) input.enable_prompt_expansion = options.enablePromptExpansion;
+        console.log('✅ Wan 2.5 text-to-video input prepared:', JSON.stringify(input, null, 2));
       } else {
         input.duration = options.duration || 5;
         input.fps = options.fps || 25;
