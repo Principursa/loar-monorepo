@@ -77,6 +77,8 @@ interface FlowCreationPanelProps {
   isGeneratingVideo: boolean;
   videoPrompt: string;
   setVideoPrompt: (prompt: string) => void;
+  videoAnimationPrompt?: string;
+  setVideoAnimationPrompt?: (prompt: string) => void;
   videoRatio: "16:9" | "9:16" | "1:1";
   setVideoRatio: (ratio: "16:9" | "9:16" | "1:1") => void;
   selectedVideoModel: 'fal-veo3' | 'fal-kling' | 'fal-wan25' | 'fal-sora';
@@ -155,13 +157,15 @@ export function FlowCreationPanel({
   const [isExtractingFrame, setIsExtractingFrame] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showCharacterDialog, setShowCharacterDialog] = useState(false);
   const [generationMode, setGenerationMode] = useState<'text-to-video' | 'image-to-video'>('text-to-video');
   const [showModeDropdown, setShowModeDropdown] = useState(false);
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Local state for event description (separate from videoDescription which is for prompts)
   const [eventDescription, setEventDescription] = useState('');
+
+  // Local state for video animation prompt (for image-to-video mode)
+  const [localVideoPrompt, setLocalVideoPrompt] = useState('');
 
   // Multi-segment state
   const [segments, setSegments] = useState<VideoSegment[]>([]);
@@ -203,27 +207,6 @@ export function FlowCreationPanel({
     }
   };
 
-  // Handle image file upload for image-to-video mode
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingImage(true);
-    try {
-      // Convert to data URL for preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        setUploadedImageUrl(dataUrl);
-        setGeneratedImageUrl(dataUrl);
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      console.error('Error uploading image:', error);
-    } finally {
-      setIsUploadingImage(false);
-    }
-  };
 
   // Add segment to queue
   const handleAddSegmentToQueue = () => {
@@ -245,7 +228,6 @@ export function FlowCreationPanel({
     setGeneratedVideoUrl(null);
     setGeneratedImageUrl(null);
     setVideoDescription("");
-    setUploadedImageUrl(null);
 
     // Show success message
     setStatusMessage?.({
@@ -272,8 +254,8 @@ export function FlowCreationPanel({
       setExtractedFrameUrl(null);
       setShowSettingsDialog(false);
       setGenerationMode('text-to-video');
-      setUploadedImageUrl(null);
       setSegments([]);
+      setLocalVideoPrompt('');
     }
   }, [showVideoDialog]);
 
@@ -394,6 +376,85 @@ export function FlowCreationPanel({
         </DialogContent>
       </Dialog>
 
+      {/* Character Selection Dialog */}
+      <Dialog open={showCharacterDialog} onOpenChange={setShowCharacterDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Characters</DialogTitle>
+            <DialogDescription>Choose up to 2 characters for your scene</DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {charactersData?.characters && charactersData.characters.length > 0 ? (
+              <div className="grid grid-cols-3 gap-3">
+                {charactersData.characters.map((char: any) => {
+                  const isSelected = selectedCharacters.includes(char.id);
+                  const isDisabled = !isSelected && selectedCharacters.length >= 2;
+                  return (
+                    <button
+                      key={char.id}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedCharacters(prev => prev.filter(id => id !== char.id));
+                        } else if (!isDisabled) {
+                          setSelectedCharacters(prev => [...prev, char.id]);
+                        }
+                      }}
+                      disabled={isDisabled}
+                      className={`relative aspect-square rounded overflow-hidden border-2 transition-all ${
+                        isSelected
+                          ? 'border-primary shadow-lg scale-95'
+                          : isDisabled
+                          ? 'border-muted opacity-40 cursor-not-allowed'
+                          : 'border-muted-foreground/20 hover:border-muted-foreground/40'
+                      }`}
+                    >
+                      <img
+                        src={char.image_url}
+                        alt={char.character_name}
+                        className="w-full h-full object-cover"
+                      />
+                      {isSelected && (
+                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                            <svg className="w-5 h-5 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        </div>
+                      )}
+                      {isDisabled && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <svg className="w-6 h-6 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-1.5">
+                        <span className="text-xs text-white font-medium line-clamp-1">
+                          {char.character_name}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground text-center p-4">
+                No characters available. Create a character first.
+              </div>
+            )}
+
+            {selectedCharacters.length > 0 && (
+              <div className="mt-4 text-sm text-muted-foreground text-center">
+                {selectedCharacters.length}/2 character{selectedCharacters.length !== 1 ? 's' : ''} selected
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Settings Modal */}
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
         <DialogContent className="max-w-md">
@@ -411,11 +472,10 @@ export function FlowCreationPanel({
                   <button
                     key={model}
                     onClick={() => setSelectedVideoModel(model)}
-                    className={`px-3 py-2 text-sm rounded-md border transition-colors text-left ${
-                      selectedVideoModel === model
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background hover:bg-muted"
-                    }`}
+                    className={`px-3 py-2 text-sm rounded-md border transition-colors text-left ${selectedVideoModel === model
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input bg-background hover:bg-muted"
+                      }`}
                   >
                     {modelNames[model]}
                   </button>
@@ -431,11 +491,10 @@ export function FlowCreationPanel({
                   <button
                     key={ratio}
                     onClick={() => setVideoRatio(ratio)}
-                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                      videoRatio === ratio
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background hover:bg-muted"
-                    }`}
+                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${videoRatio === ratio
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input bg-background hover:bg-muted"
+                      }`}
                   >
                     {ratio}
                   </button>
@@ -451,11 +510,10 @@ export function FlowCreationPanel({
                   <button
                     key={duration}
                     onClick={() => setSelectedVideoDuration(duration)}
-                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                      selectedVideoDuration === duration
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background hover:bg-muted"
-                    }`}
+                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${selectedVideoDuration === duration
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input bg-background hover:bg-muted"
+                      }`}
                   >
                     {duration}s
                   </button>
@@ -469,11 +527,10 @@ export function FlowCreationPanel({
                   <button
                     key={duration}
                     onClick={() => setSelectedVideoDuration(duration)}
-                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                      selectedVideoDuration === duration
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background hover:bg-muted"
-                    }`}
+                    className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${selectedVideoDuration === duration
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input bg-background hover:bg-muted"
+                      }`}
                   >
                     {duration}s
                   </button>
@@ -661,7 +718,8 @@ export function FlowCreationPanel({
                     <button
                       onClick={() => {
                         setGenerationMode('text-to-video');
-                        setUploadedImageUrl(null);
+                        setGeneratedImageUrl(null);
+                        setLocalVideoPrompt('');
                       }}
                       className={`px-2 py-1 text-xs rounded transition-colors ${
                         generationMode === 'text-to-video'
@@ -673,7 +731,10 @@ export function FlowCreationPanel({
                       Text
                     </button>
                     <button
-                      onClick={() => setGenerationMode('image-to-video')}
+                      onClick={() => {
+                        setGenerationMode('image-to-video');
+                        setLocalVideoPrompt('');
+                      }}
                       className={`px-2 py-1 text-xs rounded transition-colors ${
                         generationMode === 'image-to-video'
                           ? 'bg-white text-black font-medium'
@@ -705,143 +766,195 @@ export function FlowCreationPanel({
                 </Button>
               </div>
 
-              {/* Source Image Preview - Image-to-Video Mode */}
-              {generationMode === 'image-to-video' && uploadedImageUrl && (
-                <div className="relative rounded overflow-hidden bg-black aspect-video">
-                  <img
-                    src={uploadedImageUrl}
-                    alt="Source"
-                    className="w-full h-full object-contain"
-                  />
-                  <button
-                    onClick={() => {
-                      setUploadedImageUrl(null);
-                      setGeneratedImageUrl(null);
-                    }}
-                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              )}
-
-              {/* Image Selection - Image-to-Video Mode */}
-              {generationMode === 'image-to-video' && !uploadedImageUrl && (
+              {/* Image-to-Video Mode: New 2-Step Flow */}
+              {generationMode === 'image-to-video' && (
                 <div className="space-y-2">
-                  {charactersData?.characters && charactersData.characters.length > 0 && (
-                    <div className="grid grid-cols-6 gap-1.5 max-h-20 overflow-y-auto">
-                      {charactersData.characters.map((char: any) => (
-                        <button
-                          key={char.id}
-                          onClick={() => {
-                            setUploadedImageUrl(char.image_url);
-                            setGeneratedImageUrl(char.image_url);
-                          }}
-                          className="aspect-square rounded overflow-hidden border border-white/10 hover:border-white/40 transition-colors"
-                        >
-                          <img
-                            src={char.image_url}
-                            alt={char.character_name}
-                            className="w-full h-full object-cover"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="border border-dashed border-white/20 rounded p-3 hover:border-white/40 transition-colors">
-                    <label htmlFor="image-upload" className="cursor-pointer flex flex-col items-center gap-1">
-                      <ImageIcon className="h-5 w-5 text-white/50" />
-                      <p className="text-xs text-white/70">Upload image</p>
-                      <input
-                        id="image-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              {/* Prompt Input */}
-              <textarea
-                value={videoDescription}
-                onChange={(e) => setVideoDescription(e.target.value)}
-                placeholder={
-                  generationMode === 'text-to-video'
-                    ? "Describe your scene..."
-                    : "How should this image animate..."
-                }
-                rows={2}
-                className="w-full rounded border-0 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 resize-none"
-              />
-
-              {/* Compact Action Buttons */}
-              <div className="flex items-center justify-between gap-2">
-                {/* Generate/Add buttons */}
-                {!generatedVideoUrl ? (
-                  <Button
-                    onClick={handleGenerateVideo}
-                    disabled={
-                      !videoDescription.trim() ||
-                      isGeneratingVideo ||
-                      (generationMode === 'image-to-video' && !uploadedImageUrl)
-                    }
-                    size="sm"
-                    className="h-8 bg-white text-black hover:bg-white/90 text-xs"
-                  >
-                    {isGeneratingVideo ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                        Generate
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleAddSegmentToQueue}
-                      size="sm"
-                      variant="outline"
-                      className="h-8 border-white/20 text-white hover:bg-white/10 text-xs"
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-1.5" />
-                      Add to Timeline
-                    </Button>
-                    {segments.length === 0 && (
+                  {/* Step 1: Character + Scene Description (if no frame yet) */}
+                  {!generatedImageUrl && (
+                    <div className="space-y-2">
+                      {/* Character Selector Button */}
                       <Button
-                        onClick={() => setShowSaveDialog(true)}
-                        disabled={isSavingToContract || contractSaved}
+                        variant="outline"
                         size="sm"
-                        className="h-8 bg-white text-black hover:bg-white/90 text-xs"
+                        onClick={() => setShowCharacterDialog(true)}
+                        className="w-full h-8 border-white/20 text-white hover:bg-white/10 text-xs"
                       >
-                        {isSavingToContract ? (
+                        <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                        {selectedCharacters.length > 0
+                          ? `${selectedCharacters.length} Character${selectedCharacters.length !== 1 ? 's' : ''} Selected`
+                          : 'Select Characters (Optional)'}
+                      </Button>
+
+                      {/* Scene Description Input */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-white/70">Describe the Scene</Label>
+                        <textarea
+                          value={videoDescription}
+                          onChange={(e) => setVideoDescription(e.target.value)}
+                          placeholder="e.g., Banana running through a golden field at sunset..."
+                          rows={2}
+                          className="w-full rounded border-0 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 resize-none"
+                        />
+                      </div>
+
+                      {/* Generate Frame Button */}
+                      <Button
+                        onClick={handleGenerateEventImage}
+                        disabled={!videoDescription.trim() || isGeneratingImage}
+                        size="sm"
+                        className="w-full h-8 bg-white/10 text-white hover:bg-white/20 text-xs"
+                      >
+                        {isGeneratingImage ? (
                           <>
                             <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                            Saving...
-                          </>
-                        ) : contractSaved ? (
-                          <>
-                            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                            Saved
+                            Generating Frame...
                           </>
                         ) : (
                           <>
                             <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                            Save
+                            Generate Frame
                           </>
                         )}
                       </Button>
-                    )}
-                  </div>
-                )}
-              </div>
+                    </div>
+                  )}
+
+                  {/* Step 2: Generated Frame Preview + Animation Prompt (only show if no video yet) */}
+                  {generatedImageUrl && !generatedVideoUrl && (
+                    <div className="space-y-2">
+                      {/* Compact Frame Preview */}
+                      <div className="relative rounded overflow-hidden bg-black h-32">
+                        <img
+                          src={generatedImageUrl}
+                          alt="Generated frame"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          onClick={() => {
+                            setGeneratedImageUrl(null);
+                          }}
+                          className="absolute top-1 right-1 p-1 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                        <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/80 text-white text-[10px] rounded backdrop-blur-sm">
+                          Frame
+                        </div>
+                      </div>
+
+                      {/* Step 3: Video Animation Prompt */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-white/70">Describe Animation</Label>
+                        <textarea
+                          value={localVideoPrompt}
+                          onChange={(e) => setLocalVideoPrompt(e.target.value)}
+                          placeholder="e.g., Camera slowly zooms in, character waves at the camera..."
+                          rows={2}
+                          className="w-full rounded border-0 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 resize-none"
+                        />
+                      </div>
+
+                      {/* Generate Video Button */}
+                      <Button
+                        onClick={handleGenerateVideo}
+                        disabled={!localVideoPrompt.trim() || isGeneratingVideo}
+                        size="sm"
+                        className="w-full h-8 bg-white text-black hover:bg-white/90 text-xs"
+                      >
+                        {isGeneratingVideo ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            Generating Video...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                            Generate Video
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Text-to-Video Prompt Input */}
+              {generationMode === 'text-to-video' && (
+                <textarea
+                  value={videoDescription}
+                  onChange={(e) => setVideoDescription(e.target.value)}
+                  placeholder="Describe your scene..."
+                  rows={2}
+                  className="w-full rounded border-0 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 resize-none"
+                />
+              )}
+
+              {/* Compact Action Buttons - Only for text-to-video or when video is generated */}
+              {(generationMode === 'text-to-video' || generatedVideoUrl) && (
+                <div className="flex items-center justify-between gap-2">
+                  {/* Generate/Add buttons */}
+                  {!generatedVideoUrl ? (
+                    <Button
+                      onClick={handleGenerateVideo}
+                      disabled={
+                        !videoDescription.trim() ||
+                        isGeneratingVideo
+                      }
+                      size="sm"
+                      className="h-8 bg-white text-black hover:bg-white/90 text-xs"
+                    >
+                      {isGeneratingVideo ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                          Generate
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleAddSegmentToQueue}
+                        size="sm"
+                        variant="outline"
+                        className="h-8 border-white/20 text-white hover:bg-white/10 text-xs"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1.5" />
+                        Add to Timeline
+                      </Button>
+                      {segments.length === 0 && (
+                        <Button
+                          onClick={() => setShowSaveDialog(true)}
+                          disabled={isSavingToContract || contractSaved}
+                          size="sm"
+                          className="h-8 bg-white text-black hover:bg-white/90 text-xs"
+                        >
+                          {isSavingToContract ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                              Saving...
+                            </>
+                          ) : contractSaved ? (
+                            <>
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                              Saved
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                              Save
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Success Footer */}
               {contractSaved && filecoinSaved && pieceCid && (
