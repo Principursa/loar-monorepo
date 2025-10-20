@@ -119,6 +119,8 @@ interface VideoSegment {
 export function FlowCreationPanel({
   showVideoDialog,
   setShowVideoDialog,
+  videoTitle,
+  setVideoTitle,
   videoDescription,
   setVideoDescription,
   additionType,
@@ -152,10 +154,14 @@ export function FlowCreationPanel({
   const [extractedFrameUrl, setExtractedFrameUrl] = useState<string | null>(null);
   const [isExtractingFrame, setIsExtractingFrame] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [generationMode, setGenerationMode] = useState<'text-to-video' | 'image-to-video'>('text-to-video');
   const [showModeDropdown, setShowModeDropdown] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  // Local state for event description (separate from videoDescription which is for prompts)
+  const [eventDescription, setEventDescription] = useState('');
 
   // Multi-segment state
   const [segments, setSegments] = useState<VideoSegment[]>([]);
@@ -287,6 +293,107 @@ export function FlowCreationPanel({
 
   return (
     <>
+      {/* Save to Timeline Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save to Timeline</DialogTitle>
+            <DialogDescription>Provide a title and description for this event</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Title Input */}
+            <div className="space-y-2">
+              <Label>Event Title</Label>
+              <Input
+                value={videoTitle}
+                onChange={(e) => setVideoTitle(e.target.value)}
+                placeholder="Enter event title..."
+                className="w-full"
+              />
+            </div>
+
+            {/* Description Input */}
+            <div className="space-y-2">
+              <Label>Event Description</Label>
+              <textarea
+                value={eventDescription}
+                onChange={(e) => setEventDescription(e.target.value)}
+                placeholder="Describe what happens in this event..."
+                rows={4}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+              />
+            </div>
+
+            {/* Save Button */}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowSaveDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (videoTitle.trim() && eventDescription.trim()) {
+                    // Temporary solution: Use the FIRST segment as the video event
+                    const videoUrlToUse = generatedVideoUrl || (segments.length > 0 ? segments[0].videoUrl : null);
+
+                    if (!videoUrlToUse) {
+                      alert('Please generate at least one video before saving');
+                      return;
+                    }
+
+                    console.log('Before setting state:', {
+                      generatedVideoUrl,
+                      videoTitle,
+                      videoDescription,
+                      eventDescription,
+                      segments: segments.length
+                    });
+
+                    // Set the generated video URL to segment 1 (first segment)
+                    if (!generatedVideoUrl && segments.length > 0) {
+                      setGeneratedVideoUrl(segments[0].videoUrl);
+                    }
+
+                    // Set the videoDescription prop to the event description before saving
+                    setVideoDescription(eventDescription);
+
+                    // Close dialog and wait longer for state to propagate
+                    setShowSaveDialog(false);
+
+                    // Call save after a longer delay to ensure state is updated in parent
+                    setTimeout(() => {
+                      console.log('About to save with:', {
+                        generatedVideoUrl: generatedVideoUrl || segments[0]?.videoUrl,
+                        videoTitle,
+                        videoDescription: eventDescription
+                      });
+                      handleSaveToContract();
+                    }, 300);
+                  }
+                }}
+                disabled={!videoTitle.trim() || !eventDescription.trim() || isSavingToContract}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+              >
+                {isSavingToContract ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Save to Timeline
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Settings Modal */}
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
         <DialogContent className="max-w-md">
@@ -447,75 +554,98 @@ export function FlowCreationPanel({
             </div>
           )}
 
-          {/* Compact Timeline - Show if segments exist */}
-          {segments.length > 0 && (
-            <Card className="bg-black/80 backdrop-blur-sm shadow-lg border-0 mb-2">
-              <div className="p-2">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-white/50">
-                      {segments.length} clip{segments.length !== 1 ? 's' : ''} • {Math.floor(totalDuration / 60)}:{(totalDuration % 60).toString().padStart(2, '0')}
-                    </span>
-                  </div>
-                  <Button
-                    onClick={handleSaveToContract}
-                    disabled={isSavingToContract || contractSaved}
-                    size="sm"
-                    className="h-6 text-[10px] bg-white text-black hover:bg-white/90 px-2"
+          {/* Event Preview & Timeline */}
+          {(generatedVideoUrl || segments.length > 0) && (
+            <Card className="bg-black/90 backdrop-blur-sm shadow-lg border-0 mb-2">
+              <div className="p-3 space-y-2">
+                {/* Large Event Preview */}
+                <div className="relative rounded overflow-hidden bg-black aspect-video">
+                  <video
+                    key={generatedVideoUrl || segments[segments.length - 1]?.videoUrl}
+                    src={generatedVideoUrl || segments[segments.length - 1]?.videoUrl}
+                    controls
+                    className="w-full h-full object-contain pointer-events-auto"
+                    playsInline
+                    preload="auto"
                   >
-                    {isSavingToContract ? (
-                      <>
-                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        Saving...
-                      </>
-                    ) : contractSaved ? (
-                      <>
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Saved
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-3 w-3 mr-1" />
-                        Save
-                      </>
-                    )}
-                  </Button>
+                    <source src={generatedVideoUrl || segments[segments.length - 1]?.videoUrl} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
                 </div>
 
-                {/* Minimal Segment Thumbnails */}
-                <div className="flex gap-1 overflow-x-auto">
-                  {segments.map((segment, index) => (
-                    <div
-                      key={segment.id}
-                      className="relative flex-shrink-0 w-20 group"
-                    >
-                      <div className="aspect-video rounded overflow-hidden bg-black border border-white/10">
-                        {segment.imageUrl ? (
-                          <img
-                            src={segment.imageUrl}
-                            alt={`${index + 1}`}
-                            className="w-full h-full object-cover"
-                          />
+                {/* Timeline Strip */}
+                {segments.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-white/50">
+                        {segments.length} scene{segments.length !== 1 ? 's' : ''} • {Math.floor(totalDuration / 60)}:{(totalDuration % 60).toString().padStart(2, '0')}
+                      </span>
+                      <Button
+                        onClick={() => setShowSaveDialog(true)}
+                        disabled={isSavingToContract || contractSaved}
+                        size="sm"
+                        className="h-6 text-[10px] bg-white text-black hover:bg-white/90 px-2"
+                      >
+                        {isSavingToContract ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : contractSaved ? (
+                          <>
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Saved
+                          </>
                         ) : (
-                          <video
-                            src={segment.videoUrl}
-                            className="w-full h-full object-cover"
-                            muted
-                          />
+                          <>
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            Save
+                          </>
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-1">
-                          <span className="text-[10px] text-white">{segment.duration}s</span>
-                          <button
-                            onClick={() => handleRemoveSegment(segment.id)}
-                            className="p-0.5 bg-red-500/80 hover:bg-red-500 text-white rounded"
-                          >
-                            <X className="h-2.5 w-2.5" />
-                          </button>
-                        </div>
-                      </div>
+                      </Button>
                     </div>
-                  ))}
-                </div>
+
+                    {/* Scene Thumbnails */}
+                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                      {segments.map((segment, index) => (
+                        <button
+                          key={segment.id}
+                          onClick={() => setGeneratedVideoUrl(segment.videoUrl)}
+                          className="relative flex-shrink-0 w-24 group"
+                        >
+                          <div className="aspect-video rounded overflow-hidden bg-black border border-white/20 hover:border-white/60 transition-colors">
+                            {segment.imageUrl ? (
+                              <img
+                                src={segment.imageUrl}
+                                alt={`Scene ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <video
+                                src={segment.videoUrl}
+                                className="w-full h-full object-cover"
+                                muted
+                              />
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end justify-between p-1">
+                              <span className="text-[10px] text-white font-medium">Scene {index + 1}</span>
+                              <span className="text-[10px] text-white/70">{segment.duration}s</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveSegment(segment.id);
+                            }}
+                            className="absolute -top-1 -right-1 p-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
           )}
@@ -523,9 +653,38 @@ export function FlowCreationPanel({
           {/* Compact Main Panel */}
           <Card className="bg-black/90 backdrop-blur-sm shadow-2xl border-0">
             <div className="p-3 space-y-2">
-              {/* Minimal Top Bar */}
+              {/* Top Bar with Mode Selector */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
+                  {/* Mode Toggle */}
+                  <div className="flex items-center gap-1 bg-white/5 rounded p-0.5">
+                    <button
+                      onClick={() => {
+                        setGenerationMode('text-to-video');
+                        setUploadedImageUrl(null);
+                      }}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        generationMode === 'text-to-video'
+                          ? 'bg-white text-black font-medium'
+                          : 'text-white/60 hover:text-white'
+                      }`}
+                    >
+                      <Type className="h-3 w-3 inline mr-1" />
+                      Text
+                    </button>
+                    <button
+                      onClick={() => setGenerationMode('image-to-video')}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        generationMode === 'image-to-video'
+                          ? 'bg-white text-black font-medium'
+                          : 'text-white/60 hover:text-white'
+                      }`}
+                    >
+                      <ImageIcon className="h-3 w-3 inline mr-1" />
+                      Image
+                    </button>
+                  </div>
+
                   <Button
                     variant="ghost"
                     size="sm"
@@ -605,22 +764,6 @@ export function FlowCreationPanel({
                 </div>
               )}
 
-              {/* Large Video Preview */}
-              {generatedVideoUrl && (
-                <div className="relative rounded overflow-hidden bg-black aspect-video">
-                  <video
-                    key={generatedVideoUrl}
-                    controls
-                    className="w-full h-full object-contain pointer-events-auto"
-                    playsInline
-                    preload="auto"
-                  >
-                    <source src={generatedVideoUrl} type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
-                </div>
-              )}
-
               {/* Prompt Input */}
               <textarea
                 value={videoDescription}
@@ -673,7 +816,7 @@ export function FlowCreationPanel({
                     </Button>
                     {segments.length === 0 && (
                       <Button
-                        onClick={handleSaveToContract}
+                        onClick={() => setShowSaveDialog(true)}
                         disabled={isSavingToContract || contractSaved}
                         size="sm"
                         className="h-8 bg-white text-black hover:bg-white/90 text-xs"
