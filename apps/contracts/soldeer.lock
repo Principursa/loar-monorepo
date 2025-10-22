@@ -1,0 +1,13 @@
+[[dependencies]]
+name = "uniswap-v4-core"
+version = "4"
+url = "https://soldeer-revisions.s3.amazonaws.com/uniswap-v4-core/4_28-02-2025_23:27:23_uniswap-v4-core-4.zip"
+checksum = "cd91c1b34ad73028bddaeb9fd676a957962f7e4ab671998f4439aa1f474010c8"
+integrity = "859f1409f40b591e2cf337d02591d4ec53013631d2e958a9f03b84af88410abb"
+
+[[dependencies]]
+name = "uniswap-v4-periphery"
+version = "60cd93803ac2b7fa65fd6cd351fd5fd4cc8c9db5"
+url = "https://soldeer-revisions.s3.amazonaws.com/uniswap-v4-periphery/60cd93803ac2b7fa65fd6cd351fd5fd4cc8c9db5_25-08-2025_15:26:30_uniswap-v4-periphery-60cd93803ac2b7fa65fd6cd351fd5fd4cc8c9db5.zip"
+checksum = "19c161fe1e266d6652c60b823ace3e6592ae782b51e32e35e71f468d9fea46d4"
+integrity = "b2c85344c8ed94b02170b9c00533a3dea034aa8d054f7fb2063525ae8ae733ae"

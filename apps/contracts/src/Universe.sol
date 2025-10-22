@@ -4,8 +4,12 @@ pragma solidity ^0.8.13;
 import {Script, console} from "forge-std/Script.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {IUniverse} from "./interfaces/IUniverse.sol";
+import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 
 contract Universe is Ownable, IUniverse {
+  //Maybe include some sort of hook system with custom contracts for creation and visibility options later, for now this is good enough
+  //Either that or functions on this contract that 
+
     struct VideoNode {
         string link;
         uint id;
@@ -13,6 +17,7 @@ contract Universe is Ownable, IUniverse {
         uint previous;
         uint[] next;
         bool canon;
+        address creator;
     }
 
     constructor(address initialOwner) Ownable(initialOwner) {}
@@ -21,8 +26,13 @@ contract Universe is Ownable, IUniverse {
     uint public latestNodeId;
     mapping(address user => bool) isWhitelisted;
 
-    event NodeCanonized(uint id,address canonizer);
-    event NodeCreated(uint id, uint previous, address creator);
+    IUniverseManager.NodeCreationOptions private nodeCreationOption;
+    IUniverseManager.NodeVisibilityOptions private nodeVisibilityOption;
+
+    bool public isTokenMinted;
+    IUniverseManager public universeManager;
+
+
     //either put an event here to emit user + node to make it indexable or create data structure that associates addy w user
     //for profile -> videos created by user
 
@@ -70,10 +80,10 @@ contract Universe is Ownable, IUniverse {
     )
         public
         view
-        returns (uint, string memory, string memory, uint, uint[] memory, bool)
+        returns (uint, string memory, string memory, uint, uint[] memory, bool,address)
     {
         VideoNode storage n = nodes[id];
-        return (n.id, n.link, n.plot, n.previous, n.next, n.canon);
+        return (n.id, n.link, n.plot, n.previous, n.next, n.canon, n.creator);
     }
 
     function getTimeline(uint fromId) public view returns (uint[] memory) {
@@ -123,6 +133,13 @@ contract Universe is Ownable, IUniverse {
     function setMedia(uint id, string memory _link) public {
         //change ownership w gov later
         nodes[id].link = _link;
+    }
+    function setNodeVisibilityOption(NodeVisibilityOptions _option) public onlyOwner{
+      nodeVisibilityOption = _option;
+    }
+
+    function setNodeCreationOption(NodeCreationOptions _option) public onlyOwner{
+      nodeCreationOption = _option;
     }
 
     function getFullGraph()
@@ -195,6 +212,15 @@ contract Universe is Ownable, IUniverse {
         }
         require(canonId != 0, "No canon set");
         return getTimeline(canonId);
+    }
+    error TokenDoesNotExist();
+
+    function getToken() public view returns (address) {
+      if (isTokenMinted != true) {
+        revert TokenDoesNotExist();
+      } 
+      //impl get token from universemanager
+
     }
     //Might work as well to have a function that gets the canon status of an indiviudal node
 }

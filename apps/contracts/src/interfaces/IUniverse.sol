@@ -6,5 +6,7 @@ interface IUniverse {
 
   error NodeDoesNotExist();
 
+  event NodeCanonized(uint id,address canonizer);
+  event NodeCreated(uint id, uint previous, address creator);
 
 }
