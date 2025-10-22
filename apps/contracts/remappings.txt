@@ -1,6 +1,6 @@
 @/=./src/
 @openzeppelin/=dependencies/@openzeppelin-contracts-5.0.2/
+@uniswap/v4-periphery/=dependencies/uniswap-v4-periphery-60cd93803ac2b7fa65fd6cd351fd5fd4cc8c9db5/
+@uniswap-v4-core/=dependencies/uniswap-v4-core-4/src/
 forge-std/=dependencies/forge-std-1.10.0/src
 solady/=dependencies/solady-0.1.26/
-@uniswap/v4-core/=dependencies/uniswap-v4-core-4/
-@uniswap/v4-periphery/=dependencies/uniswap-v4-periphery-60cd93803ac2b7fa65fd6cd351fd5fd4cc8c9db5/

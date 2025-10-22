@@ -5,6 +5,7 @@ interface IUniverse {
 
 
   error NodeDoesNotExist();
+  error TokenDoesNotExist();
 
   event NodeCanonized(uint id,address canonizer);
   event NodeCreated(uint id, uint previous, address creator);
