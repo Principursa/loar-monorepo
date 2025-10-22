@@ -2,8 +2,8 @@
 pragma solidity ^0.8.30;
 
 interface IUniverseManager {
-  enum NodeCreationOptions {PUBLIC, PRIVATE, WHITELISTED}
-  enum NodeVisibilityOptions {ALL, HOLDERS, PRIVATE, WHITELISTED}
+  enum NodeCreationOptions {PUBLIC, WHITELISTED}
+  enum NodeVisibilityOptions {PUBLIC, HOLDERS, WHITELISTED}
 
   struct UniverseConfig {
     NodeCreationOptions nodeCreationOption;
@@ -13,6 +13,22 @@ interface IUniverseManager {
     address tokenAdmin;
     string name;
     string symbol;
+    string imageURL;
+    string metadata;
+    string context;
+  }
+
+  struct PoolConfig {
+    address hook;
+    address pairedToken;
+    int24 tickIfToken0IsLoar; //Not sure why the protocol name is in here
+    int24 tickSpacing;
+    bytes poolData;
+  }
+
+  struct DeploymentConfig {
+    TokenConfig tokenConfig;
+    PoolConfig poolConfig;
 
   }
 

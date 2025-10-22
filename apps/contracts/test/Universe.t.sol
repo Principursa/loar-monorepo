@@ -2,12 +2,12 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
-import {Timeline} from "../src/Timeline.sol";
+import {Universe} from "../src/Universe.sol";
 
 contract CounterTest is Test {
-    Timeline public timeline;
+    Universe public universe;
 
     function setUp() public {
-        timeline = new Timeline(msg.sender);
+        universe = new Universe(msg.sender);
     }
 }
