@@ -7,8 +7,8 @@ import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 
 contract Universe is Ownable, IUniverse {
-  //Maybe include some sort of hook system with custom contracts for creation and visibility options later, for now this is good enough
-  //Either that or functions on this contract that 
+    //Maybe include some sort of hook system with custom contracts for creation and visibility options later, for now this is good enough
+    //Either that or functions on this contract that
 
     struct VideoNode {
         string link;
@@ -20,31 +20,37 @@ contract Universe is Ownable, IUniverse {
         address creator;
     }
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    constructor(
+        address initialOwner,
+        IUniverseManager.NodeCreationOptions _nodeCreationOption,
+        IUniverseManager.NodeVisibilityOptions _nodeVisibilityOption
+    ) Ownable(initialOwner) {
+        nodeCreationOption = _nodeCreationOption;
+        nodeVisibilityOption = _nodeVisibilityOption;
+    }
 
     mapping(uint => VideoNode) public nodes;
     uint public latestNodeId;
     mapping(address user => bool) isWhitelisted;
 
+    //WIP: better structure types
     IUniverseManager.NodeCreationOptions private nodeCreationOption;
     IUniverseManager.NodeVisibilityOptions private nodeVisibilityOption;
 
     bool public isTokenMinted;
     IUniverseManager public universeManager;
 
-
     //either put an event here to emit user + node to make it indexable or create data structure that associates addy w user
     //for profile -> videos created by user
 
     //use this for converting internal uint id to frontend display id
     //if necessary truncate it to six chars like github
-    function nodeIDToHex(uint id) public view returns(bytes32){
-      if(id <= latestNodeId){
-        revert NodeDoesNotExist();
-      }
-      bytes32 hash = keccak256(abi.encode(id));
-      return hash;
-
+    function nodeIDToHex(uint id) public view returns (bytes32) {
+        if (id <= latestNodeId) {
+            revert NodeDoesNotExist();
+        }
+        bytes32 hash = keccak256(abi.encode(id));
+        return hash;
     }
 
     function createNode(
@@ -80,7 +86,15 @@ contract Universe is Ownable, IUniverse {
     )
         public
         view
-        returns (uint, string memory, string memory, uint, uint[] memory, bool,address)
+        returns (
+            uint,
+            string memory,
+            string memory,
+            uint,
+            uint[] memory,
+            bool,
+            address
+        )
     {
         VideoNode storage n = nodes[id];
         return (n.id, n.link, n.plot, n.previous, n.next, n.canon, n.creator);
@@ -134,12 +148,17 @@ contract Universe is Ownable, IUniverse {
         //change ownership w gov later
         nodes[id].link = _link;
     }
-    function setNodeVisibilityOption(NodeVisibilityOptions _option) public onlyOwner{
-      nodeVisibilityOption = _option;
+
+    function setNodeVisibilityOption(
+        IUniverseManager.NodeVisibilityOptions _option
+    ) public onlyOwner {
+        nodeVisibilityOption = _option;
     }
 
-    function setNodeCreationOption(NodeCreationOptions _option) public onlyOwner{
-      nodeCreationOption = _option;
+    function setNodeCreationOption(
+        IUniverseManager.NodeCreationOptions _option
+    ) public onlyOwner {
+        nodeCreationOption = _option;
     }
 
     function getFullGraph()
@@ -213,14 +232,12 @@ contract Universe is Ownable, IUniverse {
         require(canonId != 0, "No canon set");
         return getTimeline(canonId);
     }
-    error TokenDoesNotExist();
 
     function getToken() public view returns (address) {
-      if (isTokenMinted != true) {
-        revert TokenDoesNotExist();
-      } 
-      //impl get token from universemanager
-
+        if (isTokenMinted != true) {
+            revert TokenDoesNotExist();
+        }
+        //impl get token from universemanager
     }
     //Might work as well to have a function that gets the canon status of an indiviudal node
 }
