@@ -2,10 +2,10 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {Timeline} from "../src/Timeline.sol";
+import {Universe} from "../src/Universe.sol";
 
 contract TimelineScript is Script {
-    Timeline public timeline;
+    Universe public universe;
 
     function setUp() public {}
 
@@ -27,7 +27,7 @@ contract TimelineScript is Script {
         console.log("Deploying");
         vm.startBroadcast(deployerPrivateKey);
 
-        timeline = new Timeline(deployerAddress); //In backend this will be deployed w governance
+        universe = new Universe(deployerAddress); //In backend this will be deployed w governance
 
         vm.stopBroadcast();
     }
