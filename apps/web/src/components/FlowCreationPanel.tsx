@@ -16,7 +16,6 @@ import {
   X,
   Settings2,
   ArrowRight,
-  Volume2,
   ChevronDown,
   Image as ImageIcon,
   Type,
@@ -30,7 +29,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { VideoTimeline } from "@/components/segments";
+import { VideoTimelineSimple } from "@/components/VideoTimelineSimple";
 import type { VideoModel } from "@/types/segments";
 import { trpcClient } from '@/utils/trpc';
 
@@ -118,6 +117,9 @@ interface VideoSegment {
   duration: number;
   model: string;
   order: number;
+  // Trim settings
+  trimStart: number; // Start time in seconds (0 = no trim)
+  trimEnd: number; // End time in seconds (duration = no trim)
 }
 
 export function FlowCreationPanel({
@@ -171,6 +173,7 @@ export function FlowCreationPanel({
 
   // Multi-segment state
   const [segments, setSegments] = useState<VideoSegment[]>([]);
+
 
   // Frame-based video control (Remotion approach)
   const [currentFrame, setCurrentFrame] = useState(0);
@@ -242,6 +245,8 @@ export function FlowCreationPanel({
       duration: selectedVideoDuration,
       model: selectedVideoModel,
       order: segments.length,
+      trimStart: 0, // No trim by default
+      trimEnd: selectedVideoDuration, // Full duration by default
     };
 
     setSegments(prev => [...prev, newSegment]);
@@ -271,25 +276,31 @@ export function FlowCreationPanel({
     setCurrentFrame(0); // Reset to beginning
   };
 
-  // Calculate total duration in frames and seconds
-  const totalDurationInFrames = segments.reduce((acc, seg) => acc + (seg.duration * fps), 0);
-  const totalDuration = segments.reduce((acc, seg) => acc + seg.duration, 0);
+  // Note: Total duration is now calculated inside VideoTimelineSimple component
+  // Kept for reference if needed for advanced features later
 
   // Frame-based video control - find which segment should be visible at current frame
+  // IMPORTANT: This now respects trim boundaries!
   const getActiveSegmentAtFrame = useCallback((frame: number) => {
     let cumulativeFrames = 0;
 
     for (let i = 0; i < segments.length; i++) {
-      const segmentFrames = segments[i].duration * fps;
+      const segment = segments[i];
+      const trimmedDuration = segment.trimEnd - segment.trimStart;
+      const segmentFrames = trimmedDuration * fps;
       const nextCumulative = cumulativeFrames + segmentFrames;
 
       if (frame >= cumulativeFrames && frame < nextCumulative) {
         const segmentFrame = frame - cumulativeFrames;
+        // Map to actual video time accounting for trim start
+        const actualVideoTime = segment.trimStart + (segmentFrame / fps);
+
         return {
-          segment: segments[i],
+          segment: segment,
           segmentIndex: i,
           segmentFrame,
-          segmentTime: segmentFrame / fps
+          segmentTime: actualVideoTime, // This is the ACTUAL video time including trim offset
+          trimmedSegmentTime: segmentFrame / fps, // Time within the trimmed range
         };
       }
 
@@ -299,11 +310,13 @@ export function FlowCreationPanel({
     // If past the end, return last segment
     if (segments.length > 0) {
       const lastSegment = segments[segments.length - 1];
+      const trimmedDuration = lastSegment.trimEnd - lastSegment.trimStart;
       return {
         segment: lastSegment,
         segmentIndex: segments.length - 1,
-        segmentFrame: lastSegment.duration * fps - 1,
-        segmentTime: lastSegment.duration - (1 / fps)
+        segmentFrame: trimmedDuration * fps - 1,
+        segmentTime: lastSegment.trimEnd - (1 / fps), // At the end of trim range
+        trimmedSegmentTime: trimmedDuration - (1 / fps),
       };
     }
 
@@ -318,13 +331,21 @@ export function FlowCreationPanel({
     if (!activeInfo) return;
 
     const video = videoRef.current;
+    const segment = activeInfo.segment;
 
     // If the segment changed, update the video source
-    if (video.src !== activeInfo.segment.videoUrl) {
+    if (video.src !== segment.videoUrl) {
       console.log(`📹 Switching to segment ${activeInfo.segmentIndex + 1} at frame ${currentFrame}`);
-      video.src = activeInfo.segment.videoUrl;
+      console.log(`   Trim range: ${segment.trimStart}s - ${segment.trimEnd}s`);
+      console.log(`   Seeking to: ${activeInfo.segmentTime}s`);
+
+      video.src = segment.videoUrl;
       video.load();
-      video.currentTime = activeInfo.segmentTime;
+
+      // Wait for video to be ready before seeking
+      video.addEventListener('loadedmetadata', () => {
+        video.currentTime = activeInfo.segmentTime;
+      }, { once: true });
 
       // Start playing if in play mode
       if (isPlaying) {
@@ -332,8 +353,11 @@ export function FlowCreationPanel({
       }
     } else if (!isPlaying) {
       // Only manually seek when paused (scrubbing)
-      if (Math.abs(video.currentTime - activeInfo.segmentTime) > 0.1) {
-        video.currentTime = activeInfo.segmentTime;
+      // Make sure we respect trim boundaries
+      const targetTime = Math.max(segment.trimStart, Math.min(segment.trimEnd, activeInfo.segmentTime));
+
+      if (Math.abs(video.currentTime - targetTime) > 0.1) {
+        video.currentTime = targetTime;
       }
     }
   }, [currentFrame, segments, getActiveSegmentAtFrame, isPlaying]);
@@ -358,42 +382,69 @@ export function FlowCreationPanel({
     }
   }, [volume]);
 
-  // Sync frame counter with video playback
+  // Sync frame counter with video playback AND enforce trim boundaries
   useEffect(() => {
     if (!videoRef.current || segments.length === 0) return;
 
     const video = videoRef.current;
 
     const handleTimeUpdate = () => {
-      // Calculate total elapsed time across all segments
       const activeInfo = getActiveSegmentAtFrame(currentFrame);
       if (!activeInfo) return;
 
-      // Find cumulative time up to current segment
-      let cumulativeTime = 0;
-      for (let i = 0; i < activeInfo.segmentIndex; i++) {
-        cumulativeTime += segments[i].duration;
+      const segment = activeInfo.segment;
+
+      // ENFORCE TRIM END BOUNDARY - Stop playback if we exceed trimEnd
+      if (video.currentTime >= segment.trimEnd) {
+        console.log(`⏹️ Reached trim end at ${segment.trimEnd}s, moving to next segment or stopping`);
+
+        if (activeInfo.segmentIndex < segments.length - 1) {
+          // Move to next segment (start of its trim range)
+          let cumulativeTrimmedFrames = 0;
+          for (let i = 0; i <= activeInfo.segmentIndex; i++) {
+            const trimmedDuration = segments[i].trimEnd - segments[i].trimStart;
+            cumulativeTrimmedFrames += trimmedDuration * fps;
+          }
+          setCurrentFrame(Math.floor(cumulativeTrimmedFrames));
+        } else {
+          // End of all segments - stop
+          setCurrentFrame(0);
+          setIsPlaying(false);
+        }
+        return;
       }
 
-      // Add current time within the active segment
-      const totalElapsedTime = cumulativeTime + video.currentTime;
+      // Calculate frame position accounting for trimmed durations
+      let cumulativeTrimmedTime = 0;
+      for (let i = 0; i < activeInfo.segmentIndex; i++) {
+        const trimmedDuration = segments[i].trimEnd - segments[i].trimStart;
+        cumulativeTrimmedTime += trimmedDuration;
+      }
+
+      // Add current time within the active segment (offset from trimStart)
+      const timeIntoTrimmedSegment = video.currentTime - segment.trimStart;
+      const totalElapsedTime = cumulativeTrimmedTime + timeIntoTrimmedSegment;
       const newFrame = Math.floor(totalElapsedTime * fps);
 
       // Update frame counter based on video's actual playback
-      if (newFrame !== currentFrame) {
+      if (newFrame !== currentFrame && newFrame >= 0) {
         setCurrentFrame(newFrame);
       }
     };
 
     const handleEnded = () => {
-      // When a segment ends, move to the next segment
+      // When a segment ends naturally (reached video end)
       const activeInfo = getActiveSegmentAtFrame(currentFrame);
       if (!activeInfo) return;
 
       if (activeInfo.segmentIndex < segments.length - 1) {
         // Move to next segment
-        const nextSegmentFrame = (activeInfo.segmentIndex + 1) * segments[activeInfo.segmentIndex].duration * fps;
-        setCurrentFrame(nextSegmentFrame);
+        let cumulativeTrimmedFrames = 0;
+        for (let i = 0; i <= activeInfo.segmentIndex; i++) {
+          const trimmedDuration = segments[i].trimEnd - segments[i].trimStart;
+          cumulativeTrimmedFrames += trimmedDuration * fps;
+        }
+        setCurrentFrame(Math.floor(cumulativeTrimmedFrames));
       } else {
         // End of all segments - loop or stop
         setCurrentFrame(0);
@@ -498,16 +549,25 @@ export function FlowCreationPanel({
                   try {
                     // If we have multiple segments, concatenate them first
                     if (segments.length > 1) {
-                      console.log(`🎬 Concatenating ${segments.length} segments before saving...`);
+                      console.log(`🎬 Concatenating ${segments.length} segments...`);
                       setStatusMessage?.({
                         type: 'info',
                         title: 'Processing Video',
                         description: `Combining ${segments.length} segments...`,
                       });
 
-                      const videoUrls = segments.map(s => s.videoUrl);
+                      // Prepare segments with trim information
+                      const segmentsToUpload = segments.map(s => ({
+                        url: s.videoUrl,
+                        trimStart: s.trimStart,
+                        trimEnd: s.trimEnd,
+                        originalDuration: s.duration, // Include original duration for trim detection
+                      }));
+
                       // @ts-ignore - concatenateAndUpload endpoint exists in router
-                      const result = await trpcClient.video.concatenateAndUpload.mutate({ videoUrls });
+                      const result = await trpcClient.video.concatenateAndUpload.mutate({
+                        segments: segmentsToUpload
+                      });
 
                       console.log('✅ Concatenation and upload complete! PieceCID:', result.pieceCid);
 
@@ -796,164 +856,105 @@ export function FlowCreationPanel({
 
           {/* Event Preview & Timeline */}
           {(generatedVideoUrl || segments.length > 0) && (
-            <Card className="bg-black/90 backdrop-blur-sm shadow-lg border-0 mb-2">
-              <div className="p-3 space-y-2">
-                {/* Large Event Preview - Frame-Based Video Control (Remotion approach) */}
-                <div className="relative rounded overflow-hidden bg-black aspect-video">
-                  {segments.length > 0 ? (
-                    <>
-                      <video
-                        ref={videoRef}
-                        className="w-full h-full object-contain pointer-events-auto"
-                        playsInline
-                        preload="auto"
-                        muted={false}
-                      />
-
-                      {/* Frame info overlay */}
-                      <div className="absolute top-2 left-2 px-2 py-1 bg-green-500/90 text-white text-[10px] font-medium rounded z-10">
-                        ✨ Frame-Based Preview • Frame {currentFrame} / {totalDurationInFrames}
-                      </div>
-
-                      {/* Playback controls */}
-                      <div className="absolute bottom-4 left-4 right-4 flex gap-2 items-center">
-                        <button
-                          onClick={() => setIsPlaying(!isPlaying)}
-                          className="px-3 py-1 bg-white/90 hover:bg-white text-black text-xs font-medium rounded"
-                        >
-                          {isPlaying ? '⏸ Pause' : '▶ Play'}
-                        </button>
-
-                        {/* Timeline scrubber */}
-                        <input
-                          type="range"
-                          min="0"
-                          max={totalDurationInFrames - 1}
-                          value={currentFrame}
-                          onChange={(e) => {
-                            setCurrentFrame(Number(e.target.value));
-                            setIsPlaying(false); // Pause when scrubbing
-                          }}
-                          className="flex-1 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                          style={{
-                            background: `linear-gradient(to right, #10b981 0%, #10b981 ${(currentFrame / totalDurationInFrames) * 100}%, rgba(255,255,255,0.2) ${(currentFrame / totalDurationInFrames) * 100}%, rgba(255,255,255,0.2) 100%)`
-                          }}
-                        />
-
-                        <span className="text-white text-xs font-mono">
-                          {Math.floor(currentFrame / fps)}s / {Math.floor(totalDurationInFrames / fps)}s
-                        </span>
-
-                        {/* Volume control */}
-                        <div className="flex items-center gap-1">
-                          <Volume2 className="w-4 h-4 text-white" />
-                          <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.1"
-                            value={volume}
-                            onChange={(e) => setVolume(Number(e.target.value))}
-                            className="w-16 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                            style={{
-                              background: `linear-gradient(to right, #10b981 0%, #10b981 ${volume * 100}%, rgba(255,255,255,0.2) ${volume * 100}%, rgba(255,255,255,0.2) 100%)`
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  ) : generatedVideoUrl ? (
-                    // Show newly generated video before adding to segments
-                    <video
-                      src={generatedVideoUrl}
-                      controls
-                      className="w-full h-full object-contain pointer-events-auto"
-                      playsInline
-                      preload="auto"
-                    />
-                  ) : (
-                    // No video yet
-                    <div className="flex items-center justify-center h-full text-white/50 text-sm">
-                      Generate a video to preview
-                    </div>
-                  )}
-                </div>
-
-                {/* Timeline Strip */}
-                {segments.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-white/50">
-                        {segments.length} scene{segments.length !== 1 ? 's' : ''} • {Math.floor(totalDuration / 60)}:{(totalDuration % 60).toString().padStart(2, '0')}
-                      </span>
-                      <Button
-                        onClick={() => setShowSaveDialog(true)}
-                        disabled={isSavingToContract || contractSaved}
-                        size="sm"
-                        className="h-6 text-[10px] bg-white text-black hover:bg-white/90 px-2"
-                      >
-                        {isSavingToContract ? (
-                          <>
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Saving...
-                          </>
-                        ) : contractSaved ? (
-                          <>
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Saved
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-3 w-3 mr-1" />
-                            Save
-                          </>
-                        )}
-                      </Button>
-                    </div>
-
-                    {/* Scene Thumbnails */}
-                    <div className="flex gap-1.5 overflow-x-auto pb-1">
-                      {segments.map((segment, index) => (
-                        <button
-                          key={segment.id}
-                          onClick={() => setGeneratedVideoUrl(segment.videoUrl)}
-                          className="relative flex-shrink-0 w-24 group"
-                        >
-                          <div className="aspect-video rounded overflow-hidden bg-black border border-white/20 hover:border-white/60 transition-colors">
-                            {segment.imageUrl ? (
-                              <img
-                                src={segment.imageUrl}
-                                alt={`Scene ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <video
-                                src={segment.videoUrl}
-                                className="w-full h-full object-cover"
-                                muted
-                              />
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end justify-between p-1">
-                              <span className="text-[10px] text-white font-medium">Scene {index + 1}</span>
-                              <span className="text-[10px] text-white/70">{segment.duration}s</span>
-                            </div>
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveSegment(segment.id);
-                            }}
-                            className="absolute -top-1 -right-1 p-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </button>
-                      ))}
-                    </div>
+            <div className="mb-2 space-y-3">
+              {/* Video Preview */}
+              <div className="relative rounded-xl overflow-hidden bg-black aspect-video shadow-2xl">
+                {segments.length > 0 ? (
+                  <video
+                    ref={videoRef}
+                    className="w-full h-full object-contain"
+                    playsInline
+                    preload="auto"
+                    muted={false}
+                  />
+                ) : generatedVideoUrl ? (
+                  <video
+                    src={generatedVideoUrl}
+                    controls
+                    className="w-full h-full object-contain"
+                    playsInline
+                    preload="auto"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-white/50 text-sm">
+                    Generate a video to preview
                   </div>
                 )}
               </div>
-            </Card>
+
+              {/* Google Flow Style Timeline */}
+              {segments.length > 0 && (
+                <VideoTimelineSimple
+                  segments={segments.map(seg => ({
+                    id: seg.id,
+                    videoUrl: seg.videoUrl,
+                    duration: seg.duration,
+                    trimStart: seg.trimStart,
+                    trimEnd: seg.trimEnd,
+                    imageUrl: seg.imageUrl,
+                  }))}
+                  onRemoveSegment={handleRemoveSegment}
+                  onUpdateSegment={(id, trimStart, trimEnd) => {
+                    // Update the segment trim values
+                    setSegments(prev => prev.map(seg =>
+                      seg.id === id ? { ...seg, trimStart, trimEnd } : seg
+                    ));
+
+                    // Reset current frame to ensure proper playback after trim
+                    setCurrentFrame(prev => {
+                      // Recalculate to ensure we're within new bounds
+                      const activeInfo = getActiveSegmentAtFrame(prev);
+                      if (activeInfo && activeInfo.segment.id === id) {
+                        // If we're currently on the trimmed segment, adjust frame
+                        const newTrimmedDuration = trimEnd - trimStart;
+                        const maxFrame = newTrimmedDuration * fps;
+                        return Math.min(prev, Math.floor(maxFrame - 1));
+                      }
+                      return prev;
+                    });
+                  }}
+                  currentTime={currentFrame / fps}
+                  onSeek={(time) => {
+                    const frame = Math.floor(time * fps);
+                    setCurrentFrame(frame);
+                    setIsPlaying(false);
+                  }}
+                  isPlaying={isPlaying}
+                  onPlayPause={() => setIsPlaying(!isPlaying)}
+                  volume={volume}
+                  onVolumeChange={setVolume}
+                />
+              )}
+
+              {/* Save Button */}
+              {segments.length > 0 && (
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => setShowSaveDialog(true)}
+                    disabled={isSavingToContract || contractSaved}
+                    size="lg"
+                    className="bg-white text-black hover:bg-gray-100 shadow-lg"
+                  >
+                    {isSavingToContract ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : contractSaved ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Saved
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Save to Timeline
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Compact Main Panel */}

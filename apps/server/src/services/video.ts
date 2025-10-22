@@ -133,6 +133,91 @@ export async function concatenateVideos(videoUrls: string[]): Promise<string> {
 }
 
 /**
+ * Concatenates multiple local video files into a single video
+ * Similar to concatenateVideos but works with local file paths instead of URLs
+ * @param videoPaths - Array of local file paths to concatenate
+ * @returns Path to the concatenated video file
+ */
+export async function concatenateLocalVideos(videoPaths: string[]): Promise<string> {
+  if (videoPaths.length === 0) {
+    throw new Error('No video paths provided for concatenation');
+  }
+
+  // If only one video, just return its path
+  if (videoPaths.length === 1) {
+    console.log('Only one video provided, skipping concatenation');
+    return videoPaths[0];
+  }
+
+  console.log(`🎬 Starting local video concatenation for ${videoPaths.length} videos`);
+
+  // Create temp directory for processing
+  const tmpDir = join(tmpdir(), 'loar-video-concat');
+  if (!existsSync(tmpDir)) {
+    mkdirSync(tmpDir, { recursive: true });
+  }
+
+  const timestamp = Date.now();
+  const concatListPath = join(tmpDir, `concat-list-${timestamp}.txt`);
+  const outputPath = join(tmpDir, `concatenated-${timestamp}.mp4`);
+
+  try {
+    // Create concat list file for FFmpeg
+    const concatListContent = videoPaths
+      .map(path => `file '${path}'`)
+      .join('\n');
+    writeFileSync(concatListPath, concatListContent);
+    console.log('📝 Created concat list file');
+
+    // Concatenate videos using FFmpeg
+    console.log('🔗 Concatenating videos with FFmpeg...');
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg()
+        .input(concatListPath)
+        .inputOptions(['-f', 'concat', '-safe', '0'])
+        .outputOptions(['-c', 'copy']) // Copy streams without re-encoding (fast!)
+        .output(outputPath)
+        .on('start', (commandLine) => {
+          console.log('FFmpeg command:', commandLine);
+        })
+        .on('progress', (progress) => {
+          console.log(`Processing: ${progress.percent?.toFixed(2)}% done`);
+        })
+        .on('end', () => {
+          console.log('✅ Concatenation completed successfully');
+          resolve();
+        })
+        .on('error', (err) => {
+          console.error('❌ FFmpeg error:', err);
+          reject(err);
+        })
+        .run();
+    });
+
+    // Cleanup concat list
+    try {
+      unlinkSync(concatListPath);
+    } catch (err) {
+      console.warn(`Failed to delete concat list ${concatListPath}:`, err);
+    }
+
+    console.log(`🎉 Video concatenation complete: ${outputPath}`);
+    return outputPath;
+
+  } catch (error) {
+    // Cleanup on error
+    console.error('Error during concatenation, cleaning up...', error);
+    try {
+      unlinkSync(concatListPath);
+    } catch {}
+    try {
+      unlinkSync(outputPath);
+    } catch {}
+    throw error;
+  }
+}
+
+/**
  * Trims a video to a specific time range
  * @param videoUrl - URL of the video to trim
  * @param startTime - Start time in seconds

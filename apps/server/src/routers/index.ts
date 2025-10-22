@@ -182,15 +182,91 @@ export const appRouter = router({
 
     // Concatenate multiple videos into one and upload to Filecoin
     concatenateAndUpload: publicProcedure
-      .input(z.object({
-        videoUrls: z.array(z.string()).min(1, 'At least one video URL is required'),
-      }))
+      .input(z.union([
+        // New format with trim support
+        z.object({
+          segments: z.array(z.object({
+            url: z.string(),
+            trimStart: z.number().min(0),
+            trimEnd: z.number().min(0),
+            originalDuration: z.number().min(0).optional(), // Original video duration
+          })).min(1, 'At least one segment is required'),
+        }),
+        // Legacy format for backward compatibility
+        z.object({
+          videoUrls: z.array(z.string()).min(1, 'At least one video URL is required'),
+        }),
+      ]))
       .mutation(async ({ input }) => {
         console.log('🎬 === VIDEO CONCATENATION REQUEST ===');
-        console.log('Video URLs:', input.videoUrls);
 
         try {
-          const concatenatedFilePath = await concatenateVideos(input.videoUrls);
+          let concatenatedFilePath: string;
+
+          // Handle new format with trim support
+          if ('segments' in input) {
+            console.log('Segments with trim info:', input.segments);
+
+            const tmpDir = join(process.cwd(), '../..', 'tmp', 'loar-video-trim');
+            const { mkdirSync, existsSync } = await import('fs');
+            if (!existsSync(tmpDir)) {
+              mkdirSync(tmpDir, { recursive: true });
+            }
+
+            // Trim each segment first
+            const trimmedPaths: string[] = [];
+            for (let i = 0; i < input.segments.length; i++) {
+              const segment = input.segments[i];
+
+              // Check if actual trim is needed (not just default values)
+              // Trim is needed if:
+              // 1. trimStart is greater than a small threshold (0.1s)
+              // 2. trimEnd is less than the original duration (if provided)
+              const hasStartTrim = segment.trimStart > 0.1;
+              const hasEndTrim = segment.originalDuration
+                ? Math.abs(segment.trimEnd - segment.originalDuration) > 0.1
+                : false;
+              const needsTrim = hasStartTrim || hasEndTrim;
+
+              if (needsTrim) {
+                console.log(`✂️ Trimming segment ${i + 1}: ${segment.trimStart}s - ${segment.trimEnd}s`);
+                const trimmedPath = await trimVideo(segment.url, segment.trimStart, segment.trimEnd);
+                trimmedPaths.push(trimmedPath);
+              } else {
+                // No trim needed, just download the original
+                console.log(`⏭️ Segment ${i + 1}: no trim needed, downloading original`);
+                const downloadPath = join(tmpDir, `download-${Date.now()}-${i}.mp4`);
+                const response = await fetch(segment.url);
+                const buffer = Buffer.from(await response.arrayBuffer());
+                const { writeFileSync } = await import('fs');
+                writeFileSync(downloadPath, buffer);
+                trimmedPaths.push(downloadPath);
+              }
+            }
+
+            // Now concatenate the trimmed/downloaded local files
+            // We need to create a new concatenation function that works with local paths
+            console.log(`🔗 Concatenating ${trimmedPaths.length} local video files...`);
+
+            // Use the concatenateVideos function but we need to handle local files
+            // Let's create a temporary function to concatenate local files
+            const { concatenateLocalVideos } = await import('../services/video');
+            concatenatedFilePath = await concatenateLocalVideos(trimmedPaths);
+
+            // Cleanup trimmed files
+            for (const path of trimmedPaths) {
+              try {
+                unlinkSync(path);
+              } catch (err) {
+                console.warn(`Failed to cleanup trimmed file ${path}:`, err);
+              }
+            }
+          } else {
+            // Legacy format - just concatenate without trimming
+            console.log('Video URLs (legacy):', input.videoUrls);
+            concatenatedFilePath = await concatenateVideos(input.videoUrls);
+          }
+
           console.log('Concatenated file path:', concatenatedFilePath);
 
           const synapseService = await SynapseService.getInstance();
