@@ -782,6 +782,15 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
           description: `Creating your video with ${modelName}...`,
         });
 
+        console.log('🚀 Starting video generation request...');
+        console.log('Request params:', {
+          prompt: videoDescription,
+          model: textToVideoModel,
+          duration: selectedVideoDuration,
+          aspectRatio: videoRatio,
+          negativePrompt: negativePrompt || undefined
+        });
+
         const result = await trpcClient.fal.generateVideo.mutate({
           prompt: videoDescription,
           model: textToVideoModel,
@@ -789,6 +798,8 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
           aspectRatio: videoRatio,
           negativePrompt: negativePrompt || undefined
         });
+
+        console.log('✅ Video generation response:', result);
 
         if (result.videoUrl) {
           setGeneratedVideoUrl(result.videoUrl);
@@ -820,11 +831,30 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
         });
       }
     } catch (error) {
-      console.error("Error:", error);
+      console.error("❌ Video generation error:", error);
+      console.error("Error type:", error?.constructor?.name);
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        fullError: error
+      });
+
+      let errorMessage = 'Failed to generate video';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+
+        // Provide more helpful messages for common errors
+        if (error.message === 'Failed to fetch') {
+          errorMessage = 'Network error: Could not connect to server. Please check:\n• Server is running (bun dev)\n• No firewall blocking localhost:3000\n• Browser console for more details';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Request timed out. Video generation can take 1-3 minutes. Try:\n• Using a shorter duration (4-5s)\n• Checking server logs for errors';
+        }
+      }
+
       setStatusMessage({
         type: 'error',
         title: 'Generation Failed',
-        description: error instanceof Error ? error.message : 'Failed to generate video',
+        description: errorMessage,
       });
     } finally {
       setIsGeneratingVideo(false);
@@ -842,56 +872,67 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
     setIsSavingToFilecoin(true);
 
     try {
-      // Step 1: Upload to Filecoin first
-      console.log('Step 1: Uploading video to Filecoin via Synapse. URL being used:', generatedVideoUrl);
-      console.log('Current state - videoTitle:', videoTitle, 'videoDescription:', videoDescription);
-
       let filecoinPieceCid: string | null = null;
-      try {
-        const filecoinResult = await trpcClient.synapse.uploadFromUrl.mutate({
-          url: generatedVideoUrl
-        });
 
-        console.log('Filecoin upload successful. PieceCID:', filecoinResult);
-        console.log('PieceCID type:', typeof filecoinResult);
-        console.log('PieceCID stringified:', JSON.stringify(filecoinResult));
-
-        // Convert to string if it's an object
-        let pieceCidString: string;
-        if (typeof filecoinResult === 'string') {
-          pieceCidString = filecoinResult;
-        } else if (filecoinResult && typeof filecoinResult === 'object') {
-          // Try different ways to extract the string value from the PieceCID object
-          const resultObj = filecoinResult as any;
-          pieceCidString = resultObj.toString?.() ||
-            resultObj.value ||
-            resultObj.cid ||
-            resultObj._baseValue ||
-            JSON.stringify(filecoinResult);
-          console.log('Extracted PieceCID string:', pieceCidString);
-        } else {
-          pieceCidString = String(filecoinResult);
-        }
-
-        filecoinPieceCid = pieceCidString;
-        setPieceCid(pieceCidString);
+      // Check if the video is already uploaded to Filecoin (from concatenation)
+      if (generatedVideoUrl.startsWith('filecoin://')) {
+        // Video already uploaded via concatenation - extract PieceCID
+        filecoinPieceCid = generatedVideoUrl.replace('filecoin://', '');
+        console.log('✅ Using pre-uploaded PieceCID from concatenation:', filecoinPieceCid);
+        setPieceCid(filecoinPieceCid);
         setFilecoinSaved(true);
+        setIsSavingToFilecoin(false);
+      } else {
+        // Step 1: Upload to Filecoin first
+        console.log('Step 1: Uploading video to Filecoin via Synapse. URL being used:', generatedVideoUrl);
+        console.log('Current state - videoTitle:', videoTitle, 'videoDescription:', videoDescription);
 
-        // Create blob URL from Filecoin for display
         try {
-          const blobUrl = await createFilecoinBlobUrl(pieceCidString, 'video.mp4');
-          setGeneratedVideoUrl(blobUrl);
-          console.log('Updated video display to use Filecoin blob URL:', blobUrl);
-        } catch (blobError) {
-          console.error('Failed to create blob URL, keeping original URL:', blobError);
-          console.log('Keeping original URL for display:', generatedVideoUrl);
-        }
-      } catch (filecoinError) {
-        console.error('Filecoin upload failed, proceeding with original URL:', filecoinError);
-        // Continue with original URL if Filecoin fails
-      }
+          const filecoinResult = await trpcClient.synapse.uploadFromUrl.mutate({
+            url: generatedVideoUrl
+          });
 
-      setIsSavingToFilecoin(false);
+          console.log('Filecoin upload successful. PieceCID:', filecoinResult);
+          console.log('PieceCID type:', typeof filecoinResult);
+          console.log('PieceCID stringified:', JSON.stringify(filecoinResult));
+
+          // Convert to string if it's an object
+          let pieceCidString: string;
+          if (typeof filecoinResult === 'string') {
+            pieceCidString = filecoinResult;
+          } else if (filecoinResult && typeof filecoinResult === 'object') {
+            // Try different ways to extract the string value from the PieceCID object
+            const resultObj = filecoinResult as any;
+            pieceCidString = resultObj.toString?.() ||
+              resultObj.value ||
+              resultObj.cid ||
+              resultObj._baseValue ||
+              JSON.stringify(filecoinResult);
+            console.log('Extracted PieceCID string:', pieceCidString);
+          } else {
+            pieceCidString = String(filecoinResult);
+          }
+
+          filecoinPieceCid = pieceCidString;
+          setPieceCid(pieceCidString);
+          setFilecoinSaved(true);
+
+          // Create blob URL from Filecoin for display
+          try {
+            const blobUrl = await createFilecoinBlobUrl(pieceCidString, 'video.mp4');
+            setGeneratedVideoUrl(blobUrl);
+            console.log('Updated video display to use Filecoin blob URL:', blobUrl);
+          } catch (blobError) {
+            console.error('Failed to create blob URL, keeping original URL:', blobError);
+            console.log('Keeping original URL for display:', generatedVideoUrl);
+          }
+        } catch (filecoinError) {
+          console.error('Filecoin upload failed, proceeding with original URL:', filecoinError);
+          // Continue with original URL if Filecoin fails
+        }
+
+        setIsSavingToFilecoin(false);
+      }
 
       // Step 2: Determine the previous node based on addition type
       let previousNodeId: number;

@@ -15,6 +15,9 @@ import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverse
 import { falRouter } from "./fal/fal.routes";
 import { synapseService } from "../services/synapse";
 import { wikiaService } from "../services/wikia";
+import { concatenateVideos, trimVideo } from "../services/video";
+import { SynapseService } from "../services/synapse";
+import { unlinkSync } from "fs";
 
 
 export const appRouter = router({
@@ -175,6 +178,81 @@ export const appRouter = router({
           videoUrl: result.videoUrl,
           failureReason: result.error
         };
+      }),
+
+    // Concatenate multiple videos into one and upload to Filecoin
+    concatenateAndUpload: publicProcedure
+      .input(z.object({
+        videoUrls: z.array(z.string()).min(1, 'At least one video URL is required'),
+      }))
+      .mutation(async ({ input }) => {
+        console.log('🎬 === VIDEO CONCATENATION REQUEST ===');
+        console.log('Video URLs:', input.videoUrls);
+
+        try {
+          const concatenatedFilePath = await concatenateVideos(input.videoUrls);
+          console.log('Concatenated file path:', concatenatedFilePath);
+
+          const synapseService = await SynapseService.getInstance();
+          const pieceCid = await synapseService.upload(concatenatedFilePath);
+          console.log('✅ Uploaded to Filecoin with PieceCID:', pieceCid);
+
+          try {
+            unlinkSync(concatenatedFilePath);
+            console.log('🧹 Cleaned up concatenated file');
+          } catch (err) {
+            console.warn('Failed to cleanup concatenated file:', err);
+          }
+
+          return {
+            success: true,
+            pieceCid,
+          };
+        } catch (error) {
+          console.error('❌ Video concatenation failed:', error);
+          throw new Error(`Video concatenation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }),
+
+    // Trim a video and upload to Filecoin
+    trimAndUpload: publicProcedure
+      .input(z.object({
+        videoUrl: z.string(),
+        startTime: z.number().min(0, 'Start time must be >= 0'),
+        endTime: z.number().min(0, 'End time must be >= 0'),
+      }))
+      .mutation(async ({ input }) => {
+        console.log('✂️ === VIDEO TRIM REQUEST ===');
+        console.log('Video URL:', input.videoUrl);
+        console.log('Trim range:', `${input.startTime}s - ${input.endTime}s`);
+
+        if (input.endTime <= input.startTime) {
+          throw new Error('End time must be greater than start time');
+        }
+
+        try {
+          const trimmedFilePath = await trimVideo(input.videoUrl, input.startTime, input.endTime);
+          console.log('Trimmed file path:', trimmedFilePath);
+
+          const synapseService = await SynapseService.getInstance();
+          const pieceCid = await synapseService.upload(trimmedFilePath);
+          console.log('✅ Uploaded to Filecoin with PieceCID:', pieceCid);
+
+          try {
+            unlinkSync(trimmedFilePath);
+            console.log('🧹 Cleaned up trimmed file');
+          } catch (err) {
+            console.warn('Failed to cleanup trimmed file:', err);
+          }
+
+          return {
+            success: true,
+            pieceCid,
+          };
+        } catch (error) {
+          console.error('❌ Video trimming failed:', error);
+          throw new Error(`Video trimming failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
       }),
   }),
   synapse: router({

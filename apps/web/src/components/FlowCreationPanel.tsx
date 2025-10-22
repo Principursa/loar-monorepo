@@ -22,7 +22,7 @@ import {
   Type,
   Plus,
 } from "lucide-react";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { VideoTimeline } from "@/components/segments";
 import type { VideoModel } from "@/types/segments";
+import { trpcClient } from '@/utils/trpc';
 
 interface FlowCreationPanelProps {
   showVideoDialog: boolean;
@@ -111,6 +112,7 @@ interface FlowCreationPanelProps {
 interface VideoSegment {
   id: string;
   videoUrl: string;
+  videoBlob?: Blob; // Store the actual video data to avoid re-downloading
   imageUrl?: string;
   prompt: string;
   duration: number;
@@ -170,6 +172,14 @@ export function FlowCreationPanel({
   // Multi-segment state
   const [segments, setSegments] = useState<VideoSegment[]>([]);
 
+  // Frame-based video control (Remotion approach)
+  const [currentFrame, setCurrentFrame] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState(1.0); // Volume from 0.0 to 1.0
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const fps = 30; // Standard FPS for video playback
+
   // Extract last frame from previous event video
   const extractLastFrame = async () => {
     if (!previousEventVideoUrl) return;
@@ -209,12 +219,24 @@ export function FlowCreationPanel({
 
 
   // Add segment to queue
-  const handleAddSegmentToQueue = () => {
+  const handleAddSegmentToQueue = async () => {
     if (!generatedVideoUrl || !videoDescription) return;
+
+    // Fetch the video blob immediately to cache it
+    let videoBlob: Blob | undefined;
+    try {
+      console.log('📥 Caching video blob for instant preview...');
+      const response = await fetch(generatedVideoUrl);
+      videoBlob = await response.blob();
+      console.log('✅ Video blob cached:', (videoBlob.size / 1024 / 1024).toFixed(2), 'MB');
+    } catch (error) {
+      console.warn('⚠️ Could not cache video blob:', error);
+    }
 
     const newSegment: VideoSegment = {
       id: `seg-${Date.now()}`,
       videoUrl: generatedVideoUrl,
+      videoBlob, // Store the blob for instant access
       imageUrl: generatedImageUrl || undefined,
       prompt: videoDescription,
       duration: selectedVideoDuration,
@@ -228,6 +250,9 @@ export function FlowCreationPanel({
     setGeneratedVideoUrl(null);
     setGeneratedImageUrl(null);
     setVideoDescription("");
+
+    // Reset frame position when segments change
+    setCurrentFrame(0);
 
     // Show success message
     setStatusMessage?.({
@@ -243,10 +268,147 @@ export function FlowCreationPanel({
       ...seg,
       order: idx
     })));
+    setCurrentFrame(0); // Reset to beginning
   };
 
-  // Calculate total duration
+  // Calculate total duration in frames and seconds
+  const totalDurationInFrames = segments.reduce((acc, seg) => acc + (seg.duration * fps), 0);
   const totalDuration = segments.reduce((acc, seg) => acc + seg.duration, 0);
+
+  // Frame-based video control - find which segment should be visible at current frame
+  const getActiveSegmentAtFrame = useCallback((frame: number) => {
+    let cumulativeFrames = 0;
+
+    for (let i = 0; i < segments.length; i++) {
+      const segmentFrames = segments[i].duration * fps;
+      const nextCumulative = cumulativeFrames + segmentFrames;
+
+      if (frame >= cumulativeFrames && frame < nextCumulative) {
+        const segmentFrame = frame - cumulativeFrames;
+        return {
+          segment: segments[i],
+          segmentIndex: i,
+          segmentFrame,
+          segmentTime: segmentFrame / fps
+        };
+      }
+
+      cumulativeFrames = nextCumulative;
+    }
+
+    // If past the end, return last segment
+    if (segments.length > 0) {
+      const lastSegment = segments[segments.length - 1];
+      return {
+        segment: lastSegment,
+        segmentIndex: segments.length - 1,
+        segmentFrame: lastSegment.duration * fps - 1,
+        segmentTime: lastSegment.duration - (1 / fps)
+      };
+    }
+
+    return null;
+  }, [segments, fps]);
+
+  // Update video element based on current frame (for scrubbing)
+  useEffect(() => {
+    if (segments.length === 0 || !videoRef.current) return;
+
+    const activeInfo = getActiveSegmentAtFrame(currentFrame);
+    if (!activeInfo) return;
+
+    const video = videoRef.current;
+
+    // If the segment changed, update the video source
+    if (video.src !== activeInfo.segment.videoUrl) {
+      console.log(`📹 Switching to segment ${activeInfo.segmentIndex + 1} at frame ${currentFrame}`);
+      video.src = activeInfo.segment.videoUrl;
+      video.load();
+      video.currentTime = activeInfo.segmentTime;
+
+      // Start playing if in play mode
+      if (isPlaying) {
+        video.play().catch(err => console.warn('Auto-play prevented:', err));
+      }
+    } else if (!isPlaying) {
+      // Only manually seek when paused (scrubbing)
+      if (Math.abs(video.currentTime - activeInfo.segmentTime) > 0.1) {
+        video.currentTime = activeInfo.segmentTime;
+      }
+    }
+  }, [currentFrame, segments, getActiveSegmentAtFrame, isPlaying]);
+
+  // Handle play/pause
+  useEffect(() => {
+    if (!videoRef.current || segments.length === 0) return;
+
+    const video = videoRef.current;
+
+    if (isPlaying && video.paused) {
+      video.play().catch(err => console.warn('Auto-play prevented:', err));
+    } else if (!isPlaying && !video.paused) {
+      video.pause();
+    }
+  }, [isPlaying, segments.length]);
+
+  // Sync volume with video element
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.volume = volume;
+    }
+  }, [volume]);
+
+  // Sync frame counter with video playback
+  useEffect(() => {
+    if (!videoRef.current || segments.length === 0) return;
+
+    const video = videoRef.current;
+
+    const handleTimeUpdate = () => {
+      // Calculate total elapsed time across all segments
+      const activeInfo = getActiveSegmentAtFrame(currentFrame);
+      if (!activeInfo) return;
+
+      // Find cumulative time up to current segment
+      let cumulativeTime = 0;
+      for (let i = 0; i < activeInfo.segmentIndex; i++) {
+        cumulativeTime += segments[i].duration;
+      }
+
+      // Add current time within the active segment
+      const totalElapsedTime = cumulativeTime + video.currentTime;
+      const newFrame = Math.floor(totalElapsedTime * fps);
+
+      // Update frame counter based on video's actual playback
+      if (newFrame !== currentFrame) {
+        setCurrentFrame(newFrame);
+      }
+    };
+
+    const handleEnded = () => {
+      // When a segment ends, move to the next segment
+      const activeInfo = getActiveSegmentAtFrame(currentFrame);
+      if (!activeInfo) return;
+
+      if (activeInfo.segmentIndex < segments.length - 1) {
+        // Move to next segment
+        const nextSegmentFrame = (activeInfo.segmentIndex + 1) * segments[activeInfo.segmentIndex].duration * fps;
+        setCurrentFrame(nextSegmentFrame);
+      } else {
+        // End of all segments - loop or stop
+        setCurrentFrame(0);
+        setIsPlaying(false);
+      }
+    };
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('ended', handleEnded);
+
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('ended', handleEnded);
+    };
+  }, [segments, currentFrame, fps, getActiveSegmentAtFrame]);
 
   // Reset when dialog closes
   useEffect(() => {
@@ -256,6 +418,8 @@ export function FlowCreationPanel({
       setGenerationMode('text-to-video');
       setSegments([]);
       setLocalVideoPrompt('');
+      setCurrentFrame(0); // Reset frame position
+      setIsPlaying(false); // Stop playback
     }
   }, [showVideoDialog]);
 
@@ -316,44 +480,63 @@ export function FlowCreationPanel({
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  if (videoTitle.trim() && eventDescription.trim()) {
-                    // Temporary solution: Use the FIRST segment as the video event
-                    const videoUrlToUse = generatedVideoUrl || (segments.length > 0 ? segments[0].videoUrl : null);
+                onClick={async () => {
+                  if (!videoTitle.trim() || !eventDescription.trim()) {
+                    return;
+                  }
 
-                    if (!videoUrlToUse) {
-                      alert('Please generate at least one video before saving');
-                      return;
-                    }
+                  // Check if we have a video to save
+                  const hasVideo = generatedVideoUrl || segments.length > 0;
+                  if (!hasVideo) {
+                    alert('Please generate at least one video before saving');
+                    return;
+                  }
 
-                    console.log('Before setting state:', {
-                      generatedVideoUrl,
-                      videoTitle,
-                      videoDescription,
-                      eventDescription,
-                      segments: segments.length
-                    });
+                  setShowSaveDialog(false);
+                  setVideoDescription(eventDescription);
 
-                    // Set the generated video URL to segment 1 (first segment)
-                    if (!generatedVideoUrl && segments.length > 0) {
-                      setGeneratedVideoUrl(segments[0].videoUrl);
-                    }
-
-                    // Set the videoDescription prop to the event description before saving
-                    setVideoDescription(eventDescription);
-
-                    // Close dialog and wait longer for state to propagate
-                    setShowSaveDialog(false);
-
-                    // Call save after a longer delay to ensure state is updated in parent
-                    setTimeout(() => {
-                      console.log('About to save with:', {
-                        generatedVideoUrl: generatedVideoUrl || segments[0]?.videoUrl,
-                        videoTitle,
-                        videoDescription: eventDescription
+                  try {
+                    // If we have multiple segments, concatenate them first
+                    if (segments.length > 1) {
+                      console.log(`🎬 Concatenating ${segments.length} segments before saving...`);
+                      setStatusMessage?.({
+                        type: 'info',
+                        title: 'Processing Video',
+                        description: `Combining ${segments.length} segments...`,
                       });
-                      handleSaveToContract();
-                    }, 300);
+
+                      const videoUrls = segments.map(s => s.videoUrl);
+                      // @ts-ignore - concatenateAndUpload endpoint exists in router
+                      const result = await trpcClient.video.concatenateAndUpload.mutate({ videoUrls });
+
+                      console.log('✅ Concatenation and upload complete! PieceCID:', result.pieceCid);
+
+                      // Store the pieceCid in a special marker URL format
+                      // The parent's handleSaveToContract will recognize this and skip upload
+                      setGeneratedVideoUrl(`filecoin://${result.pieceCid}`);
+
+                      setStatusMessage?.({
+                        type: 'success',
+                        title: 'Video Ready',
+                        description: 'Concatenated video uploaded to Filecoin!',
+                      });
+
+                      setTimeout(() => handleSaveToContract(), 500);
+                    } else {
+                      // Single segment or single video
+                      const videoUrl = generatedVideoUrl || segments[0]?.videoUrl;
+                      if (videoUrl) {
+                        setGeneratedVideoUrl(videoUrl);
+                        setTimeout(() => handleSaveToContract(), 300);
+                      }
+                    }
+                  } catch (error) {
+                    console.error('❌ Error concatenating videos:', error);
+                    setStatusMessage?.({
+                      type: 'error',
+                      title: 'Concatenation Failed',
+                      description: error instanceof Error ? error.message : 'Failed to combine videos',
+                    });
                   }
                 }}
                 disabled={!videoTitle.trim() || !eventDescription.trim() || isSavingToContract}
@@ -615,19 +798,85 @@ export function FlowCreationPanel({
           {(generatedVideoUrl || segments.length > 0) && (
             <Card className="bg-black/90 backdrop-blur-sm shadow-lg border-0 mb-2">
               <div className="p-3 space-y-2">
-                {/* Large Event Preview */}
+                {/* Large Event Preview - Frame-Based Video Control (Remotion approach) */}
                 <div className="relative rounded overflow-hidden bg-black aspect-video">
-                  <video
-                    key={generatedVideoUrl || segments[segments.length - 1]?.videoUrl}
-                    src={generatedVideoUrl || segments[segments.length - 1]?.videoUrl}
-                    controls
-                    className="w-full h-full object-contain pointer-events-auto"
-                    playsInline
-                    preload="auto"
-                  >
-                    <source src={generatedVideoUrl || segments[segments.length - 1]?.videoUrl} type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
+                  {segments.length > 0 ? (
+                    <>
+                      <video
+                        ref={videoRef}
+                        className="w-full h-full object-contain pointer-events-auto"
+                        playsInline
+                        preload="auto"
+                        muted={false}
+                      />
+
+                      {/* Frame info overlay */}
+                      <div className="absolute top-2 left-2 px-2 py-1 bg-green-500/90 text-white text-[10px] font-medium rounded z-10">
+                        ✨ Frame-Based Preview • Frame {currentFrame} / {totalDurationInFrames}
+                      </div>
+
+                      {/* Playback controls */}
+                      <div className="absolute bottom-4 left-4 right-4 flex gap-2 items-center">
+                        <button
+                          onClick={() => setIsPlaying(!isPlaying)}
+                          className="px-3 py-1 bg-white/90 hover:bg-white text-black text-xs font-medium rounded"
+                        >
+                          {isPlaying ? '⏸ Pause' : '▶ Play'}
+                        </button>
+
+                        {/* Timeline scrubber */}
+                        <input
+                          type="range"
+                          min="0"
+                          max={totalDurationInFrames - 1}
+                          value={currentFrame}
+                          onChange={(e) => {
+                            setCurrentFrame(Number(e.target.value));
+                            setIsPlaying(false); // Pause when scrubbing
+                          }}
+                          className="flex-1 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                          style={{
+                            background: `linear-gradient(to right, #10b981 0%, #10b981 ${(currentFrame / totalDurationInFrames) * 100}%, rgba(255,255,255,0.2) ${(currentFrame / totalDurationInFrames) * 100}%, rgba(255,255,255,0.2) 100%)`
+                          }}
+                        />
+
+                        <span className="text-white text-xs font-mono">
+                          {Math.floor(currentFrame / fps)}s / {Math.floor(totalDurationInFrames / fps)}s
+                        </span>
+
+                        {/* Volume control */}
+                        <div className="flex items-center gap-1">
+                          <Volume2 className="w-4 h-4 text-white" />
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            value={volume}
+                            onChange={(e) => setVolume(Number(e.target.value))}
+                            className="w-16 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                            style={{
+                              background: `linear-gradient(to right, #10b981 0%, #10b981 ${volume * 100}%, rgba(255,255,255,0.2) ${volume * 100}%, rgba(255,255,255,0.2) 100%)`
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  ) : generatedVideoUrl ? (
+                    // Show newly generated video before adding to segments
+                    <video
+                      src={generatedVideoUrl}
+                      controls
+                      className="w-full h-full object-contain pointer-events-auto"
+                      playsInline
+                      preload="auto"
+                    />
+                  ) : (
+                    // No video yet
+                    <div className="flex items-center justify-center h-full text-white/50 text-sm">
+                      Generate a video to preview
+                    </div>
+                  )}
                 </div>
 
                 {/* Timeline Strip */}
