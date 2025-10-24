@@ -21,12 +21,10 @@ contract Universe is Ownable, IUniverse {
     }
 
     constructor(
-        address initialOwner,
-        IUniverseManager.NodeCreationOptions _nodeCreationOption,
-        IUniverseManager.NodeVisibilityOptions _nodeVisibilityOption
-    ) Ownable(initialOwner) {
-        nodeCreationOption = _nodeCreationOption;
-        nodeVisibilityOption = _nodeVisibilityOption;
+        IUniverseManager.UniverseConfig memory config
+    ) Ownable(config.universeAdmin) {
+        nodeCreationOption = config.nodeCreationOption;
+        nodeVisibilityOption = config.nodeVisibilityOption;
     }
 
     mapping(uint => VideoNode) public nodes;
