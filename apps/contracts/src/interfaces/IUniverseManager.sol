@@ -8,6 +8,7 @@ interface IUniverseManager {
   struct UniverseConfig {
     NodeCreationOptions nodeCreationOption;
     NodeVisibilityOptions nodeVisibilityOption;
+    address universeAdmin;
   }
   struct TokenConfig {
     address tokenAdmin;

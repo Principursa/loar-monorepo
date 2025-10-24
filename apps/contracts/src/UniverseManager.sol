@@ -11,23 +11,43 @@ import {PoolKey} from "../dependencies/uniswap-v4-core-4/src/types/PoolKey.sol";
 import {EnumerableSetLib} from "solady/src/utils/EnumerableSetLib.sol";
 import {LoarDeployer} from "./utils/LoarDeployer.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/access/Ownable.sol";
 
-contract UniverseManager is IUniverseManager, ReentrancyGuard {
+contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     uint public teamFee;
     address teamFeeRecipient;
     uint256 public constant TOKEN_SUPPLY = 100_000_000_000e18; // 100b with 18 decimals
     uint256 public constant BPS = 10_000;
+    struct UniverseSystem {
+        address universe;
+        address universeGovernor;
+        address universeToken;
+    }
 
     //mapping(PoolId id => Pool.State) internal _pools;
-    mapping(uint id => Universe) universes;
+    mapping(uint id => UniverseSystem) universeSystems;
+    uint latestId; //See if EnumerableSetLib fixes this
 
     function createUniverse(
         string memory name,
         string memory imageURL,
         string memory description,
         NodeCreationOptions nodeCreationOptions,
-        NodeVisibilityOptions nodeVisibilityOptions
-    ) public {}
+        NodeVisibilityOptions nodeVisibilityOptions,
+        address initialOwner
+    ) public nonReentrant {
+        UniverseConfig memory config = UniverseConfig(
+            nodeCreationOptions,
+            nodeVisibilityOptions,
+            initialOwner
+        );
+        Universe universe = new Universe(config);
+        UniverseSystem memory system = UniverseSystem(
+            address(universe),
+            address(0),
+            address(0)
+        );
+    }
 
     function createUniverseToken() public {}
 
@@ -38,14 +58,23 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard {
             deploymentConfig.tokenConfig,
             TOKEN_SUPPLY
         );
-        //deployGovernance as well
+        //insert into universesystem array
+
+        PoolKey memory poolkey = _initializePool();
     }
 
-    function setTeamFeeRecipient() public {}
+    function deployGovernance() internal returns (address) {}
 
-    function claimTeamFee() public {}
+    function setTeamFeeRecipient() public onlyOwner {}
 
-    function _initializePool() internal {}
+    function claimTeamFee() external onlyOwner {}
+
+    function _initializePool(
+        PoolConfig memory poolConfig,
+        address newToken
+    ) internal {}
 
     function _initializeLiquidity() internal {}
+
+    function getUniverse() public {}
 }
