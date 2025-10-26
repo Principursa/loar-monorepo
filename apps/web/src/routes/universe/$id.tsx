@@ -96,6 +96,9 @@ function UniverseTimelineEditor() {
     characterId?: string;
   } | null>(null);
 
+  // Image-to-video character selection (1-2 max)
+  const [selectedImageCharacters, setSelectedImageCharacters] = useState<string[]>([]);
+
   // File upload state  
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -529,6 +532,91 @@ function UniverseTimelineEditor() {
       setIsGeneratingImage(false);
     }
   }, [videoDescription, generateImageMutation]);
+
+  // Handle character frame generation for image-to-video
+  const handleGenerateCharacterFrame = useCallback(async () => {
+    if (!videoDescription.trim() || selectedImageCharacters.length === 0) return;
+
+    setStatusMessage(null);
+    setIsGeneratingImage(true);
+
+    try {
+      // Get selected character data
+      const selectedChars = charactersData?.characters?.filter((c: any) =>
+        selectedImageCharacters.includes(c.id)
+      ) || [];
+
+      if (selectedChars.length === 0) {
+        setStatusMessage({
+          type: 'error',
+          title: 'No Characters Found',
+          description: 'Please select valid characters.',
+        });
+        return;
+      }
+
+      const characterNames = selectedChars.map((c: any) => c.character_name).join(' and ');
+
+      // Get character image URLs for nano-banana edit
+      const characterImageUrls = selectedChars
+        .filter((char: any) => char.image_url && char.image_url.trim())
+        .map((char: any) => char.image_url);
+
+      if (characterImageUrls.length === 0) {
+        setStatusMessage({
+          type: 'error',
+          title: 'No Character Images',
+          description: 'Selected characters have no valid images.',
+        });
+        return;
+      }
+
+      setStatusMessage({
+        type: 'info',
+        title: 'Generating Character Frame',
+        description: 'Creating frame with nano-banana...',
+      });
+
+      console.log('🎨 Generating character frame:', {
+        selectedImageCharacters,
+        characterNames,
+        characterImageUrls,
+        prompt: videoDescription
+      });
+
+      // Call nano-banana edit directly with the character images
+      const editPrompt = `${characterNames} ${videoDescription}, cinematic scene, high quality, detailed environment`;
+
+      const result = await trpcClient.fal.imageToImage.mutate({
+        prompt: `Create a cinematic frame: ${editPrompt}. Professional photography, detailed environment, high quality composition`,
+        imageUrls: characterImageUrls,
+        imageSize: imageFormat,
+        numImages: 1,
+      });
+
+      if (result.status !== 'completed' || !result.imageUrl) {
+        throw new Error(result.error || 'Character frame generation failed');
+      }
+
+      console.log('✅ Character frame generated:', result.imageUrl);
+      setGeneratedImageUrl(result.imageUrl);
+
+      setStatusMessage({
+        type: 'success',
+        title: 'Frame Generated!',
+        description: 'Your character frame is ready. Now you can generate a video from it.',
+      });
+    } catch (error) {
+      console.error('Character frame generation failed:', error);
+      setStatusMessage({
+        type: 'error',
+        title: 'Frame Generation Failed',
+        description: error instanceof Error ? error.message : 'Failed to generate character frame. Please try again.',
+      });
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  }, [videoDescription, selectedImageCharacters, charactersData, imageFormat, trpcClient, setStatusMessage]);
 
   // Handle video generation with multiple models
   const generateVideoMutation = useMutation({
@@ -1142,10 +1230,16 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       newEventPosition = { x: sourceNode.position.x + 480, y: branchY };
       newAddPosition = { x: sourceNode.position.x + 960, y: branchY };
     } else {
-      // Linear addition to the right
-      const rightmostX = nodes.length > 0 ? Math.max(...nodes.map((n: any) => n.position.x)) : 100;
-      newEventPosition = { x: rightmostX + 480, y: 200 };
-      newAddPosition = { x: rightmostX + 960, y: 200 };
+      // Linear addition to the right of the reference node (or source node)
+      if (referenceNode) {
+        // Place after the specific reference/source node
+        newEventPosition = { x: referenceNode.position.x + 480, y: referenceNode.position.y };
+        newAddPosition = { x: referenceNode.position.x + 960, y: referenceNode.position.y };
+      } else {
+        // No reference node, start fresh
+        newEventPosition = { x: 100, y: 200 };
+        newAddPosition = { x: 580, y: 200 };
+      }
     }
 
     // Generate user-friendly display name - Keep it simple for universe branch
@@ -1680,6 +1774,9 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
             previousEventVideoUrl={previousEventVideoUrl}
             statusMessage={statusMessage}
             setStatusMessage={setStatusMessage}
+            selectedImageCharacters={selectedImageCharacters}
+            setSelectedImageCharacters={setSelectedImageCharacters}
+            handleGenerateCharacterFrame={handleGenerateCharacterFrame}
           />
         );
       })()}
