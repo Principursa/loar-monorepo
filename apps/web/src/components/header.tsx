@@ -1,17 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { useAccount } from "wagmi";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
-import { Button } from "@/components/ui/button";
-
 import { ModeToggle } from "./mode-toggle";
-// import { DynamicWalletButton } from "./dynamic-wallet-button";
 
 export default function Header() {
-  const { address: walletAddress, isConnected: isAuthenticated } = useAccount();
   const links = [
     { to: "/", label: "Home" },
     { to: "/universes", label: "Universes" },
-    { to: "/wiki", label: "Characters" },
     { to: "/cinematicuniversecreate", label: "Create Universe" },
   ];
 

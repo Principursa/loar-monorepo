@@ -36,24 +36,41 @@ interface TimelineFlowEditorProps {
   rootNodeId?: number;
   isCreateDialogOpen?: boolean;
   setIsCreateDialogOpen?: (open: boolean) => void;
+  readOnly?: boolean;
 }
 
 export function TimelineFlowEditor({
   universeId,
   timelineId,
+  initialNodes = [],
+  initialEdges = [],
+  readOnly = false,
 }: TimelineFlowEditorProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedNode, setSelectedNode] = useState<Node<TimelineNodeData> | null>(null);
   const [eventCounter, setEventCounter] = useState(1);
-  
+
   // Timeline parameters
   const [timelineTitle, setTimelineTitle] = useState("My Timeline");
   const [timelineDescription, setTimelineDescription] = useState("A narrative timeline");
   const [selectedEventTitle, setSelectedEventTitle] = useState("");
   const [selectedEventDescription, setSelectedEventDescription] = useState("");
-  
+
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+
+  // Update nodes and edges when initialNodes/initialEdges change
+  useEffect(() => {
+    if (initialNodes && initialNodes.length > 0) {
+      setNodes(initialNodes);
+    }
+  }, [initialNodes, setNodes]);
+
+  useEffect(() => {
+    if (initialEdges && initialEdges.length > 0) {
+      setEdges(initialEdges);
+    }
+  }, [initialEdges, setEdges]);
 
   // Handle adding new events to timeline
   const handleAddEvent = useCallback(() => {
@@ -149,12 +166,20 @@ export function TimelineFlowEditor({
 
   // Handle node selection
   const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
-    setSelectedNode(node);
-    if (node.data.nodeType === 'scene') {
-      setSelectedEventTitle(node.data.label);
-      setSelectedEventDescription(node.data.description);
+    if (readOnly) {
+      // In read-only mode, navigate to the timeline viewer
+      if (node.data.eventId && node.data.universeId) {
+        window.location.href = `/timeline?universe=${node.data.universeId}&event=${node.data.eventId}`;
+      }
+    } else {
+      // In edit mode, select the node for editing
+      setSelectedNode(node);
+      if (node.data.nodeType === 'scene') {
+        setSelectedEventTitle(node.data.label);
+        setSelectedEventDescription(node.data.description);
+      }
     }
-  }, []);
+  }, [readOnly]);
 
   // Initialize with start event
   useEffect(() => {
@@ -222,115 +247,117 @@ export function TimelineFlowEditor({
 
   return (
     <div className="flex h-full bg-background">
-      {/* Left Sidebar */}
-      <div className="w-80 border-r bg-card p-4 overflow-y-auto">
-        <div className="space-y-6">
-          {/* Timeline Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Settings className="h-4 w-4" />
-                Timeline Settings
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="timeline-title">Timeline Title</Label>
-                <Input
-                  id="timeline-title"
-                  value={timelineTitle}
-                  onChange={(e: any) => setTimelineTitle(e.target.value)}
-                  placeholder="Enter timeline title"
-                />
-              </div>
-              <div>
-                <Label htmlFor="timeline-description">Description</Label>
-                <textarea
-                  id="timeline-description"
-                  value={timelineDescription}
-                  onChange={(e: any) => setTimelineDescription(e.target.value)}
-                  placeholder="Describe your timeline"
-                  rows={3}
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Add Event */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Plus className="h-4 w-4" />
-                Add Event
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={handleAddEvent} className="w-full">
-                <Plus className="h-4 w-4 mr-2" />
-                Add New Event
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Selected Event */}
-          {selectedNode && selectedNode.data.nodeType === 'scene' && (
+      {/* Left Sidebar - Hide in read-only mode */}
+      {!readOnly && (
+        <div className="w-80 border-r bg-card p-4 overflow-y-auto">
+          <div className="space-y-6">
+            {/* Timeline Settings */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <Film className="h-4 w-4" />
-                  Edit Event
+                  <Settings className="h-4 w-4" />
+                  Timeline Settings
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="event-title">Event Title</Label>
+                  <Label htmlFor="timeline-title">Timeline Title</Label>
                   <Input
-                    id="event-title"
-                    value={selectedEventTitle}
-                    onChange={(e: any) => setSelectedEventTitle(e.target.value)}
-                    placeholder="Enter event title"
+                    id="timeline-title"
+                    value={timelineTitle}
+                    onChange={(e: any) => setTimelineTitle(e.target.value)}
+                    placeholder="Enter timeline title"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="event-description">Description</Label>
+                  <Label htmlFor="timeline-description">Description</Label>
                   <textarea
-                    id="event-description"
-                    value={selectedEventDescription}
-                    onChange={(e: any) => setSelectedEventDescription(e.target.value)}
-                    placeholder="Describe this event"
+                    id="timeline-description"
+                    value={timelineDescription}
+                    onChange={(e: any) => setTimelineDescription(e.target.value)}
+                    placeholder="Describe your timeline"
                     rows={3}
                     className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
                   />
                 </div>
-                <Button onClick={updateSelectedNode} className="w-full">
-                  Update Event
+              </CardContent>
+            </Card>
+
+            {/* Add Event */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Plus className="h-4 w-4" />
+                  Add Event
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={handleAddEvent} className="w-full">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Event
                 </Button>
               </CardContent>
             </Card>
-          )}
 
-          {/* Timeline Stats */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Clock className="h-4 w-4" />
-                Timeline Stats
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Total Events:</span>
-                <span className="text-sm font-medium">{nodes.filter((n: any) => n.data.nodeType === 'scene').length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Timeline ID:</span>
-                <span className="text-sm font-mono">{timelineId}</span>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Selected Event */}
+            {selectedNode && selectedNode.data.nodeType === 'scene' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Film className="h-4 w-4" />
+                    Edit Event
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="event-title">Event Title</Label>
+                    <Input
+                      id="event-title"
+                      value={selectedEventTitle}
+                      onChange={(e: any) => setSelectedEventTitle(e.target.value)}
+                      placeholder="Enter event title"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="event-description">Description</Label>
+                    <textarea
+                      id="event-description"
+                      value={selectedEventDescription}
+                      onChange={(e: any) => setSelectedEventDescription(e.target.value)}
+                      placeholder="Describe this event"
+                      rows={3}
+                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                    />
+                  </div>
+                  <Button onClick={updateSelectedNode} className="w-full">
+                    Update Event
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Timeline Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Clock className="h-4 w-4" />
+                  Timeline Stats
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Total Events:</span>
+                  <span className="text-sm font-medium">{nodes.filter((n: any) => n.data.nodeType === 'scene').length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Timeline ID:</span>
+                  <span className="text-sm font-mono">{timelineId}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Timeline Flow */}
       <div className="flex-1">
@@ -339,9 +366,9 @@ export function TimelineFlowEditor({
             <ReactFlow
               nodes={nodes}
               edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
+              onNodesChange={readOnly ? undefined : onNodesChange}
+              onEdgesChange={readOnly ? undefined : onEdgesChange}
+              onConnect={readOnly ? undefined : onConnect}
               onNodeClick={onNodeClick}
               nodeTypes={nodeTypes}
               fitView
@@ -355,6 +382,9 @@ export function TimelineFlowEditor({
               snapToGrid={true}
               snapGrid={[20, 20]}
               connectionLineStyle={{ stroke: '#10b981', strokeWidth: 2 }}
+              nodesDraggable={!readOnly}
+              nodesConnectable={!readOnly}
+              elementsSelectable={true}
             >
               <Background gap={20} size={1} color="#f1f5f9" />
               <Controls />

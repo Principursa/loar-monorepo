@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Play, Users, Plus, Database, ChevronLeft, ChevronRight, Info, Search } from "lucide-react";
+import { Play, Users, Plus, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
 import { useReadContract, useAccount } from 'wagmi';
 import { timelineAbi } from '@/generated';
@@ -17,6 +17,8 @@ export const Route = createFileRoute("/universes")({
 
 // Netflix-style Hero Banner Component
 function HeroBanner({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
+  const navigate = Route.useNavigate();
+
   const { data: nodeCount } = useReadContract({
     abi: timelineAbi,
     address: universe?.address as `0x${string}`,
@@ -30,6 +32,8 @@ function HeroBanner({ universe, onSelect }: { universe: any; onSelect: (id: stri
   });
 
   if (!universe) return null;
+
+  const hasEvents = nodeCount && nodeCount > 0;
 
   return (
     <div className="relative h-[75vh] w-full overflow-hidden">
@@ -52,16 +56,17 @@ function HeroBanner({ universe, onSelect }: { universe: any; onSelect: (id: stri
       <div className="relative h-full flex flex-col justify-end p-16 pb-24 max-w-3xl">
         <div className="space-y-6">
           {/* Badges */}
-          <div className="flex gap-3">
-            {universe.address && (
-              <Badge className="bg-white/20 backdrop-blur-md text-white border-0 px-4 py-2 text-sm">
-                <Database className="h-4 w-4 mr-2" />
-                {nodeCount || 0} nodes
+          <div className="flex gap-3 flex-wrap">
+            {hasEvents ? (
+              <Badge className="bg-green-500/90 backdrop-blur-md text-white border-0 px-4 py-2 text-sm font-semibold">
+                <Play className="h-4 w-4 mr-2" />
+                {nodeCount} Events Available
+              </Badge>
+            ) : (
+              <Badge className="bg-gray-500/90 backdrop-blur-md text-white border-0 px-4 py-2 text-sm font-semibold">
+                No Events Yet
               </Badge>
             )}
-            <Badge className="bg-primary/90 backdrop-blur-md text-white border-0 px-4 py-2 text-sm font-semibold">
-              {universe.address ? 'ON-CHAIN' : 'OFF-CHAIN'}
-            </Badge>
           </div>
 
           {/* Title */}
@@ -75,21 +80,24 @@ function HeroBanner({ universe, onSelect }: { universe: any; onSelect: (id: stri
           </p>
 
           {/* Action Buttons */}
-          <div className="flex gap-4 pt-4">
+          <div className="flex gap-4 pt-4 flex-wrap">
+            {hasEvents && (
+              <Button
+                size="lg"
+                className="bg-white text-black hover:bg-white/90 px-10 text-lg h-14 font-bold shadow-2xl"
+                onClick={() => navigate({ to: "/timeline", search: { universe: universe.id } })}
+              >
+                <Play className="h-6 w-6 mr-3 fill-black" />
+                Watch Timeline
+              </Button>
+            )}
             <Button
               size="lg"
-              className="bg-white text-black hover:bg-white/90 px-10 text-lg h-14 font-bold"
+              className="bg-primary text-white hover:bg-primary/90 px-10 text-lg h-14 font-bold shadow-2xl"
               onClick={() => onSelect(universe.id)}
             >
-              <Play className="h-6 w-6 mr-3 fill-black" />
-              Explore Universe
-            </Button>
-            <Button
-              size="lg"
-              className="bg-white/20 backdrop-blur-md text-white hover:bg-white/30 border border-white/20 px-10 text-lg h-14 font-semibold"
-            >
-              <Info className="h-6 w-6 mr-3" />
-              More Info
+              <Plus className="h-6 w-6 mr-3" />
+              Create Event
             </Button>
           </div>
         </div>
@@ -180,6 +188,7 @@ function UniverseRow({ title, universes, onSelect }: { title: string; universes:
 // Netflix-style Universe Card Component
 function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
   const [isHovered, setIsHovered] = useState(false);
+  const navigate = Route.useNavigate();
 
   const { data: nodeCount } = useReadContract({
     abi: timelineAbi,
@@ -193,10 +202,11 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
     }
   });
 
+  const hasEvents = nodeCount && nodeCount > 0;
+
   return (
     <div
       className="relative flex-shrink-0 w-[320px] cursor-pointer transition-transform duration-300 ease-out hover:scale-[1.08] hover:z-30"
-      onClick={() => onSelect(universe.id)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{ transformOrigin: 'center center' }}
@@ -215,39 +225,63 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
 
         {/* Hover Overlay with Info */}
         <div className={`absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/40 transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
+          <div className="absolute top-4 left-4 right-4 space-y-2">
             <h3 className="text-white font-bold text-lg truncate drop-shadow-lg">{universe.name}</h3>
             <p className="text-white/90 text-sm line-clamp-2 leading-relaxed">
               {universe.description || "Explore this narrative universe"}
             </p>
-            <div className="flex items-center gap-2 pt-1">
-              {universe.address && (
-                <Badge className="bg-white/25 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
-                  <Database className="h-3 w-3 mr-1" />
-                  {nodeCount || 0} nodes
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
+              {hasEvents ? (
+                <Badge className="bg-green-500/90 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
+                  <Play className="h-3 w-3 mr-1" />
+                  {nodeCount} events
+                </Badge>
+              ) : (
+                <Badge className="bg-gray-500/90 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
+                  No events yet
                 </Badge>
               )}
-              <Badge className="bg-primary/90 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
-                {universe.address ? 'On-chain' : 'Off-chain'}
-              </Badge>
             </div>
           </div>
-        </div>
 
-        {/* Play Button Overlay */}
-        <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="bg-white/30 backdrop-blur-md rounded-full p-3 border-2 border-white shadow-2xl">
-            <Play className="h-8 w-8 text-white fill-white" />
+          {/* Quick Action Buttons */}
+          <div className={`absolute bottom-4 left-4 right-4 flex gap-2 transition-all duration-300 ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            {hasEvents && (
+              <Button
+                size="sm"
+                className="flex-1 bg-white text-black hover:bg-white/90 font-semibold h-10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate({ to: "/timeline", search: { universe: universe.id } });
+                }}
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Watch
+              </Button>
+            )}
+            <Button
+              size="sm"
+              className="flex-1 bg-primary text-white hover:bg-primary/90 font-semibold h-10"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(universe.id);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create
+            </Button>
           </div>
         </div>
 
         {/* Small badge when not hovering */}
-        {!isHovered && universe.address && (
-          <div className="absolute top-2 right-2">
-            <Badge className="bg-black/70 backdrop-blur-sm text-white border-0 text-xs">
-              <Database className="h-2.5 w-2.5 mr-1" />
-              {nodeCount || 0}
-            </Badge>
+        {!isHovered && (
+          <div className="absolute top-2 right-2 flex gap-1">
+            {hasEvents && (
+              <Badge className="bg-green-500/90 backdrop-blur-sm text-white border-0 text-xs">
+                <Play className="h-2.5 w-2.5 mr-1" />
+                {nodeCount}
+              </Badge>
+            )}
           </div>
         )}
       </div>
@@ -397,6 +431,18 @@ function RouteComponent() {
             className="w-full pl-12 pr-4 h-14 text-base bg-background/95 backdrop-blur-md border-2 border-border shadow-2xl rounded-full focus:ring-2 focus:ring-primary"
           />
         </div>
+      </div>
+
+      {/* Floating Create Universe Button */}
+      <div className="fixed bottom-24 right-8 z-50">
+        <Button
+          onClick={createNewUniverse}
+          size="lg"
+          className="h-16 w-16 rounded-full shadow-2xl hover:scale-110 transition-all duration-300 bg-primary hover:bg-primary/90 group"
+          title="Create New Universe"
+        >
+          <Plus className="h-8 w-8 group-hover:rotate-90 transition-transform duration-300" />
+        </Button>
       </div>
     </div>
   );

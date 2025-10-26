@@ -248,7 +248,7 @@ export const falRouter = router({
       // Step 2: Video
       const videoResult = await falService.generateVideo({
         prompt: input.videoPrompt,
-        model: "fal-ai/veo3/fast/image-to-video",
+        model: "fal-ai/veo3.1/fast/image-to-video",
         imageUrl: imageResult.imageUrl,
         duration: input.videoDuration || 5,
         aspectRatio: "16:9",
@@ -278,11 +278,17 @@ export const falRouter = router({
         prompt: z.string().min(1),
         model: z
           .enum([
+            // Text-to-Video models
             "fal-ai/hunyuan-video",
             "fal-ai/ltx-video",
             "fal-ai/cogvideox-5b",
             "fal-ai/runway-gen3",
-            "fal-ai/veo3/fast/image-to-video",
+            "fal-ai/veo3.1/fast",
+            "fal-ai/sora-2/text-to-video",
+            "fal-ai/kling-video/v2.5-turbo/pro/text-to-video",
+            "fal-ai/wan-25-preview/text-to-video",
+            // Image-to-Video models
+            "fal-ai/veo3.1/fast/image-to-video",
             "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
             "fal-ai/wan-25-preview/image-to-video",
             "fal-ai/sora-2/image-to-video",
@@ -350,7 +356,7 @@ export const falRouter = router({
       const result = await falService.generateVideo({
         prompt: input.prompt,
         imageUrl: input.imageUrl,
-        model: "fal-ai/veo3/fast/image-to-video",
+        model: "fal-ai/veo3.1/fast/image-to-video",
         duration: input.duration,
         aspectRatio: input.aspectRatio,
         motionStrength: input.motionStrength,

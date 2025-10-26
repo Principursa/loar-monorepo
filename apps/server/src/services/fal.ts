@@ -44,7 +44,21 @@ export interface FalImageGenerationResult {
 
 export interface FalVideoGenerationOptions {
   prompt: string;
-  model?: 'fal-ai/hunyuan-video' | 'fal-ai/ltx-video' | 'fal-ai/cogvideox-5b' | 'fal-ai/runway-gen3' | 'fal-ai/veo3/fast/image-to-video' | 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video' | 'fal-ai/wan-25-preview/image-to-video' | 'fal-ai/sora-2/image-to-video';
+  model?:
+    // Text-to-Video models
+    | 'fal-ai/hunyuan-video'
+    | 'fal-ai/ltx-video'
+    | 'fal-ai/cogvideox-5b'
+    | 'fal-ai/runway-gen3'
+    | 'fal-ai/veo3.1/fast'
+    | 'fal-ai/sora-2/text-to-video'
+    | 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video'
+    | 'fal-ai/wan-25-preview/text-to-video'
+    // Image-to-Video models
+    | 'fal-ai/veo3.1/fast/image-to-video'
+    | 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video'
+    | 'fal-ai/wan-25-preview/image-to-video'
+    | 'fal-ai/sora-2/image-to-video';
   imageUrl?: string;
   duration?: number;
   fps?: number;
@@ -331,44 +345,73 @@ export class FalService {
       const model = options.model || 'fal-ai/ltx-video';
       const input: any = { prompt: options.prompt };
 
-      if (model === 'fal-ai/veo3/fast/image-to-video') {
-        if (!options.imageUrl) throw new Error('Image URL is required for Veo3 image-to-video model');
-        
-        console.log('🔧 Building Veo3 input...');
-        
-        input.image_url = options.imageUrl;
-        
-        // Veo3 only supports 8s duration
+      if (model === 'fal-ai/veo3.1/fast') {
+        // Text-to-video model (no image required)
+        console.log('🔧 Building Veo3.1 text-to-video input...');
+
+        // Veo3.1 only supports 8s duration
         input.duration = "8s";
-        console.log('Using duration: 8s (Veo3 requirement)');
-        
+        console.log('Using duration: 8s (Veo3.1 requirement)');
+
+        // Aspect ratio
+        if (options.aspectRatio && options.aspectRatio !== "auto") {
+          input.aspect_ratio = options.aspectRatio;
+          console.log(`Using aspect ratio: ${options.aspectRatio}`);
+        }
+
+        // Resolution
+        if (options.resolution) {
+          input.resolution = options.resolution;
+          console.log(`Using resolution: ${options.resolution}`);
+        }
+
+        // Generate audio (optional)
+        if (options.generateAudio === true) {
+          input.generate_audio = true;
+          console.log('Audio generation enabled');
+        }
+
+        console.log('✅ Veo3.1 text-to-video input prepared:', JSON.stringify(input, null, 2));
+
+      } else if (model === 'fal-ai/veo3.1/fast/image-to-video') {
+        // Image-to-video model (image required)
+        if (!options.imageUrl) throw new Error('Image URL is required for Veo3.1 image-to-video model');
+
+        console.log('🔧 Building Veo3.1 image-to-video input...');
+
+        input.image_url = options.imageUrl;
+
+        // Veo3.1 only supports 8s duration
+        input.duration = "8s";
+        console.log('Using duration: 8s (Veo3.1 requirement)');
+
         // If aspect_ratio is provided and NOT "auto", use it
-        // Otherwise let Veo3 auto-detect from image
+        // Otherwise let Veo3.1 auto-detect from image
         if (options.aspectRatio && options.aspectRatio !== "auto") {
           input.aspect_ratio = options.aspectRatio;
           console.log(`Using aspect ratio: ${options.aspectRatio}`);
         } else {
-          // For veo3, omit aspect_ratio to let it auto-detect
+          // For veo3.1, omit aspect_ratio to let it auto-detect
           // or explicitly set to "auto"
           input.aspect_ratio = "auto";
           console.log('Using auto aspect ratio');
         }
-        
-        // Resolution for veo3 - defaults to 720p
+
+        // Resolution for veo3.1 - defaults to 720p
         // Only include if specified
         if (options.resolution) {
           input.resolution = options.resolution;
           console.log(`Using resolution: ${options.resolution}`);
         }
-        
+
         // Generate audio (optional) - only include if explicitly set
         if (options.generateAudio === true) {
           input.generate_audio = true;
           console.log('Audio generation enabled');
         }
-        
-        console.log('✅ Veo3 input prepared:', JSON.stringify(input, null, 2));
-        
+
+        console.log('✅ Veo3.1 image-to-video input prepared:', JSON.stringify(input, null, 2));
+
       } else if (model === 'fal-ai/wan-25-preview/image-to-video') {
         if (!options.imageUrl) throw new Error('Image URL is required for wan25 image-to-video model');
         input.image_url = options.imageUrl;
@@ -400,6 +443,41 @@ export class FalService {
           input.resolution = "auto";
         }
         // Sora can generate audio naturally from prompts if needed
+      } else if (model === 'fal-ai/sora-2/text-to-video') {
+        // Sora 2 text-to-video (no image required)
+        console.log('🔧 Building Sora 2 text-to-video input...');
+
+        // Duration: 4, 8, or 12 seconds (as number)
+        const validDurations = [4, 8, 12];
+        input.duration = validDurations.includes(options.duration || 0) ? options.duration : 4;
+
+        // Aspect ratio: Only "16:9" or "9:16" supported (NOT "1:1" or "auto")
+        if (options.aspectRatio === "9:16" || options.aspectRatio === "16:9") {
+          input.aspect_ratio = options.aspectRatio;
+        } else {
+          input.aspect_ratio = "16:9"; // Default to 16:9 if invalid
+        }
+
+        // Resolution: Only "720p" supported
+        input.resolution = "720p";
+
+        console.log('✅ Sora 2 text-to-video input prepared:', JSON.stringify(input, null, 2));
+      } else if (model === 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video') {
+        // Kling text-to-video (no image required)
+        console.log('🔧 Building Kling text-to-video input...');
+        input.duration = String(options.duration || 5); // 5 or 10 seconds
+        input.aspect_ratio = options.aspectRatio || "16:9";
+        if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+        if (options.cfgScale !== undefined) input.cfg_scale = options.cfgScale;
+        console.log('✅ Kling text-to-video input prepared:', JSON.stringify(input, null, 2));
+      } else if (model === 'fal-ai/wan-25-preview/text-to-video') {
+        // Wan 2.5 text-to-video (no image required)
+        console.log('🔧 Building Wan 2.5 text-to-video input...');
+        input.duration = String(options.duration || 5); // 5 or 10 seconds
+        input.resolution = options.resolution || "1080p";
+        if (options.negativePrompt) input.negative_prompt = options.negativePrompt;
+        if (options.enablePromptExpansion !== undefined) input.enable_prompt_expansion = options.enablePromptExpansion;
+        console.log('✅ Wan 2.5 text-to-video input prepared:', JSON.stringify(input, null, 2));
       } else {
         input.duration = options.duration || 5;
         input.fps = options.fps || 25;

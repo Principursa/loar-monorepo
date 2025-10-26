@@ -7,13 +7,14 @@ import { TimelineFlowEditor } from './TimelineFlowEditor';
 import type { TimelineNodeData } from './TimelineNodes';
 import { useGetFullGraph } from '@/hooks/useTimeline';
 
-export function TimelineFlowWithData({ 
-  universeId, 
-  timelineId, 
+export function TimelineFlowWithData({
+  universeId,
+  timelineId,
   rootNodeId = 1,
   isCreateDialogOpen = false,
   setIsCreateDialogOpen = () => {},
-  timelineAddress
+  timelineAddress,
+  readOnly = false
 }: {
   universeId: string;
   timelineId: string;
@@ -21,6 +22,7 @@ export function TimelineFlowWithData({
   isCreateDialogOpen?: boolean;
   setIsCreateDialogOpen?: (open: boolean) => void;
   timelineAddress?: string;
+  readOnly?: boolean;
 }) {
   const [initialNodes, setInitialNodes] = useState<Node<TimelineNodeData>[]>([]);
   const [initialEdges, setInitialEdges] = useState<Edge[]>([]);
@@ -143,8 +145,9 @@ export function TimelineFlowWithData({
           initialNodes={initialNodes}
           initialEdges={initialEdges}
           rootNodeId={rootNodeId}
-          isCreateDialogOpen={isCreateDialogOpen}
-          setIsCreateDialogOpen={setIsCreateDialogOpen}
+          isCreateDialogOpen={readOnly ? false : isCreateDialogOpen}
+          setIsCreateDialogOpen={readOnly ? () => {} : setIsCreateDialogOpen}
+          readOnly={readOnly}
         />
       )}
     </div>

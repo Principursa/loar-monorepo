@@ -1,8 +1,7 @@
 import { Handle, Position } from 'reactflow';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from '@tanstack/react-router';
-import { Plus } from 'lucide-react';
+import { Plus, Film } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { trpcClient } from '@/utils/trpc';
 
@@ -21,10 +20,10 @@ export interface TimelineNodeData {
   nodeType?: 'scene' | 'branch' | 'add';
   isInCanonChain?: boolean; // Whether this node is part of the canonical chain
   onAddScene?: (position: 'after' | 'branch', sourceNodeId?: string) => void;
+  onEditScene?: (eventId: string) => void;
 }
 
 export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
-  const navigate = useNavigate();
   const [displayVideoUrl, setDisplayVideoUrl] = useState<string | null>(null);
   const [isLoadingFilecoin, setIsLoadingFilecoin] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -44,10 +43,10 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
       
       // Download from Filecoin via tRPC with timeout
       const downloadPromise = trpcClient.synapse.download.query({ pieceCid });
-      const result = await Promise.race([downloadPromise, timeoutPromise]);
-      
+      const result = await Promise.race([downloadPromise, timeoutPromise]) as any;
+
       console.log('TimelineNode: Download completed, converting to blob...');
-      
+
       // Convert base64 back to Uint8Array
       const binaryData = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
       
@@ -73,13 +72,14 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
     if (data.videoUrl && data.videoUrl.startsWith('bafk')) {
       // This looks like a raw PieceCID from Filecoin
       console.log('TimelineNode: Converting PieceCID to blob URL for:', data.videoUrl);
-      
+
       setIsLoadingFilecoin(true);
-      
+      const videoUrl = data.videoUrl; // Capture in closure
+
       // Add a delay to prevent overwhelming the server with concurrent requests
       const delay = Math.random() * 1000; // Random delay up to 1 second
       setTimeout(() => {
-        createFilecoinBlobUrl(data.videoUrl)
+        createFilecoinBlobUrl(videoUrl)
           .then((blobUrl) => {
             setDisplayVideoUrl(blobUrl);
             console.log('TimelineNode: Successfully created blob URL:', blobUrl);
@@ -105,18 +105,18 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
 
   const handleClick = () => {
     if (data.eventId && data.universeId) {
-      console.log('Navigating to event:', {
+      console.log('Navigating to timeline:', {
         universeId: data.universeId,
         eventId: data.eventId
       });
-      // eventId is already numeric (e.g., "1", "2", "3")
-      const eventUrl = `/event/${data.universeId}/${data.eventId}`;
-      window.location.href = eventUrl;
+      // Navigate to timeline viewer with specific event
+      const timelineUrl = `/timeline?universe=${data.universeId}&event=${data.eventId}`;
+      window.location.href = timelineUrl;
     } else {
-      console.log('Missing navigation data:', { 
+      console.log('Missing navigation data:', {
         eventId: data.eventId,
         universeId: data.universeId,
-        data 
+        data
       });
     }
   };
@@ -228,10 +228,10 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
 
           {/* Event ID and Status - Fixed footer with displayName support */}
           <div className="p-4 h-20 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div 
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div
                 className={`w-3 h-3 rounded-full flex-shrink-0 ${data.isRoot ? 'bg-primary' : 'bg-current'}`}
-                style={{ 
+                style={{
                   backgroundColor: data.timelineColor || '#10b981'
                 }}
               />
@@ -239,7 +239,21 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
                 {data.displayName || `Event ${data.eventId || '?'}`}
               </span>
             </div>
-            {data.isRoot && <Badge variant="secondary" className="text-sm">Start</Badge>}
+            <div className="flex items-center gap-2">
+              {data.isRoot && <Badge variant="secondary" className="text-sm">Start</Badge>}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onEditScene?.(data.eventId || '');
+                }}
+                className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Edit scene segments"
+              >
+                <Film className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
         

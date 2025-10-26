@@ -24,7 +24,7 @@ import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-t
 import { type Address } from 'viem';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { UniverseSidebar } from '@/components/UniverseSidebar';
-import { EventCreationSidebar } from '@/components/EventCreationSidebar';
+import { FlowCreationPanel } from '@/components/FlowCreationPanel';
 import { GovernanceSidebar } from '@/components/GovernanceSidebar';
 import { toast } from 'sonner';
 
@@ -96,6 +96,9 @@ function UniverseTimelineEditor() {
     characterId?: string;
   } | null>(null);
 
+  // Image-to-video character selection (1-2 max)
+  const [selectedImageCharacters, setSelectedImageCharacters] = useState<string[]>([]);
+
   // File upload state  
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -111,6 +114,10 @@ function UniverseTimelineEditor() {
   const [isSavingToFilecoin, setIsSavingToFilecoin] = useState(false);
   const [filecoinSaved, setFilecoinSaved] = useState(false);
   const [pieceCid, setPieceCid] = useState<string | null>(null);
+
+  // Music/soundtrack state
+  const [soundtrackUrl, setSoundtrackUrl] = useState<string>("");
+  const [soundtrackName, setSoundtrackName] = useState<string>("");
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
@@ -526,6 +533,91 @@ function UniverseTimelineEditor() {
     }
   }, [videoDescription, generateImageMutation]);
 
+  // Handle character frame generation for image-to-video
+  const handleGenerateCharacterFrame = useCallback(async () => {
+    if (!videoDescription.trim() || selectedImageCharacters.length === 0) return;
+
+    setStatusMessage(null);
+    setIsGeneratingImage(true);
+
+    try {
+      // Get selected character data
+      const selectedChars = charactersData?.characters?.filter((c: any) =>
+        selectedImageCharacters.includes(c.id)
+      ) || [];
+
+      if (selectedChars.length === 0) {
+        setStatusMessage({
+          type: 'error',
+          title: 'No Characters Found',
+          description: 'Please select valid characters.',
+        });
+        return;
+      }
+
+      const characterNames = selectedChars.map((c: any) => c.character_name).join(' and ');
+
+      // Get character image URLs for nano-banana edit
+      const characterImageUrls = selectedChars
+        .filter((char: any) => char.image_url && char.image_url.trim())
+        .map((char: any) => char.image_url);
+
+      if (characterImageUrls.length === 0) {
+        setStatusMessage({
+          type: 'error',
+          title: 'No Character Images',
+          description: 'Selected characters have no valid images.',
+        });
+        return;
+      }
+
+      setStatusMessage({
+        type: 'info',
+        title: 'Generating Character Frame',
+        description: 'Creating frame with nano-banana...',
+      });
+
+      console.log('🎨 Generating character frame:', {
+        selectedImageCharacters,
+        characterNames,
+        characterImageUrls,
+        prompt: videoDescription
+      });
+
+      // Call nano-banana edit directly with the character images
+      const editPrompt = `${characterNames} ${videoDescription}, cinematic scene, high quality, detailed environment`;
+
+      const result = await trpcClient.fal.imageToImage.mutate({
+        prompt: `Create a cinematic frame: ${editPrompt}. Professional photography, detailed environment, high quality composition`,
+        imageUrls: characterImageUrls,
+        imageSize: imageFormat,
+        numImages: 1,
+      });
+
+      if (result.status !== 'completed' || !result.imageUrl) {
+        throw new Error(result.error || 'Character frame generation failed');
+      }
+
+      console.log('✅ Character frame generated:', result.imageUrl);
+      setGeneratedImageUrl(result.imageUrl);
+
+      setStatusMessage({
+        type: 'success',
+        title: 'Frame Generated!',
+        description: 'Your character frame is ready. Now you can generate a video from it.',
+      });
+    } catch (error) {
+      console.error('Character frame generation failed:', error);
+      setStatusMessage({
+        type: 'error',
+        title: 'Frame Generation Failed',
+        description: error instanceof Error ? error.message : 'Failed to generate character frame. Please try again.',
+      });
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  }, [videoDescription, selectedImageCharacters, charactersData, imageFormat, trpcClient, setStatusMessage]);
+
   // Handle video generation with multiple models
   const generateVideoMutation = useMutation({
     mutationFn: async ({ imageUrl, prompt }: { imageUrl: string; prompt?: string }) => {
@@ -541,13 +633,13 @@ function UniverseTimelineEditor() {
         const result = await trpcClient.fal.generateVideo.mutate({
           prompt: finalPrompt,
           imageUrl,
-          model: "fal-ai/veo3/fast/image-to-video",
+          model: "fal-ai/veo3.1/fast/image-to-video",
           duration: selectedVideoDuration,
           aspectRatio: videoRatio,
           motionStrength: 127,
           negativePrompt: negativePrompt || undefined
         });
-        console.log('Veo3 video result:', result);
+        console.log('Veo3.1 video result:', result);
         return { videoUrl: result.videoUrl };
       } else if (selectedVideoModel === 'fal-kling') {
         const result = await trpcClient.fal.klingVideo.mutate({
@@ -624,8 +716,8 @@ function UniverseTimelineEditor() {
           // Check if it's Sora and provide specific guidance
           if (selectedVideoModel === 'fal-sora') {
             errorDescription = `OpenAI Sora has detected content that violates its usage policies. This often happens with:
-            
-• Certain aspect ratios (Sora works best with 16:9, 9:16, or 1:1)
+
+• Certain aspect ratios (Sora ONLY supports 16:9 or 9:16, NOT 1:1)
 • Character images that contain copyrighted or unlicensed content
 • Generated images that include recognizable IP
 
@@ -658,15 +750,16 @@ Try switching to Veo3, Kling 2.5, or Wan 2.5 which have more flexible content po
           
           // Provide Sora-specific guidance for validation errors
           if (selectedVideoModel === 'fal-sora') {
-            errorDescription = `Sora has specific requirements:
-            
-• Aspect Ratio: 16:9 (landscape), 9:16 (portrait), or 1:1 (square) work best
-• Duration: 4, 8, or 12 seconds
+            errorDescription = `Sora 2 has STRICT requirements:
+
+• Aspect Ratio: ONLY 16:9 or 9:16 (1:1 is NOT supported!)
+• Duration: ONLY 4, 8, or 12 seconds
+• Resolution: ONLY 720p
 • Image Format: Must be a valid, accessible URL
 
 Current settings: ${videoRatio} aspect ratio, ${selectedVideoDuration || 4}s duration
 
-Try adjusting your settings or use a different video model like Veo3 or Kling 2.5.`;
+${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support! Change to 16:9 or 9:16.\n\n" : ""}Try adjusting your settings or use a different video model like Veo3 or Kling 2.5.`;
             action = {
               label: 'Switch to Veo3',
               onClick: () => {
@@ -735,33 +828,96 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
   }, [generatedImageUrl]);
 
   const handleGenerateVideo = useCallback(async () => {
-    if (!generatedImageUrl) return;
-
     setStatusMessage(null); // Clear any previous messages
-    
-    // Use uploaded URL if available, otherwise use the generated image URL
-    const imageUrlToUse = uploadedUrl || generatedImageUrl;
-
-    console.log('=== VIDEO GENERATION DEBUG ===');
-    console.log('Generated Image URL:', generatedImageUrl);
-    console.log('Uploaded URL:', uploadedUrl);
-    console.log('Using URL for video:', imageUrlToUse);
-    console.log('Image URL type:', imageUrlToUse.startsWith('data:') ? 'Data URL' : 'HTTP URL');
-    console.log('Video Description:', videoDescription);
-    console.log('===============================');
 
     setIsGeneratingVideo(true);
     try {
-      await generateVideoMutation.mutateAsync({
-        imageUrl: imageUrlToUse,
-        prompt: `Animate this scene: ${videoDescription}`
-      });
+      const hasImage = uploadedUrl || generatedImageUrl;
+
+      // Determine if we're in text-to-video or image-to-video mode
+      const isTextToVideo = !hasImage;
+
+      if (isTextToVideo) {
+        // Text-to-video mode: Use selected model for text-to-video
+        const modelMap: Record<string, string> = {
+          'fal-veo3': 'fal-ai/veo3.1/fast',
+          'fal-sora': 'fal-ai/sora-2/text-to-video',
+          'fal-kling': 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
+          'fal-wan25': 'fal-ai/wan-25-preview/text-to-video'
+        };
+
+        const modelNames: Record<string, string> = {
+          'fal-veo3': 'Veo 3.1',
+          'fal-kling': 'Kling 2.5',
+          'fal-wan25': 'Wan 2.5',
+          'fal-sora': 'Sora 2'
+        };
+
+        const textToVideoModel = modelMap[selectedVideoModel] || 'fal-ai/veo3.1/fast';
+        const modelName = modelNames[selectedVideoModel] || 'AI';
+
+        console.log('🎬 Text-to-video mode:', {
+          selectedModel: selectedVideoModel,
+          actualModel: textToVideoModel,
+          prompt: videoDescription,
+          duration: selectedVideoDuration,
+          aspectRatio: videoRatio
+        });
+
+        setStatusMessage({
+          type: 'info',
+          title: 'Generating Video',
+          description: `Creating your video with ${modelName}...`,
+        });
+
+        const result = await trpcClient.fal.generateVideo.mutate({
+          prompt: videoDescription,
+          model: textToVideoModel,
+          duration: selectedVideoDuration,
+          aspectRatio: videoRatio,
+          negativePrompt: negativePrompt || undefined
+        });
+
+        if (result.videoUrl) {
+          setGeneratedVideoUrl(result.videoUrl);
+          setStatusMessage({
+            type: 'success',
+            title: 'Video Generated Successfully!',
+            description: `Your ${modelName} video has been created. You can now save it to the timeline.`,
+          });
+        }
+      } else {
+        // Image-to-video mode: Use image-to-video models
+        const imageUrlToUse = uploadedUrl || generatedImageUrl;
+
+        console.log('=== IMAGE-TO-VIDEO GENERATION DEBUG ===');
+        console.log('Image URL:', imageUrlToUse);
+        console.log('Video Description:', videoDescription);
+        console.log('Model:', selectedVideoModel);
+        console.log('===============================');
+
+        setStatusMessage({
+          type: 'info',
+          title: 'Animating Video',
+          description: 'Creating your video animation...',
+        });
+
+        await generateVideoMutation.mutateAsync({
+          imageUrl: imageUrlToUse!,
+          prompt: `Animate this scene: ${videoDescription}`
+        });
+      }
     } catch (error) {
       console.error("Error:", error);
+      setStatusMessage({
+        type: 'error',
+        title: 'Generation Failed',
+        description: error instanceof Error ? error.message : 'Failed to generate video',
+      });
     } finally {
       setIsGeneratingVideo(false);
     }
-  }, [generatedImageUrl, uploadedUrl, videoDescription, generateVideoMutation]);
+  }, [generatedImageUrl, uploadedUrl, videoDescription, generateVideoMutation, selectedVideoModel, selectedVideoDuration, videoRatio, negativePrompt, setStatusMessage]);
 
   // Save to contract function (now includes Filecoin upload)
   const handleSaveToContract = useCallback(async () => {
@@ -959,6 +1115,9 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
     setVideoPrompt(""); // Reset video prompt
     setVideoRatio("16:9"); // Reset video ratio
     setImageFormat('landscape_16_9'); // Reset image format
+    setSoundtrackUrl(""); // Reset soundtrack URL
+    setSoundtrackName(""); // Reset soundtrack name
+    setSelectedCharacters([]); // Reset selected characters
     setStatusMessage(null); // Clear any status messages
     setShowVideoDialog(true);
   }, []);
@@ -1071,10 +1230,16 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
       newEventPosition = { x: sourceNode.position.x + 480, y: branchY };
       newAddPosition = { x: sourceNode.position.x + 960, y: branchY };
     } else {
-      // Linear addition to the right
-      const rightmostX = nodes.length > 0 ? Math.max(...nodes.map((n: any) => n.position.x)) : 100;
-      newEventPosition = { x: rightmostX + 480, y: 200 };
-      newAddPosition = { x: rightmostX + 960, y: 200 };
+      // Linear addition to the right of the reference node (or source node)
+      if (referenceNode) {
+        // Place after the specific reference/source node
+        newEventPosition = { x: referenceNode.position.x + 480, y: referenceNode.position.y };
+        newAddPosition = { x: referenceNode.position.x + 960, y: referenceNode.position.y };
+      } else {
+        // No reference node, start fresh
+        newEventPosition = { x: 100, y: 200 };
+        newAddPosition = { x: 580, y: 200 };
+      }
     }
 
     // Generate user-friendly display name - Keep it simple for universe branch
@@ -1168,6 +1333,30 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
       description: videoDescription,
       videoUrl: generatedVideoUrl,
       imageUrl: generatedImageUrl,
+
+      // Characters used in this event
+      characterIds: selectedCharacters, // Array of character IDs
+      characterNames: selectedCharacters.length > 0 && charactersData?.characters
+        ? charactersData.characters
+            .filter((c: any) => selectedCharacters.includes(c.id))
+            .map((c: any) => c.character_name)
+        : [],
+
+      // Generation prompts and settings
+      imagePrompt: videoDescription, // The prompt used for image generation
+      videoPrompt: videoPrompt || videoDescription, // Video animation prompt
+      negativePrompt: negativePrompt || '', // Negative prompt for filtering unwanted content
+
+      // Model and settings used
+      videoModel: selectedVideoModel, // Which AI model was used (veo3, kling, wan25, sora)
+      videoDuration: selectedVideoDuration, // Video duration in seconds
+      videoRatio: videoRatio, // Aspect ratio (16:9, 9:16, 1:1)
+      imageFormat: imageFormat, // Image format used
+
+      // Music/Soundtrack
+      soundtrackUrl: soundtrackUrl || '', // Music track URL
+      soundtrackName: soundtrackName || '', // Track name/title
+
       sourceNodeId: sourceNodeId,
       additionType: additionType,
       timestamp: Date.now(),
@@ -1400,14 +1589,14 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
       setSelectedEventTitle(node.data.label);
       setSelectedEventDescription(node.data.description);
 
-      // Navigate to event detail page using new route structure
+      // Navigate to timeline viewer with specific event
       const universeId = node.data.universeId || id;
       const eventId = node.data.eventId;
 
       if (eventId && universeId) {
-        // Use window.location for navigation with new route structure: /event/{universeId}/{eventId}
-        const eventUrl = `/event/${universeId}/${eventId}`;
-        window.location.href = eventUrl;
+        // Navigate to timeline page with universe and event parameters
+        const timelineUrl = `/timeline?universe=${universeId}&event=${eventId}`;
+        window.location.href = timelineUrl;
       }
     }
   }, [id]);
@@ -1513,8 +1702,8 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
         </ReactFlowProvider>
       </div>
 
-      {/* Right Sidebar - Event Creation */}
-      {showVideoDialog && (() => {
+      {/* Bottom Panel - Event Creation (Google Veo Flow Style) */}
+      {(() => {
         // Find previous event's video URL - always use the last event or the source node
         const sourceNode = sourceNodeId
           ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
@@ -1522,7 +1711,7 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
         const previousEventVideoUrl = sourceNode?.data.videoUrl || null;
 
         return (
-          <EventCreationSidebar
+          <FlowCreationPanel
             showVideoDialog={showVideoDialog}
             setShowVideoDialog={setShowVideoDialog}
             videoTitle={videoTitle}
@@ -1561,6 +1750,7 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
             isUploading={isUploading}
             uploadToTmpfiles={uploadToTmpfiles}
             generatedVideoUrl={generatedVideoUrl}
+            setGeneratedVideoUrl={setGeneratedVideoUrl}
             setGeneratedImageUrl={setGeneratedImageUrl}
             isGeneratingVideo={isGeneratingVideo}
             videoPrompt={videoPrompt}
@@ -1584,6 +1774,9 @@ Try adjusting your settings or use a different video model like Veo3 or Kling 2.
             previousEventVideoUrl={previousEventVideoUrl}
             statusMessage={statusMessage}
             setStatusMessage={setStatusMessage}
+            selectedImageCharacters={selectedImageCharacters}
+            setSelectedImageCharacters={setSelectedImageCharacters}
+            handleGenerateCharacterFrame={handleGenerateCharacterFrame}
           />
         );
       })()}

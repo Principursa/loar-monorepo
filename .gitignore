@@ -5,6 +5,7 @@ node_modules
 CLAUDE.md
 bun.lock
 bun.lockb
+.playwright-mcp
 
 
 .env.local
