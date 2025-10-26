@@ -25,6 +25,7 @@ forge-std = "1.10.0"
 solady = "0.1.26"
 uniswap-v4-core = "4"
 uniswap-v4-periphery = "60cd93803ac2b7fa65fd6cd351fd5fd4cc8c9db5"
+uniswap-permit2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3"
 # Chain-specific API keys using standardized environment variables
 # Format: VERIFICATION_KEY_{chainId}
 # mainnet = { key = "${VERIFICATION_KEY_1}" }
