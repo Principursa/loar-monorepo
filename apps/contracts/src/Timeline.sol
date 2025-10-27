@@ -18,6 +18,7 @@ contract Timeline is Ownable {
 
     mapping(uint => VideoNode) public nodes;
     uint public latestNodeId;
+    mapping(address user => bool) isWhitelisted;
 
     event NodeCanonized(uint id,address canonizer);
     event NodeCreated(uint id, uint previous, address creator);
@@ -153,8 +154,6 @@ contract Timeline is Ownable {
 
         return (ids, links, plots, previousIds, nextIds, canonFlags);
     }
-
-    //Handle voting later
 
     // ---- Canon ----
 
