@@ -110,10 +110,10 @@ function UniverseTimelineEditor() {
   // Governance state
   const [showGovernanceSidebar, setShowGovernanceSidebar] = useState(false);
 
-  // Filecoin integration state
-  const [isSavingToFilecoin, setIsSavingToFilecoin] = useState(false);
-  const [filecoinSaved, setFilecoinSaved] = useState(false);
-  const [pieceCid, setPieceCid] = useState<string | null>(null);
+  // MinIO/Storage integration state
+  const [isSavingToStorage, setIsSavingToStorage] = useState(false);
+  const [storageSaved, setStorageSaved] = useState(false);
+  const [storageKey, setStorageKey] = useState<string | null>(null);
 
   // Music/soundtrack state
   const [soundtrackUrl, setSoundtrackUrl] = useState<string>("");
@@ -127,32 +127,6 @@ function UniverseTimelineEditor() {
     console.log('generatedVideoUrl changed to:', generatedVideoUrl);
     console.log('Stack trace:', new Error().stack);
   }, [generatedVideoUrl]);
-
-  // Custom hook to create blob URL from Filecoin PieceCID
-  const createFilecoinBlobUrl = useCallback(async (pieceCid: string, filename: string = 'video.mp4') => {
-    try {
-      console.log('Creating blob URL for PieceCID:', pieceCid);
-
-      // Download from Filecoin via tRPC
-      const result = await trpcClient.synapse.download.query({ pieceCid });
-
-      // Convert base64 back to Uint8Array
-      const binaryData = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
-
-      // Create blob with proper MIME type
-      const mimeType = filename.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream';
-      const blob = new Blob([binaryData], { type: mimeType });
-
-      // Create URL for the blob
-      const blobUrl = URL.createObjectURL(blob);
-      console.log('Created blob URL:', blobUrl);
-
-      return blobUrl;
-    } catch (error) {
-      console.error('Failed to create blob URL from Filecoin:', error);
-      throw error;
-    }
-  }, []);
 
   // Contract hooks - we'll use the write contract directly for universe-specific contracts
   const { writeContractAsync } = useWriteContract();
@@ -927,59 +901,40 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
     }
 
     setIsSavingToContract(true);
-    setIsSavingToFilecoin(true);
+    setIsSavingToStorage(true);
 
     try {
-      // Step 1: Upload to Filecoin first
-      console.log('Step 1: Uploading video to Filecoin via Synapse. URL being used:', generatedVideoUrl);
+      // Step 1: Upload to MinIO S3 storage first
+      console.log('Step 1: Uploading video to MinIO S3. URL being used:', generatedVideoUrl);
       console.log('Current state - videoTitle:', videoTitle, 'videoDescription:', videoDescription);
 
-      let filecoinPieceCid: string | null = null;
+      let minioKey: string | null = null;
+      let minioUrl: string | null = null;
       try {
-        const filecoinResult = await trpcClient.synapse.uploadFromUrl.mutate({
-          url: generatedVideoUrl
+        // Generate a clean UUID for the filename
+        const uuid = crypto.randomUUID();
+        const minioResult = await trpcClient.minio.uploadFromUrl.mutate({
+          url: generatedVideoUrl,
+          filename: `${uuid}.mp4`
         });
 
-        console.log('Filecoin upload successful. PieceCID:', filecoinResult);
-        console.log('PieceCID type:', typeof filecoinResult);
-        console.log('PieceCID stringified:', JSON.stringify(filecoinResult));
+        console.log('MinIO upload successful. Key:', minioResult.key);
+        console.log('MinIO public URL:', minioResult.url);
 
-        // Convert to string if it's an object
-        let pieceCidString: string;
-        if (typeof filecoinResult === 'string') {
-          pieceCidString = filecoinResult;
-        } else if (filecoinResult && typeof filecoinResult === 'object') {
-          // Try different ways to extract the string value from the PieceCID object
-          const resultObj = filecoinResult as any;
-          pieceCidString = resultObj.toString?.() ||
-            resultObj.value ||
-            resultObj.cid ||
-            resultObj._baseValue ||
-            JSON.stringify(filecoinResult);
-          console.log('Extracted PieceCID string:', pieceCidString);
-        } else {
-          pieceCidString = String(filecoinResult);
-        }
+        minioKey = minioResult.key;
+        minioUrl = minioResult.url;
+        setStorageKey(minioResult.key);
+        setStorageSaved(true);
 
-        filecoinPieceCid = pieceCidString;
-        setPieceCid(pieceCidString);
-        setFilecoinSaved(true);
-
-        // Create blob URL from Filecoin for display
-        try {
-          const blobUrl = await createFilecoinBlobUrl(pieceCidString, 'video.mp4');
-          setGeneratedVideoUrl(blobUrl);
-          console.log('Updated video display to use Filecoin blob URL:', blobUrl);
-        } catch (blobError) {
-          console.error('Failed to create blob URL, keeping original URL:', blobError);
-          console.log('Keeping original URL for display:', generatedVideoUrl);
-        }
-      } catch (filecoinError) {
-        console.error('Filecoin upload failed, proceeding with original URL:', filecoinError);
-        // Continue with original URL if Filecoin fails
+        // Use the MinIO public URL directly
+        setGeneratedVideoUrl(minioUrl);
+        console.log('Updated video display to use MinIO URL:', minioUrl);
+      } catch (minioError) {
+        console.error('MinIO upload failed, proceeding with original URL:', minioError);
+        // Continue with original URL if MinIO fails
       }
 
-      setIsSavingToFilecoin(false);
+      setIsSavingToStorage(false);
 
       // Step 2: Determine the previous node based on addition type
       let previousNodeId: number;
@@ -1000,15 +955,14 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
         console.log('Creating linear continuation after event:', previousNodeId);
       }
 
-      // Step 3: Determine the video URL to store - prefer Filecoin PieceCID if available
-      const videoUrlForContract = filecoinPieceCid
-        ? filecoinPieceCid // Store raw PieceCID 
-        : generatedVideoUrl;
+      // Step 3: Determine the video URL to store - prefer MinIO URL if available
+      const videoUrlForContract = minioUrl || generatedVideoUrl;
 
       console.log('Step 2: Saving to contract:', {
         link: videoUrlForContract,
         originalLink: generatedVideoUrl,
-        pieceCid: filecoinPieceCid,
+        minioKey: minioKey,
+        minioUrl: minioUrl,
         plot: videoDescription,
         previous: previousNodeId,
         title: videoTitle,
@@ -1035,18 +989,10 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       setContractSaved(true);
 
       // Show success message
-      // Show success toast
-      if (filecoinPieceCid) {
-        toast.success('Event Saved to Blockchain & Filecoin!', {
-          description: `Your timeline event has been permanently stored.\nFilecoin PieceCID: ${filecoinPieceCid.substring(0, 20)}...\nTransaction: ${txHash.substring(0, 10)}...${txHash.substring(txHash.length - 8)}`,
-          duration: 8000
-        });
-      } else {
-        toast.success('Event Saved to Blockchain!', {
-          description: `Your timeline event has been added to the chain.\nTransaction: ${txHash.substring(0, 10)}...${txHash.substring(txHash.length - 8)}`,
-          duration: 6000
-        });
-      }
+      toast.success('Event Saved to Blockchain & MinIO!', {
+        description: `Your timeline event has been permanently stored.\nTransaction: ${txHash.substring(0, 10)}...${txHash.substring(txHash.length - 8)}`,
+        duration: 8000
+      });
 
       // Refresh the blockchain data to show the new node
       setTimeout(async () => {
@@ -1070,7 +1016,7 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       });
     } finally {
       setIsSavingToContract(false);
-      setIsSavingToFilecoin(false);
+      setIsSavingToStorage(false);
     }
   }, [generatedVideoUrl, videoTitle, videoDescription, graphData.nodeIds, writeContractAsync, isBlockchainUniverse, id, chainId]);
 
@@ -1766,9 +1712,9 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
             handleGenerateVideo={handleGenerateVideo}
             isSavingToContract={isSavingToContract}
             contractSaved={contractSaved}
-            isSavingToFilecoin={isSavingToFilecoin}
-            filecoinSaved={filecoinSaved}
-            pieceCid={pieceCid}
+            isSavingToFilecoin={isSavingToStorage}
+            filecoinSaved={storageSaved}
+            pieceCid={storageKey}
             handleSaveToContract={handleSaveToContract}
             handleCreateEvent={handleCreateEvent}
             previousEventVideoUrl={previousEventVideoUrl}

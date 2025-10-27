@@ -2,8 +2,7 @@ import { Handle, Position } from 'reactflow';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, Film } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
-import { trpcClient } from '@/utils/trpc';
+import { useState, useEffect } from 'react';
 
 export interface TimelineNodeData {
   label: string;
@@ -24,84 +23,48 @@ export interface TimelineNodeData {
 }
 
 export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
-  const [displayVideoUrl, setDisplayVideoUrl] = useState<string | null>(null);
-  const [isLoadingFilecoin, setIsLoadingFilecoin] = useState(false);
+  const [displayVideoUrl, setDisplayVideoUrl] = useState<string | null>(data.videoUrl || null);
+  const [isLoadingStorage, setIsLoadingStorage] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
+
   // Debug: Log the node data
   console.log('TimelineEventNode data:', data);
 
-  // Custom function to create blob URL from Filecoin PieceCID
-  const createFilecoinBlobUrl = useCallback(async (pieceCid: string, filename: string = 'video.mp4') => {
-    try {
-      console.log('TimelineNode: Creating blob URL for PieceCID:', pieceCid);
-      
-      // Add timeout for large files
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Download timeout after 30 seconds')), 30000)
-      );
-      
-      // Download from Filecoin via tRPC with timeout
-      const downloadPromise = trpcClient.synapse.download.query({ pieceCid });
-      const result = await Promise.race([downloadPromise, timeoutPromise]) as any;
-
-      console.log('TimelineNode: Download completed, converting to blob...');
-
-      // Convert base64 back to Uint8Array
-      const binaryData = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
-      
-      console.log(`TimelineNode: Converted to binary data, size: ${binaryData.length} bytes`);
-      
-      // Create blob with proper MIME type
-      const mimeType = filename.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream';
-      const blob = new Blob([binaryData], { type: mimeType });
-      
-      // Create URL for the blob
-      const blobUrl = URL.createObjectURL(blob);
-      console.log('TimelineNode: Created blob URL:', blobUrl);
-      
-      return blobUrl;
-    } catch (error) {
-      console.error('TimelineNode: Failed to create blob URL from Filecoin:', error);
-      throw error;
-    }
-  }, []);
-
-  // Handle PieceCIDs by creating blob URLs
+  // MinIO URLs are direct HTTP URLs, no conversion needed
   useEffect(() => {
-    if (data.videoUrl && data.videoUrl.startsWith('bafk')) {
-      // This looks like a raw PieceCID from Filecoin
-      console.log('TimelineNode: Converting PieceCID to blob URL for:', data.videoUrl);
+    // Simply use the video URL directly - MinIO provides HTTP URLs
+    setDisplayVideoUrl(data.videoUrl || null);
+    setIsLoadingStorage(false);
+  }, [data.videoUrl]);
 
-      setIsLoadingFilecoin(true);
-      const videoUrl = data.videoUrl; // Capture in closure
+  // Handle video play/pause based on hover state
+  useEffect(() => {
+    if (!videoElement) return;
 
-      // Add a delay to prevent overwhelming the server with concurrent requests
-      const delay = Math.random() * 1000; // Random delay up to 1 second
-      setTimeout(() => {
-        createFilecoinBlobUrl(videoUrl)
-          .then((blobUrl) => {
-            setDisplayVideoUrl(blobUrl);
-            console.log('TimelineNode: Successfully created blob URL:', blobUrl);
-          })
-          .catch((error) => {
-            console.error('TimelineNode: Failed to create blob URL, falling back to HTTP gateway:', error);
-            // Fallback: Use our HTTP gateway instead of blob URL
-            const baseUrl = import.meta.env.PROD ? 'https://loartech.xyz' : 'http://localhost:3000';
-            const fallbackUrl = `${baseUrl}/api/filecoin/${data.videoUrl}`;
-            setDisplayVideoUrl(fallbackUrl);
-            console.log('TimelineNode: Using HTTP gateway fallback for large file:', fallbackUrl);
-          })
-          .finally(() => {
-            setIsLoadingFilecoin(false);
-          });
-      }, delay);
+    let playPromise: Promise<void> | undefined;
+
+    if (isHovered) {
+      playPromise = videoElement.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // Auto-play was prevented, silently ignore
+        });
+      }
     } else {
-      // Use the original URL for HTTP URLs
-      setDisplayVideoUrl(data.videoUrl || null);
-      setIsLoadingFilecoin(false);
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          videoElement.pause();
+          videoElement.currentTime = 0;
+        }).catch(() => {
+          // Play was prevented, no need to pause
+        });
+      } else {
+        videoElement.pause();
+        videoElement.currentTime = 0;
+      }
     }
-  }, [data.videoUrl, createFilecoinBlobUrl]);
+  }, [isHovered, videoElement]);
 
   const handleClick = () => {
     if (data.eventId && data.universeId) {
@@ -157,7 +120,7 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
         >
           {/* Video Preview - Fixed size with proper containment and hover effects */}
           <div className="w-full h-52 bg-black relative overflow-hidden">
-            {isLoadingFilecoin && (
+            {isLoadingStorage && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-1"></div>
@@ -167,22 +130,13 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
             )}
             {displayVideoUrl ? (
               <>
-                <video 
+                <video
+                  ref={setVideoElement}
                   className="w-full h-full object-cover"
                   controls={false}
                   preload="metadata"
                   muted
                   loop
-                  ref={(video) => {
-                    if (video) {
-                      if (isHovered) {
-                        video.play().catch(e => console.log('Video play failed:', e));
-                      } else {
-                        video.pause();
-                        video.currentTime = 0;
-                      }
-                    }
-                  }}
                   onClick={(e) => {
                     e.stopPropagation(); // Prevent node click when using video controls
                   }}

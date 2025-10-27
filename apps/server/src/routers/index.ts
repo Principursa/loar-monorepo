@@ -15,6 +15,7 @@ import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverse
 import { falRouter } from "./fal/fal.routes";
 import { synapseService } from "../services/synapse";
 import { wikiaService } from "../services/wikia";
+import { minioService } from "../services/minio";
 
 
 export const appRouter = router({
@@ -175,6 +176,73 @@ export const appRouter = router({
           videoUrl: result.videoUrl,
           failureReason: result.error
         };
+      }),
+  }),
+  minio: router({
+    uploadFromUrl: publicProcedure
+      .input(z.object({
+        url: z.string().min(1, "URL is required"),
+        filename: z.string().optional()
+      }))
+      .mutation(async ({ input}) => {
+        try {
+          console.log(`MinIO S3 upload for ${input.url}`)
+          const result = await minioService.uploadFromUrl(input.url, input.filename)
+          console.log(`MinIO S3 upload successful - key:`, result)
+
+          // Return both the key and the public URL
+          return {
+            key: result,
+            url: minioService.getPublicUrl(result)
+          };
+        } catch (error) {
+          console.error("MinIO upload error:", error)
+          throw error
+        }
+      }),
+    download: publicProcedure
+      .input(z.object({ key: z.string() }))
+      .query(async ({ input }) => {
+        try {
+          console.log(`Starting MinIO download for key: ${input.key}`);
+
+          const data = await minioService.download(input.key);
+
+          console.log(`Downloaded ${data.length} bytes for key: ${input.key}`);
+
+          // Check if data is too large (> 5MB for tRPC transport safety)
+          if (data.length > 5 * 1024 * 1024) {
+            console.error(`File too large for tRPC: ${Math.round(data.length / 1024 / 1024)}MB`);
+            throw new Error(`File too large for tRPC: ${Math.round(data.length / 1024 / 1024)}MB (max 5MB). Use public URL instead.`);
+          }
+
+          try {
+            console.log(`🔄 Converting ${data.length} bytes to base64...`);
+
+            const base64Data = Buffer.from(data).toString('base64');
+
+            console.log(`✅ Base64 conversion successful, encoded length: ${base64Data.length}`);
+
+            return {
+              data: base64Data,
+              key: input.key,
+              originalSize: data.length,
+              encodedSize: base64Data.length
+            };
+
+          } catch (base64Error) {
+            console.error(`❌ Base64 conversion failed for ${input.key}:`, base64Error);
+            throw new Error(`Base64 encoding failed: File too large for memory. Use public URL instead.`);
+          }
+        } catch (error) {
+          console.error(`Failed to download key ${input.key}:`, error);
+          throw new Error(`Failed to download from MinIO: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }),
+    getPublicUrl: publicProcedure
+      .input(z.object({ key: z.string() }))
+      .query(({ input }) => {
+        return { url: minioService.getPublicUrl(input.key) };
       }),
   }),
   synapse: router({
