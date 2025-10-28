@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {Script, console} from "forge-std/Script.sol";
 import {Universe} from "../src/Universe.sol";
 
-contract TimelineScript is Script {
+contract UniverseScript is Script {
     Universe public universe;
 
     function setUp() public {}
