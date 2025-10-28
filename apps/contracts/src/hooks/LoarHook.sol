@@ -6,25 +6,25 @@ pragma solidity ^0.8.28;
 //import {ILoarMevModule} from "../interfaces/IClankerMevModule.sol";
 import {GovernanceERC20} from "../GovernanceERC20.sol";
 import {IUniverseManager} from "../interfaces/IUniverseManager.sol";
-import {IPermit2} from "@uniswap/permit2/src/interfaces/IPermit2.sol";
-import {Hooks, IHooks} from "@uniswap/v4-core/libraries/Hooks.sol";
-import {IPoolManager} from "@uniswap/v4-core/interfaces/IPoolManager.sol";
+import {IPermit2} from "permit2/src/interfaces/IPermit2.sol";
+import {Hooks, IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IPositionManager} from "@uniswap/v4-periphery/src/interfaces/IPositionManager.sol";
 
 import {IERC20} from "@openzeppelin/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
 
-import {IUnlockCallback} from "@uniswap/v4-core/interfaces/callback/IUnlockCallback.sol";
-import {LPFeeLibrary} from "@uniswap/v4-core/libraries/LPFeeLibrary.sol";
-import {TickMath} from "@uniswap/v4-core/libraries/TickMath.sol";
-import {BalanceDeltaLibrary} from "@uniswap/v4-core/types/BalanceDelta.sol";
-import {BalanceDelta} from "@uniswap/v4-core/types/BalanceDelta.sol";
-import {BeforeSwapDelta, toBeforeSwapDelta} from "@uniswap/v4-core/types/BeforeSwapDelta.sol";
+import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockCallback.sol";
+import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
+import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
+import {BeforeSwapDelta, toBeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {
     BeforeSwapDelta, BeforeSwapDeltaLibrary
-} from "@uniswap/v4-core/types/BeforeSwapDelta.sol";
-import {Currency} from "@uniswap/v4-core/types/Currency.sol";
-import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/types/PoolId.sol";
+} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
+import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Actions} from "@uniswap/v4-periphery/src/libraries/Actions.sol";
 import {LiquidityAmounts} from "@uniswap/v4-periphery/src/libraries/LiquidityAmounts.sol";
 import {BaseHook} from "@uniswap/v4-periphery/src/utils/BaseHook.sol";
