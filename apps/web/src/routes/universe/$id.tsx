@@ -994,6 +994,39 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
         duration: 8000
       });
 
+      // Step 4: Generate wiki entry in background (non-blocking)
+      console.log('Step 3: Generating wiki entry in background...');
+
+      // Gather previous events for context (last 2-3 events)
+      const previousEvents = graphData.nodeIds
+        .slice(-3) // Get last 3 events
+        .map((nodeId, idx) => ({
+          title: graphData.descriptions[graphData.nodeIds.length - 3 + idx] || `Event ${nodeId}`,
+          description: graphData.descriptions[graphData.nodeIds.length - 3 + idx] || ''
+        }))
+        .filter(evt => evt.description.length > 0);
+
+      // Generate wiki in background (non-blocking)
+      trpcClient.wiki.generateFromVideo.mutate({
+        universeId: id,
+        eventId: String(previousNodeId + 1), // New event ID
+        videoUrl: videoUrlForContract,
+        title: videoTitle,
+        description: videoDescription,
+        characterIds: selectedCharacters.length > 0 ? selectedCharacters : undefined,
+        previousEvents: previousEvents.length > 0 ? previousEvents : undefined
+      }).then((wikiResult) => {
+        console.log('✅ Wiki generated successfully!', wikiResult);
+        toast.success('Wiki Generated!', {
+          description: 'AI-powered wiki entry created for your event.',
+          duration: 4000
+        });
+      }).catch((wikiError) => {
+        console.error('❌ Wiki generation failed:', wikiError);
+        // Don't show error to user - wiki can be generated later
+        console.warn('Event saved but wiki generation failed. Wiki can be regenerated later.');
+      });
+
       // Refresh the blockchain data to show the new node
       setTimeout(async () => {
         if (isBlockchainUniverse) {
@@ -1432,7 +1465,13 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
 
       // Debug: Log the node creation data
       console.log(`Creating node ${nodeId} (${eventLabel}):`, {
-        url, description, previousNode, parentId, position: { x, y }
+        blockchainNodeId: nodeId,
+        eventLabel,
+        url,
+        description,
+        previousNode,
+        parentId,
+        position: { x, y }
       });
 
       blockchainNodes.push({
@@ -1448,6 +1487,7 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
           timelineColor: color,
           nodeType: 'scene',
           eventId: eventLabel, // Use the proper event label (e.g., "2b" for branches)
+          blockchainNodeId: nodeId, // Store actual blockchain node ID for navigation
           displayName: eventLabel, // User-friendly display name
           timelineId: `timeline-1`,
           universeId: finalUniverse?.id || id,
@@ -1535,14 +1575,24 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       setSelectedEventTitle(node.data.label);
       setSelectedEventDescription(node.data.description);
 
-      // Navigate to timeline viewer with specific event
+      // Navigate to event page with specific event
       const universeId = node.data.universeId || id;
-      const eventId = node.data.eventId;
+      // Use blockchainNodeId if available (for blockchain nodes), otherwise use eventId
+      const eventId = node.data.blockchainNodeId || node.data.eventId;
+
+      console.log('🎯 Node clicked:', {
+        eventId: node.data.eventId,
+        blockchainNodeId: node.data.blockchainNodeId,
+        selectedEventId: eventId,
+        label: node.data.label,
+        universeId
+      });
 
       if (eventId && universeId) {
-        // Navigate to timeline page with universe and event parameters
-        const timelineUrl = `/timeline?universe=${universeId}&event=${eventId}`;
-        window.location.href = timelineUrl;
+        // Navigate to event page with universe and event parameters
+        const eventUrl = `/event/${universeId}/${eventId}`;
+        console.log('🔗 Navigating to:', eventUrl);
+        window.location.href = eventUrl;
       }
     }
   }, [id]);

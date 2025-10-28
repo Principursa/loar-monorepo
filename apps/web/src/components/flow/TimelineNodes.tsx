@@ -13,6 +13,7 @@ export interface TimelineNodeData {
   timelineName?: string;
   isRoot?: boolean;
   eventId?: string;
+  blockchainNodeId?: number; // Actual blockchain node ID for navigation
   displayName?: string; // User-friendly display name for UI
   timelineId?: string;
   universeId?: string;
@@ -67,21 +68,21 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
   }, [isHovered, videoElement]);
 
   const handleClick = () => {
-    if (data.eventId && data.universeId) {
-      console.log('Navigating to timeline:', {
-        universeId: data.universeId,
-        eventId: data.eventId
-      });
-      // Navigate to timeline viewer with specific event
-      const timelineUrl = `/timeline?universe=${data.universeId}&event=${data.eventId}`;
-      window.location.href = timelineUrl;
-    } else {
-      console.log('Missing navigation data:', {
-        eventId: data.eventId,
-        universeId: data.universeId,
-        data
-      });
+    if (!data.eventId || !data.universeId) return;
+
+    // Extract the numeric ID from eventId (e.g., "4b" -> 4, "10" -> 10)
+    let numericEventId: string | number = data.eventId;
+
+    // If eventId is a string like "4b", extract just the number part
+    if (typeof numericEventId === 'string') {
+      const match = numericEventId.match(/^\d+/);
+      if (match) {
+        numericEventId = match[0];
+      }
     }
+
+    const eventUrl = `/event/${data.universeId}/${numericEventId}`;
+    window.location.href = eventUrl;
   };
 
   // Add Event Node - just a + button
