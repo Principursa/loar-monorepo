@@ -7,11 +7,23 @@ import {UniverseGovernor} from "./UniverseGovernor.sol";
 import {Universe} from "./Universe.sol";
 import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
-import {PoolKey} from "../dependencies/uniswap-v4-core-4/src/types/PoolKey.sol"; //WIP: figure out why uniswap import is bugging out
 import {EnumerableSetLib} from "solady/src/utils/EnumerableSetLib.sol";
 import {LoarDeployer} from "./utils/LoarDeployer.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import {ILoarHook} from "./interfaces/ILoarHook.sol";
+
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
+import {BeforeSwapDelta, BeforeSwapDeltaLibrary, toBeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
+import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {Hooks, IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {SafeCast} from "@uniswap/v4-core/src/libraries/SafeCast.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 
 contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     uint public teamFee;
@@ -26,7 +38,12 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
 
     //mapping(PoolId id => Pool.State) internal _pools;
     mapping(uint id => UniverseSystem) universeSystems;
+    mapping(address hook => bool enabled) enabledHooks;
     uint latestId; //See if EnumerableSetLib fixes this
+
+    constructor(address _teamFeeRecipient) Ownable(msg.sender) {
+        teamFeeRecipient = _teamFeeRecipient;
+    }
 
     function createUniverse(
         string memory name,
@@ -49,8 +66,6 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         );
     }
 
-    function createUniverseToken() public {}
-
     function deployUniverseToken(
         DeploymentConfig memory deploymentConfig
     ) public payable nonReentrant returns (address tokenAddress) {
@@ -60,21 +75,56 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         );
         //insert into universesystem array
 
-        PoolKey memory poolkey = _initializePool();
+        PoolKey memory poolkey = _initializePool(
+            deploymentConfig.poolConfig,
+            tokenAddress
+        );
+        emit TokenCreated();
     }
 
     function deployGovernance() internal returns (address) {}
 
-    function setTeamFeeRecipient() public onlyOwner {}
+    function setTeamFeeRecipient(address _teamFeeRecipient) public onlyOwner {
+        address oldTeamFeeRecipient = teamFeeRecipient;
+        teamFeeRecipient = _teamFeeRecipient;
+        emit SetTeamFeeRecipient(oldTeamFeeRecipient, teamFeeRecipient);
+    }
 
-    function claimTeamFee() external onlyOwner {}
+    function claimTeamFee(address token) external onlyOwner {
+        if (teamFeeRecipient == address(0)) revert TeamFeeRecipientNotSet();
+
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        SafeERC20.safeTransfer(IERC20(token), teamFeeRecipient, balance);
+        emit ClaimTeamFees(token, teamFeeRecipient, balance);
+    }
 
     function _initializePool(
         PoolConfig memory poolConfig,
         address newToken
+    ) internal returns (PoolKey memory poolKey) {
+        if (!enabledHooks[poolConfig.hook]) {
+            revert HookNotEnabled();
+        }
+
+        poolKey = ILoarHook(poolConfig.hook).initializePool(
+            newToken,
+            poolConfig.pairedToken,
+            poolConfig.tickIfToken0IsLoar,
+            poolConfig.tickSpacing,
+            poolConfig.poolData
+        );
+    }
+
+    function _initializeLiquidity(
+        IUniverseManager.PoolConfig memory poolConfig,
+        PoolKey memory poolKey,
+        uint256 poolSupply,
+        address token
     ) internal {}
 
-    function _initializeLiquidity() internal {}
-
-    function getUniverse() public {}
+    function getUniverse(
+        uint id
+    ) public returns (UniverseSystem memory system) {
+        return universeSystems[id];
+    }
 }

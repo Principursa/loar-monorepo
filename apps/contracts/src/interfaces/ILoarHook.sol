@@ -3,8 +3,8 @@ pragma solidity ^0.8.28;
 
 import {IUniverseManager} from "./IUniverseManager.sol";
 
-import {PoolId} from "../../dependencies/uniswap-v4-core-4/src/types/PoolId.sol";
-import {PoolKey} from "../../dependencies/uniswap-v4-core-4/src/types/PoolKey.sol";
+import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
 interface ILoarHook {
     error ETHPoolNotAllowed();
@@ -32,18 +32,14 @@ interface ILoarHook {
         address mevModule
     );
 
-    // note: is not emitted when a mev module expires
-    event MevModuleDisabled(PoolId);
     event ClaimProtocolFees(address indexed token, uint256 amount);
 
     // initialize a pool on the hook for a token
     function initializePool(
-        address clanker,
+        address loar,
         address pairedToken,
-        int24 tickIfToken0IsClanker,
+        int24 tickIfToken0Isloar,
         int24 tickSpacing,
-        address locker,
-        address mevModule,
         bytes calldata poolData
     ) external returns (PoolKey memory);
 
@@ -55,16 +51,6 @@ interface ILoarHook {
         int24 tickSpacing,
         bytes calldata poolData
     ) external returns (PoolKey memory);
-
-    // turn a pool's mev module on if it exists
-    function initializeMevModule(
-        PoolKey calldata poolKey,
-        bytes calldata mevModuleData
-    ) external;
-
-    // note: original base IClankerHook deployment is missing these functions but
-    // the IClankerLpFeeConversion locker needs them
-    function mevModuleEnabled(PoolId poolId) external view returns (bool);
 
     function poolCreationTimestamp(
         PoolId poolId
