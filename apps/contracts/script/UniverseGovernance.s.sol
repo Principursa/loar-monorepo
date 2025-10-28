@@ -10,7 +10,7 @@ import {ERC20Votes} from "@openzeppelin/token/ERC20/extensions/ERC20Votes.sol";
 import {Nonces} from "@openzeppelin/utils/Nonces.sol";
 import {GovernanceERC20} from "../src/GovernanceERC20.sol";
 
-contract TimelineGovernanceScript is Script {
+contract UniverseGovernanceScript is Script {
     Universe public universe;
     UniverseGovernor public governor;
     GovernanceERC20 public token;
