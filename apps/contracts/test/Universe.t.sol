@@ -7,7 +7,5 @@ import {Universe} from "../src/Universe.sol";
 contract CounterTest is Test {
     Universe public universe;
 
-    function setUp() public {
-        universe = new Universe(msg.sender);
-    }
+    function setUp() public {}
 }

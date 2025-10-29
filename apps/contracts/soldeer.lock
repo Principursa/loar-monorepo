@@ -20,6 +20,13 @@ checksum = "9872ac7cfd32c1eba32800508a1325c49f4a4aa8c6f670454db91971a583e26b"
 integrity = "5da4b5ca9cbad98812a4b75ad528ff34c72a0b84433204be6d1420c81de1d6ff"
 
 [[dependencies]]
+name = "solmate"
+version = "89365b880c4f3c786bdd453d4b8e8fe410344a69"
+url = "https://soldeer-revisions.s3.amazonaws.com/solmate/89365b880c4f3c786bdd453d4b8e8fe410344a69_25-08-2025_15:48:50_solmate-89365b880c4f3c786bdd453d4b8e8fe410344a69.zip"
+checksum = "76a5ec8e8a119288a318d6220331f985ba7a3278edf558402232782736066dd0"
+integrity = "a70931c29b02514a8a2a29f58f689c3ed0448b8f58dc8ba0ad34fa2037531c3d"
+
+[[dependencies]]
 name = "uniswap-permit2"
 version = "0x000000000022D473030F116dDEE9F6B43aC78BA3"
 url = "https://soldeer-revisions.s3.amazonaws.com/uniswap-permit2/0x000000000022D473030F116dDEE9F6B43aC78BA3_11-11-2024_08:00:23_permit2.zip"
