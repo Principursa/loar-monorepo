@@ -33,12 +33,12 @@ contract UniverseGovernorScript is Script {
         console.log("ChainId: ", getChainId());
         console.log("Deploying");
         vm.startBroadcast(deployerPrivateKey);
-        token = new GovernanceERC20("MyToken","MTKN");
+        //token = new GovernanceERC20("MyToken","MTKN");
 
         governor = new UniverseGovernor(token);
 
         console.log("Governor deployed at:", address(governor));
-        console.log("Token deployed at:", address(token));
+        //console.log("Token deployed at:", address(token));
 
         vm.stopBroadcast();
     }

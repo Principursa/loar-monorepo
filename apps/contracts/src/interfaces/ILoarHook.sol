@@ -16,19 +16,18 @@ interface ILoarHook {
 
     event PoolCreatedOpen(
         address indexed pairedToken,
-        address indexed clanker,
+        address indexed loar,
         PoolId poolId,
-        int24 tickIfToken0IsClanker,
+        int24 tickIfToken0IsLoar,
         int24 tickSpacing
     );
 
     event PoolCreatedFactory(
         address indexed pairedToken,
-        address indexed clanker,
+        address indexed loar,
         PoolId poolId,
-        int24 tickIfToken0IsClanker,
+        int24 tickIfToken0IsLoar,
         int24 tickSpacing,
-        address locker,
         address mevModule
     );
 
@@ -38,16 +37,16 @@ interface ILoarHook {
     function initializePool(
         address loar,
         address pairedToken,
-        int24 tickIfToken0Isloar,
+        int24 tickIfToken0IsLoar,
         int24 tickSpacing,
         bytes calldata poolData
     ) external returns (PoolKey memory);
 
     // initialize a pool not via the factory
     function initializePoolOpen(
-        address clanker,
+        address loar,
         address pairedToken,
-        int24 tickIfToken0IsClanker,
+        int24 tickIfToken0IsLoar,
         int24 tickSpacing,
         bytes calldata poolData
     ) external returns (PoolKey memory);
