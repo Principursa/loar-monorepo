@@ -27,7 +27,7 @@ contract UniverseScript is Script {
         console.log("Deploying");
         vm.startBroadcast(deployerPrivateKey);
 
-        universe = new Universe(deployerAddress); //In backend this will be deployed w governance
+        //universe = new Universe(deployerAddress); //In backend this will be deployed w governance
 
         vm.stopBroadcast();
     }

@@ -18,7 +18,10 @@ contract UniverseManagerTest is Test, Deployers {
     PoolManager internal poolManager;
     PoolModifyLiquidityTest internal poolModifyPosition;
 
-    bytes internal constant UNAUTHORIZED = 0x82b42900;
+    WETH9 internal WETH;
+    WETH9 internal lrWETH;
+
+    //bytes internal constant UNAUTHORIZED = 0x82b42900;
     int24 TICK_SPACING = 60;
 
     address public constant DEPLOYER =
@@ -28,5 +31,11 @@ contract UniverseManagerTest is Test, Deployers {
         poolManager = new PoolManager(address(this));
         poolModifyPosition = new PoolModifyLiquidityTest(poolManager);
         universeManager = new UniverseManager(msg.sender);
+        WETH = WETH9(payable(address(123)));
+        lrWETH = WETH;
+    }
+
+    function test_CreateUniverse() public {
+
     }
 }

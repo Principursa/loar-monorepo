@@ -38,11 +38,11 @@ contract UniverseGovernanceScript is Script {
 
         token = new GovernanceERC20("MyToken", "MTKN",100,msg.sender,"","","");
         governor = new UniverseGovernor(token);
-        universe = new Universe(address(governor)); //In backend this will be deployed w governance
+        //universe = new Universe(address(governor)); //In backend this will be deployed w governance
 
         console.log("Governor deployed at:", address(governor));
         console.log("Token deployed at:", address(token));
-        console.log("universe deployed at:", address(universe));
+        //console.log("universe deployed at:", address(universe));
 
         vm.stopBroadcast();
     }
