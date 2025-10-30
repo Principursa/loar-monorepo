@@ -68,20 +68,29 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
   }, [isHovered, videoElement]);
 
   const handleClick = () => {
-    if (!data.eventId || !data.universeId) return;
+    if (!data.universeId) return;
 
-    // Extract the numeric ID from eventId (e.g., "4b" -> 4, "10" -> 10)
-    let numericEventId: string | number = data.eventId;
+    // Use blockchainNodeId if available (the actual blockchain node ID)
+    // Otherwise fall back to parsing eventId
+    let eventIdToUse: string | number;
 
-    // If eventId is a string like "4b", extract just the number part
-    if (typeof numericEventId === 'string') {
-      const match = numericEventId.match(/^\d+/);
-      if (match) {
-        numericEventId = match[0];
+    if (data.blockchainNodeId !== undefined) {
+      // Use the actual blockchain node ID
+      eventIdToUse = data.blockchainNodeId;
+    } else if (data.eventId) {
+      // Fallback: Extract numeric ID from eventId (e.g., "4b" -> 4, "10" -> 10)
+      eventIdToUse = data.eventId;
+      if (typeof eventIdToUse === 'string') {
+        const match = eventIdToUse.match(/^\d+/);
+        if (match) {
+          eventIdToUse = match[0];
+        }
       }
+    } else {
+      return;
     }
 
-    const eventUrl = `/event/${data.universeId}/${numericEventId}`;
+    const eventUrl = `/event/${data.universeId}/${eventIdToUse}`;
     window.location.href = eventUrl;
   };
 
