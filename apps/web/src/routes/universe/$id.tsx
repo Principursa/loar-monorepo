@@ -295,12 +295,12 @@ function UniverseTimelineEditor() {
     queryFn: () => trpcClient.wiki.characters.query(),
   });
 
-  // Generate character mutation (without saving to DB)
+  // Generate character mutation (with optional DB save)
   const generateCharacterMutation = useMutation({
-    mutationFn: async (input: { name: string; description: string; style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk' }) => {
+    mutationFn: async (input: { name: string; description: string; style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'; saveToDatabase?: boolean }) => {
       const result = await trpcClient.fal.generateCharacter.mutate({
         ...input,
-        saveToDatabase: false // Don't save automatically
+        saveToDatabase: input.saveToDatabase ?? false // Use input value or default to false
       });
       return result;
     },
@@ -1773,6 +1773,7 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
             selectedImageCharacters={selectedImageCharacters}
             setSelectedImageCharacters={setSelectedImageCharacters}
             handleGenerateCharacterFrame={handleGenerateCharacterFrame}
+            refetchCharacters={refetchCharacters}
           />
         );
       })()}

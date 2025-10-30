@@ -153,12 +153,16 @@ export const falRouter = router({
       let characterId: string | undefined;
       let localImageUrl: string | undefined;
 
+      console.log('💾 saveToDatabase flag:', input.saveToDatabase);
+
       if (input.saveToDatabase) {
+        console.log('✅ Saving character to database...');
         // Use the original FAL image URL directly instead of uploading to Walrus
         localImageUrl = imageResult.imageUrl;
 
         characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        await db.insert(characters).values({
+
+        const characterData = {
           id: characterId,
           character_name: input.name,
           collection: "Nano Banana AI",
@@ -174,7 +178,19 @@ export const falRouter = router({
           description: input.description,
           created_at: new Date(),
           updated_at: new Date(),
-        });
+        };
+
+        console.log('📝 Character data to insert:', characterData);
+
+        try {
+          await db.insert(characters).values(characterData);
+          console.log('✅ Character saved successfully with ID:', characterId);
+        } catch (dbError) {
+          console.error('❌ Database insert failed:', dbError);
+          throw dbError;
+        }
+      } else {
+        console.log('⏭️  Skipping database save (saveToDatabase: false)');
       }
 
       return {
