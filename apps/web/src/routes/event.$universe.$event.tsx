@@ -2,7 +2,7 @@ import { createFileRoute, useParams, useNavigate } from "@tanstack/react-router"
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, BookOpen, Sparkles, Users as UsersIcon, Calendar, Film } from "lucide-react";
+import { ArrowLeft, Loader2, BookOpen, Sparkles, Users as UsersIcon, Calendar, Film, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { trpcClient } from "@/utils/trpc";
 import { useGetFullGraph } from "@/hooks/useTimeline";
@@ -26,6 +26,51 @@ function EventPage() {
 
   const eventVideoUrl = eventIndex !== -1 ? String(graphData?.[1]?.[eventIndex] || '') : '';
   const eventDescription = eventIndex !== -1 ? String(graphData?.[2]?.[eventIndex] || '') : '';
+
+  // Find previous event (the parent node)
+  const previousNodeId = eventIndex !== -1 ? graphData?.[3]?.[eventIndex] : null;
+  const previousEventId = previousNodeId && String(previousNodeId) !== '0'
+    ? (typeof previousNodeId === 'bigint' ? Number(previousNodeId) : parseInt(String(previousNodeId)))
+    : null;
+
+  // Find next events (all children of this node)
+  const nextEventIds: number[] = [];
+  const nextEventData: Array<{ id: number; videoUrl: string; description: string }> = [];
+  if (graphData && eventIndex !== -1) {
+    const currentNodeId = graphData[0][eventIndex];
+    const currentId = typeof currentNodeId === 'bigint' ? Number(currentNodeId) : parseInt(String(currentNodeId));
+
+    // Find all nodes that have this node as their parent
+    graphData[3]?.forEach((parentId: any, idx: number) => {
+      const parentNumeric = typeof parentId === 'bigint' ? Number(parentId) : parseInt(String(parentId));
+      if (parentNumeric === currentId) {
+        const childId = graphData[0][idx];
+        const childNumeric = typeof childId === 'bigint' ? Number(childId) : parseInt(String(childId));
+        nextEventIds.push(childNumeric);
+        nextEventData.push({
+          id: childNumeric,
+          videoUrl: String(graphData[1]?.[idx] || ''),
+          description: String(graphData[2]?.[idx] || `Event ${childNumeric}`)
+        });
+      }
+    });
+  }
+
+  // Get previous event data
+  let previousEventData: { id: number; videoUrl: string; description: string } | null = null;
+  if (previousEventId && graphData) {
+    const prevIndex = graphData[0]?.findIndex((id: any) => {
+      const numericId = typeof id === 'bigint' ? Number(id) : parseInt(String(id));
+      return numericId === previousEventId;
+    });
+    if (prevIndex !== -1) {
+      previousEventData = {
+        id: previousEventId,
+        videoUrl: String(graphData[1]?.[prevIndex] || ''),
+        description: String(graphData[2]?.[prevIndex] || `Event ${previousEventId}`)
+      };
+    }
+  }
 
   // Fetch wiki data
   const { data: wikiData, isLoading: isLoadingWiki } = useQuery({
@@ -145,6 +190,154 @@ function EventPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Navigation Buttons */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold">Navigate Timeline</h3>
+            <Button
+              variant="outline"
+              onClick={() => navigate({ to: `/universe/${universeId}` })}
+            >
+              View Full Timeline
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Previous Event Card */}
+            {previousEventData ? (
+              <Card
+                className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-primary"
+                onClick={() => navigate({ to: `/event/${universeId}/${previousEventData.id}` })}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <ChevronLeft className="h-5 w-5 text-primary" />
+                    <span className="font-semibold">Previous Event</span>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-32 h-20 bg-black rounded overflow-hidden flex-shrink-0">
+                      {previousEventData.videoUrl ? (
+                        <video
+                          src={previousEventData.videoUrl}
+                          className="w-full h-full object-cover"
+                          muted
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-white">
+                          <Film className="h-8 w-8" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">Event #{previousEventData.id}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {previousEventData.description}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="opacity-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <ChevronLeft className="h-5 w-5" />
+                    <span className="font-semibold">No Previous Event</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">This is the first event</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Next Event Card(s) */}
+            {nextEventData.length > 0 ? (
+              nextEventData.length === 1 ? (
+                <Card
+                  className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-primary"
+                  onClick={() => navigate({ to: `/event/${universeId}/${nextEventData[0].id}` })}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="font-semibold">Next Event</span>
+                      <ChevronRight className="h-5 w-5 text-primary ml-auto" />
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="w-32 h-20 bg-black rounded overflow-hidden flex-shrink-0">
+                        {nextEventData[0].videoUrl ? (
+                          <video
+                            src={nextEventData[0].videoUrl}
+                            className="w-full h-full object-cover"
+                            muted
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-white">
+                            <Film className="h-8 w-8" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">Event #{nextEventData[0].id}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {nextEventData[0].description}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-2">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-semibold">Multiple Branches Available</span>
+                      <Badge variant="secondary">{nextEventData.length} branches</Badge>
+                    </div>
+                    <div className="max-h-[400px] overflow-y-auto space-y-2 pr-2">
+                      {nextEventData.map((event, idx) => (
+                        <div
+                          key={event.id}
+                          className="flex gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-all group border border-transparent hover:border-primary"
+                          onClick={() => navigate({ to: `/event/${universeId}/${event.id}` })}
+                        >
+                          <div className="w-20 h-14 bg-black rounded overflow-hidden flex-shrink-0">
+                            {event.videoUrl ? (
+                              <video
+                                src={event.videoUrl}
+                                className="w-full h-full object-cover"
+                                muted
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-white">
+                                <Film className="h-5 w-5" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">Branch {idx + 1} - Event #{event.id}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-1">
+                              {event.description}
+                            </p>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            ) : (
+              <Card className="opacity-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="font-semibold">No Next Event</span>
+                    <ChevronRight className="h-5 w-5 ml-auto" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">This is the last event</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
 
         {/* Wiki Content */}
         {wiki ? (
