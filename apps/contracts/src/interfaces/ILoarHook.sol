@@ -27,8 +27,7 @@ interface ILoarHook {
         address indexed loar,
         PoolId poolId,
         int24 tickIfToken0IsLoar,
-        int24 tickSpacing,
-        address mevModule
+        int24 tickSpacing
     );
 
     event ClaimProtocolFees(address indexed token, uint256 amount);
@@ -43,19 +42,9 @@ interface ILoarHook {
     ) external returns (PoolKey memory);
 
     // initialize a pool not via the factory
-    function initializePoolOpen(
-        address loar,
-        address pairedToken,
-        int24 tickIfToken0IsLoar,
-        int24 tickSpacing,
-        bytes calldata poolData
-    ) external returns (PoolKey memory);
-
     function poolCreationTimestamp(
         PoolId poolId
     ) external view returns (uint256);
-
-    function MAX_MEV_MODULE_DELAY() external view returns (uint256);
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool);
 }

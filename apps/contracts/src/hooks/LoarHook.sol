@@ -86,32 +86,28 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     }
 
     function initializePool(
-        address Loar,
+        address loar,
         address pairedToken,
         int24 tickIfToken0IsLoar,
         int24 tickSpacing,
-        address _locker,
-        address _mevModule,
         bytes calldata poolData
     ) public onlyFactory returns (PoolKey memory) {
         // initialize the pool
         PoolKey memory poolKey = _initializePool(
-            Loar,
+            loar,
             pairedToken,
             tickIfToken0IsLoar,
             tickSpacing,
             poolData
         );
 
-        // set the mev module
 
         emit PoolCreatedFactory({
             pairedToken: pairedToken,
-            loar: Loar,
+            loar: loar,
             poolId: poolKey.toId(),
             tickIfToken0IsLoar: tickIfToken0IsLoar,
-            tickSpacing: tickSpacing,
-            mevModule: _mevModule
+            tickSpacing: tickSpacing
         });
 
         return poolKey;
@@ -301,6 +297,16 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     ) external pure returns (bool) {
         return interfaceId == type(ILoarHook).interfaceId;
     }
+
+    function _beforeAddLiquidity(
+        address,
+        PoolKey calldata poolKey,
+        ModifyLiquidityParams calldata,
+        bytes calldata
+    ) internal virtual override returns (bytes4) {
+        return BaseHook.beforeAddLiquidity.selector;
+    }
+
 
     function _hookFeeClaim(PoolKey calldata poolKey) internal {
         // determine the fee token
