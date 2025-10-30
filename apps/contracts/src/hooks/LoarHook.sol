@@ -183,14 +183,14 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         bool swappingForLoar = swapParams.zeroForOne != token0IsLoar;
         bool isExactInput = swapParams.amountSpecified < 0;
 
-        // case: specified amount paired in, unspecified amount clanker out
+        // case: specified amount paired in, unspecified amount loar out
         // want to: keep amountIn the same, take fee on amountIn
         // how: we modulate the specified amount being swapped DOWN, and
         // transfer the difference into the hook's account before making the swap
         if (isExactInput && swappingForLoar) {
             // since we're taking the protocol fee before the LP swap, we want to
             // take a slightly smaller amount to keep the taken LP/protocol fee at the 20% ratio,
-            // this also helps us match the ExactOutput swappingForClanker scenario
+            // this also helps us match the ExactOutput swappingForLoar scenario
             uint128 scaledProtocolFee = (uint128(protocolFee) * 1e18) /
                 (1_000_000 + protocolFee);
             int128 fee = int128(
@@ -207,7 +207,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             );
         }
 
-        // case: specified amount paired out, unspecified amount clanker in
+        // case: specified amount paired out, unspecified amount loar in
         // want to: increase amountOut by fee and take it
         // how: we modulate the specified amount out UP, and transfer it
         // into the hook's account
@@ -242,14 +242,14 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     ) internal override returns (bytes4, int128 unspecifiedDelta) {
         // variables to determine how to collect protocol fee
         bool token0IsLoar = loarIsToken0[poolKey.toId()];
-        bool swappingForClanker = swapParams.zeroForOne != token0IsLoar;
+        bool swappingForLoar = swapParams.zeroForOne != token0IsLoar;
         bool isExactInput = swapParams.amountSpecified < 0;
 
         // case: specified amount clanker in, unspecified amount paired out
         // want to: take fee on amount out
         // how: the change in unspecified delta is debited to the swaps account post swap,
         // in this case the amount out given to the swapper is decreased
-        if (isExactInput && !swappingForClanker) {
+        if (isExactInput && !swappingForLoar) {
             // grab non-clanker amount out
             int128 amountOut = token0IsLoar ? delta.amount1() : delta.amount0();
             // take fee from it
@@ -269,7 +269,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         // want to: take fee on amount in
         // how: the change in unspecified delta is debited to the swapper's account post swap,
         // in this case the amount taken from the swapper's account is increased
-        if (!isExactInput && swappingForClanker) {
+        if (!isExactInput && swappingForLoar) {
             // grab non-clanker amount in
             int128 amountIn = token0IsLoar ? delta.amount1() : delta.amount0();
             // take fee from amount int

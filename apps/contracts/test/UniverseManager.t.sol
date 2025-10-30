@@ -11,12 +11,14 @@ import {PoolModifyLiquidityTest} from "@uniswap/v4-core/src/test/PoolModifyLiqui
 import {IPoolManager, PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {WETH9} from "./tokens/WETH9.sol";
+//import {LoarHook} from "../src/hooks/LoarHook.sol";
+import {LoarHookStaticFee} from "../src/hooks/LoarHookStaticFee.sol";
 
 contract UniverseManagerTest is Test, Deployers {
-
     UniverseManager public universeManager;
-    PoolManager internal poolManager;
-    PoolModifyLiquidityTest internal poolModifyPosition;
+    PoolManager public poolManager;
+    PoolModifyLiquidityTest public poolModifyPosition;
+    LoarHookStaticFee public loarHook;
 
     WETH9 internal WETH;
     WETH9 internal lrWETH;
@@ -32,10 +34,13 @@ contract UniverseManagerTest is Test, Deployers {
         poolModifyPosition = new PoolModifyLiquidityTest(poolManager);
         universeManager = new UniverseManager(msg.sender);
         WETH = WETH9(payable(address(123)));
+        loarHook = new LoarHookStaticFee(
+            address(poolManager),
+            address(universeManager),
+            address(WETH)
+        );
         lrWETH = WETH;
     }
 
-    function test_CreateUniverse() public {
-
-    }
+    function test_CreateUniverse() public {}
 }
