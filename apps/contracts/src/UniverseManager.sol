@@ -24,6 +24,7 @@ import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {SafeCast} from "@uniswap/v4-core/src/libraries/SafeCast.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
+import "./libraries/NodeOptions.sol";
 
 contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     uint public teamFee;
@@ -52,11 +53,14 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         NodeCreationOptions nodeCreationOptions,
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner
-    ) public nonReentrant {
+    ) public nonReentrant returns (uint256 _id) {
         UniverseConfig memory config = UniverseConfig(
             nodeCreationOptions,
             nodeVisibilityOptions,
-            initialOwner
+            initialOwner,
+            name,
+            imageURL,
+            description
         );
         Universe universe = new Universe(config);
         UniverseSystem memory system = UniverseSystem(

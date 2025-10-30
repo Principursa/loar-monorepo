@@ -5,6 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
+import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
 
 contract Universe is Ownable, IUniverse {
     //Maybe include some sort of hook system with custom contracts for creation and visibility options later, for now this is good enough
@@ -32,8 +33,8 @@ contract Universe is Ownable, IUniverse {
     mapping(address user => bool) isWhitelisted;
 
     //WIP: better structure types
-    IUniverseManager.NodeCreationOptions private nodeCreationOption;
-    IUniverseManager.NodeVisibilityOptions private nodeVisibilityOption;
+    NodeCreationOptions private nodeCreationOption;
+    NodeVisibilityOptions private nodeVisibilityOption;
 
     bool public isTokenMinted;
     IUniverseManager public universeManager;
@@ -148,13 +149,13 @@ contract Universe is Ownable, IUniverse {
     }
 
     function setNodeVisibilityOption(
-        IUniverseManager.NodeVisibilityOptions _option
+        NodeVisibilityOptions _option
     ) public onlyOwner {
         nodeVisibilityOption = _option;
     }
 
     function setNodeCreationOption(
-        IUniverseManager.NodeCreationOptions _option
+        NodeCreationOptions _option
     ) public onlyOwner {
         nodeCreationOption = _option;
     }

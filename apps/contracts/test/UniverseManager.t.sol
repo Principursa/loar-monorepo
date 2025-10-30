@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
 import {UniverseManager} from "../src/UniverseManager.sol";
+import {NodeCreationOptions, NodeVisibilityOptions} from "../src/libraries/NodeOptions.sol";
 
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {Deployers} from "@uniswap/v4-core/test/utils/Deployers.sol";
@@ -42,5 +43,18 @@ contract UniverseManagerTest is Test, Deployers {
         lrWETH = WETH;
     }
 
-    function test_CreateUniverse() public {}
+    function test_CreateUniverse() public {
+        universeManager.createUniverse(
+            "One Piece",
+            "random.png",
+            "one piece adventures",
+            NodeCreationOptions.PUBLIC,
+            NodeVisibilityOptions.PUBLIC,
+            address(this)
+        );
+    }
+
+    function test_deployUniverseToken() public {}
+
+    function test_claimFee() public {}
 }

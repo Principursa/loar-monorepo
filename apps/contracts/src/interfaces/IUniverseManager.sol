@@ -2,22 +2,16 @@
 pragma solidity ^0.8.30;
 
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {NodeCreationOptions, NodeVisibilityOptions} from "../libraries/NodeOptions.sol";
 
 interface IUniverseManager {
-    enum NodeCreationOptions {
-        PUBLIC,
-        WHITELISTED
-    }
-    enum NodeVisibilityOptions {
-        PUBLIC,
-        HOLDERS,
-        WHITELISTED
-    }
-
     struct UniverseConfig {
         NodeCreationOptions nodeCreationOption;
         NodeVisibilityOptions nodeVisibilityOption;
         address universeAdmin;
+        string name;
+        string ImageURL;
+        string description;
     }
     struct TokenConfig {
         address tokenAdmin;
@@ -85,7 +79,7 @@ interface IUniverseManager {
         NodeCreationOptions nodeCreationOptions,
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner
-    ) external;
+    ) external returns (uint _id);
 
     function deployUniverseToken(
         DeploymentConfig memory deploymentConfig
