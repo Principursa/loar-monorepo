@@ -31,6 +31,7 @@ export const eventWikis = pgTable("eventWikis", {
       name: string;
       description: string;
       actions: string[];
+      characterId?: string; // Optional character ID for linking to character images
     }>;
     keyMoments: string[];
     duration?: string;
@@ -41,6 +42,7 @@ export const eventWikis = pgTable("eventWikis", {
   videoUrl: text("videoUrl"),
   eventTitle: text("eventTitle"),
   eventDescription: text("eventDescription"),
+  characterIds: jsonb("characterIds").$type<string[]>(), // Array of character IDs used in this event
 
   // Generation metadata
   generatedAt: timestamp("generatedAt").notNull().defaultNow(),
@@ -76,6 +78,7 @@ export interface WikiData {
     name: string;
     description: string;
     actions: string[];
+    characterId?: string; // Optional character ID for linking to character images
   }>;
   keyMoments: string[];
   duration?: string;

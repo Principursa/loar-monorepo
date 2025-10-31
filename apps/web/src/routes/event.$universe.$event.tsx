@@ -2,7 +2,7 @@ import { createFileRoute, useParams, useNavigate } from "@tanstack/react-router"
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, BookOpen, Sparkles, Users as UsersIcon, Calendar, Film, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Loader2, BookOpen, Users as UsersIcon, Calendar, Film, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { trpcClient } from "@/utils/trpc";
 import { useGetFullGraph } from "@/hooks/useTimeline";
@@ -107,6 +107,20 @@ function EventPage() {
     retry: 1
   });
 
+  // Fetch characters to get images for character elements
+  const { data: charactersData } = useQuery({
+    queryKey: ['characters'],
+    queryFn: async () => {
+      try {
+        const result = await trpcClient.wiki.characters.query();
+        return result;
+      } catch (error) {
+        console.error('Failed to fetch characters:', error);
+        return null;
+      }
+    }
+  });
+
   const wiki = wikiData?.wikiData;
   const isLoading = isLoadingGraph || isLoadingWiki;
 
@@ -173,10 +187,10 @@ function EventPage() {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-6 py-8 max-w-6xl">
+      <div className="container mx-auto px-6 py-4 max-w-6xl">
         {/* Video Player */}
         {eventVideoUrl && (
-          <Card className="mb-8 shadow-lg">
+          <Card className="mb-4 shadow-lg">
             <CardContent className="p-0">
               <div className="aspect-video bg-black rounded-lg overflow-hidden">
                 <video
@@ -195,10 +209,10 @@ function EventPage() {
 
         {/* User Description */}
         {eventDescription && (
-          <Card className="mb-8 shadow-sm bg-muted/50">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-2">Event Description</h3>
-              <p className="text-base leading-relaxed text-muted-foreground">
+          <Card className="mb-4 shadow-sm bg-muted/50">
+            <CardContent className="p-4">
+              <h3 className="text-base font-semibold mb-1.5">Event Description</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 {eventDescription}
               </p>
             </CardContent>
@@ -206,9 +220,9 @@ function EventPage() {
         )}
 
         {/* Navigation Buttons */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold">Navigate Timeline</h3>
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-bold">Navigate Timeline</h3>
             <Button
               variant="outline"
               onClick={() => navigate({ to: `/universe/${universeId}` })}
@@ -357,90 +371,105 @@ function EventPage() {
         {wiki ? (
           <>
             {/* Title & Summary */}
-            <div className="mb-8">
-              <h2 className="text-5xl font-bold mb-4">
-                {wiki.title}
-              </h2>
-              {wiki.summary && (
-                <p className="text-xl text-muted-foreground leading-relaxed">
-                  {wiki.summary}
-                </p>
-              )}
+            <div className="mb-4">
+              <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-l-4 border-primary pl-4 py-4 rounded-r-2xl">
+                <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  {wiki.title}
+                </h2>
+                {wiki.summary && (
+                  <p className="text-base text-muted-foreground leading-relaxed">
+                    {wiki.summary}
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* Video Analysis */}
-            {wiki.videoAnalysis && (
-              <Card className="mb-8 shadow-sm">
-                <CardContent className="p-8">
-                  <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                    <Sparkles className="h-6 w-6 text-primary" />
-                    Video Analysis
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Setting</h4>
-                      <p className="text-base leading-relaxed">{wiki.videoAnalysis.setting}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Visual Style</h4>
-                      <p className="text-base leading-relaxed">{wiki.videoAnalysis.visualStyle}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Subjects</h4>
-                      <p className="text-base leading-relaxed">{wiki.videoAnalysis.subjects}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Action</h4>
-                      <p className="text-base leading-relaxed">{wiki.videoAnalysis.action}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Plot/Storyline */}
-            <Card className="mb-8 shadow-sm">
-              <CardContent className="p-8">
-                <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                  <BookOpen className="h-6 w-6" />
+            <Card className="mb-4 shadow-sm bg-gradient-to-br from-card via-card to-primary/5">
+              <CardContent className="p-5">
+                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <BookOpen className="h-4 w-4 text-primary" />
+                  </div>
                   Plot Summary
                 </h3>
                 <div className="prose prose-lg max-w-none">
-                  <p className="text-base leading-relaxed whitespace-pre-line text-foreground">
-                    {wiki.plot}
-                  </p>
+                  <div className="bg-card/80 backdrop-blur-sm rounded-xl p-4 border border-primary/10">
+                    <p className="text-sm leading-relaxed whitespace-pre-line text-foreground/90">
+                      {wiki.plot}
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Characters & Elements */}
             {wiki.elements && wiki.elements.length > 0 && (
-              <Card className="mb-8 shadow-sm">
-                <CardContent className="p-8">
-                  <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                    <UsersIcon className="h-6 w-6 text-primary" />
+              <Card className="mb-4 shadow-sm">
+                <CardContent className="p-5">
+                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                    <UsersIcon className="h-5 w-5 text-primary" />
                     Characters & Elements
                   </h3>
-                  <div className="space-y-6">
-                    {wiki.elements.map((element, idx) => (
-                      <div key={idx} className="border-l-4 border-primary/30 pl-4">
-                        <h4 className="text-lg font-semibold mb-2">{element.name}</h4>
-                        <p className="text-sm text-muted-foreground mb-3">{element.description}</p>
-                        {element.actions && element.actions.length > 0 && (
-                          <div>
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Actions</p>
-                            <ul className="space-y-1">
-                              {element.actions.map((action, actionIdx) => (
-                                <li key={actionIdx} className="text-sm flex items-start gap-2">
-                                  <span className="text-primary">•</span>
-                                  <span>{action}</span>
-                                </li>
-                              ))}
-                            </ul>
+
+                  {/* Character details */}
+                  <div className="space-y-4">
+                    {wiki.elements.map((element, idx) => {
+                      // Get character image for the detail card
+                      let matchingCharacter;
+                      if (element.characterId) {
+                        matchingCharacter = charactersData?.characters?.find((char: any) =>
+                          char.id === element.characterId
+                        );
+                      }
+                      if (!matchingCharacter) {
+                        matchingCharacter = charactersData?.characters?.find((char: any) =>
+                          char.character_name.toLowerCase() === element.name.toLowerCase()
+                        );
+                      }
+
+                      return (
+                        <div key={idx} className="group">
+                          <div className="bg-gradient-to-r from-primary/5 via-transparent to-transparent border-l-4 border-primary/50 pl-4 py-3 rounded-r-xl hover:border-primary transition-all duration-300 hover:shadow-md">
+                            <div className="flex items-start gap-4">
+                              {/* Thumbnail */}
+                              {matchingCharacter?.image_url && (
+                                <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5">
+                                  <img
+                                    src={matchingCharacter.image_url}
+                                    alt={element.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              )}
+
+                              {/* Content */}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-lg font-bold mb-2 text-foreground group-hover:text-primary transition-colors">{element.name}</h4>
+                                <p className="text-sm text-muted-foreground leading-relaxed mb-3">{element.description}</p>
+
+                                {element.actions && element.actions.length > 0 && (
+                                  <div className="bg-muted/30 rounded-lg p-3 border border-primary/10">
+                                    <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2 flex items-center gap-2">
+                                      <span className="w-1 h-3 bg-primary rounded-full"></span>
+                                      Actions
+                                    </p>
+                                    <ul className="space-y-1.5">
+                                      {element.actions.map((action, actionIdx) => (
+                                        <li key={actionIdx} className="text-xs flex items-start gap-2">
+                                          <span className="text-primary mt-0.5">•</span>
+                                          <span className="text-foreground/90">{action}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -448,21 +477,24 @@ function EventPage() {
 
             {/* Key Moments */}
             {wiki.keyMoments && wiki.keyMoments.length > 0 && (
-              <Card className="mb-8 shadow-sm">
-                <CardContent className="p-8">
-                  <h3 className="text-2xl font-bold mb-6">Key Moments</h3>
-                  <ol className="space-y-4">
+              <Card className="mb-4 shadow-sm bg-gradient-to-br from-card to-card/50">
+                <CardContent className="p-5">
+                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                    <div className="w-1 h-6 bg-primary rounded-full"></div>
+                    Key Moments
+                  </h3>
+                  <ol className="space-y-3">
                     {wiki.keyMoments.map((moment, idx) => {
                       // Extract string from moment (might be object or string)
                       const momentText = typeof moment === 'object' && moment !== null && 'description' in moment
                         ? String((moment as any).description)
                         : String(moment || '');
                       return (
-                        <li key={idx} className="flex items-start gap-4">
-                          <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
+                        <li key={idx} className="group flex items-start gap-3 p-3 rounded-lg hover:bg-primary/5 transition-all duration-300">
+                          <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground text-sm font-bold flex items-center justify-center shadow group-hover:scale-110 transition-transform duration-300">
                             {idx + 1}
                           </span>
-                          <span className="text-base leading-relaxed pt-1">{momentText}</span>
+                          <span className="text-sm leading-relaxed pt-0.5 text-foreground/90 group-hover:text-foreground">{momentText}</span>
                         </li>
                       );
                     })}
@@ -473,9 +505,12 @@ function EventPage() {
 
             {/* Visual Details */}
             {wiki.visualDetails && wiki.visualDetails.length > 0 && (
-              <Card className="mb-8 shadow-sm">
-                <CardContent className="p-8">
-                  <h3 className="text-2xl font-bold mb-6">Visual Details</h3>
+              <Card className="mb-4 shadow-sm bg-gradient-to-br from-card to-primary/5">
+                <CardContent className="p-5">
+                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                    <div className="w-1 h-6 bg-gradient-to-b from-primary to-primary/50 rounded-full"></div>
+                    Visual Details
+                  </h3>
                   <ul className="grid md:grid-cols-2 gap-3">
                     {wiki.visualDetails.map((detail, idx) => {
                       // Extract string from detail (might be object or string)
@@ -483,9 +518,9 @@ function EventPage() {
                         ? String((detail as any).description)
                         : String(detail || '');
                       return (
-                        <li key={idx} className="flex items-start gap-2 text-sm">
-                          <span className="text-primary mt-1">✦</span>
-                          <span className="text-muted-foreground">{detailText}</span>
+                        <li key={idx} className="group flex items-start gap-2 p-2 rounded-lg hover:bg-primary/10 transition-all duration-300 border border-transparent hover:border-primary/20">
+                          <span className="text-primary mt-0.5 group-hover:scale-125 transition-transform duration-300">✦</span>
+                          <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">{detailText}</span>
                         </li>
                       );
                     })}

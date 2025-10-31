@@ -19,6 +19,7 @@ export interface WikiData {
     name: string;
     description: string;
     actions: string[];
+    characterId?: string; // Optional character ID for linking to character images
   }>;
   keyMoments: string[];
   duration?: string;
@@ -194,6 +195,34 @@ Output valid JSON only. Be precise and factual.`;
     }
 
     const wikiData = JSON.parse(jsonText) as WikiData;
+
+    // Map character IDs to elements by matching character names (case-insensitive)
+    if (eventData.characters && eventData.characterIds && eventData.characters.length > 0) {
+      console.log('🔍 Matching elements to characters:');
+      console.log(`   Elements found: ${wikiData.elements.map(e => e.name).join(', ')}`);
+      console.log(`   Characters available: ${eventData.characters.map(c => c.name).join(', ')}`);
+
+      wikiData.elements = wikiData.elements.map((element) => {
+        // Find matching character by name (case-insensitive)
+        const characterIndex = eventData.characters!.findIndex(
+          (char) => char.name.toLowerCase().trim() === element.name.toLowerCase().trim()
+        );
+
+        if (characterIndex !== -1 && eventData.characterIds![characterIndex]) {
+          console.log(`   ✅ Matched "${element.name}" to character ID: ${eventData.characterIds![characterIndex]}`);
+          return {
+            ...element,
+            characterId: eventData.characterIds![characterIndex],
+          };
+        } else {
+          console.log(`   ❌ No match for "${element.name}"`);
+        }
+
+        return element;
+      });
+
+      console.log(`🔗 Mapped character IDs to ${wikiData.elements.filter(e => e.characterId).length} elements`);
+    }
 
     // Calculate costs
     const usage = response.usageMetadata;

@@ -238,6 +238,18 @@ function UniverseTimelineEditor() {
 
   const { data: canonChainData, isLoading: isLoadingCanonChain, refetch: refetchCanonChain } = useUniverseCanonChain(timelineContractAddress);
 
+  // Fetch latestNodeId from the contract
+  const { data: latestNodeIdData, refetch: refetchLatestNodeId } = useReadContract({
+    abi: timelineAbi,
+    address: timelineContractAddress as Address,
+    functionName: 'latestNodeId',
+    query: {
+      enabled: !!timelineContractAddress && isBlockchainUniverse
+    }
+  });
+
+  const latestNodeId = latestNodeIdData ? Number(latestNodeIdData) : 0;
+
   // Get timeline data: use blockchain data if available, otherwise dummy data
   const graphData = useMemo(() => {
     console.log('=== GRAPH DATA DEBUG ===');
@@ -1027,9 +1039,13 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       });
 
       // Generate wiki in background (non-blocking)
+      // Use latestNodeId + 1 as the new event ID (this is how the Timeline contract assigns IDs)
+      const newEventId = latestNodeId + 1;
+      console.log(`📝 Generating wiki for new event ID: ${newEventId} (latestNodeId: ${latestNodeId})`);
+
       trpcClient.wiki.generateFromVideo.mutate({
         universeId: id,
-        eventId: String(previousNodeId + 1), // New event ID
+        eventId: String(newEventId), // Use latestNodeId + 1, not previousNodeId + 1
         videoUrl: videoUrlForContract,
         title: videoTitle,
         description: videoDescription,
@@ -1054,6 +1070,7 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
           await refetchLeaves();
           await refetchFullGraph();
           await refetchCanonChain();
+          await refetchLatestNodeId();
           console.log('Refetched blockchain data after contract save');
         }
         // Invalidate all queries as fallback
@@ -1071,7 +1088,7 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       setIsSavingToContract(false);
       setIsSavingToStorage(false);
     }
-  }, [generatedVideoUrl, videoTitle, videoDescription, graphData.nodeIds, writeContractAsync, isBlockchainUniverse, id, chainId]);
+  }, [generatedVideoUrl, videoTitle, videoDescription, graphData.nodeIds, writeContractAsync, isBlockchainUniverse, id, chainId, latestNodeId]);
 
   // Manual refresh function
   const handleRefreshTimeline = useCallback(async () => {
@@ -1081,11 +1098,12 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       await refetchLeaves();
       await refetchFullGraph();
       await refetchCanonChain();
+      await refetchLatestNodeId();
       console.log('Refetched blockchain data for universe:', id);
     }
     // Also invalidate all queries as fallback
     await queryClient.invalidateQueries();
-  }, [queryClient, isBlockchainUniverse, refetchLeaves, refetchFullGraph, refetchCanonChain, id]);
+  }, [queryClient, isBlockchainUniverse, refetchLeaves, refetchFullGraph, refetchCanonChain, refetchLatestNodeId, id]);
 
   // Handle opening governance sidebar
   const handleOpenGovernance = useCallback(() => {
@@ -1507,14 +1525,14 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
         data: {
           label: description && description.length > 0 && description !== `Timeline event ${nodeId}`
             ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
-            : `Event ${eventLabel}`,
-          description: description || `Timeline event ${eventLabel}`,
+            : `Event ${nodeId}`, // Always show actual blockchain node ID
+          description: description || `Timeline event ${nodeId}`,
           videoUrl: url,
           timelineColor: color,
           nodeType: 'scene',
-          eventId: eventLabel, // Use the proper event label (e.g., "2b" for branches)
+          eventId: nodeId.toString(), // Use actual blockchain node ID for navigation
           blockchainNodeId: nodeId, // Store actual blockchain node ID for navigation
-          displayName: eventLabel, // User-friendly display name
+          displayName: nodeId.toString(), // Display actual blockchain node ID (not branch labels)
           timelineId: `timeline-1`,
           universeId: finalUniverse?.id || id,
           isRoot: String(previousNode) === '0' || !previousNode,
