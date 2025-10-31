@@ -1700,11 +1700,13 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
 
       {/* Bottom Panel - Event Creation (Google Veo Flow Style) */}
       {(() => {
-        // Find previous event's video URL - always use the last event or the source node
+        // Find previous event's video URL and description - always use the last event or the source node
         const sourceNode = sourceNodeId
           ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
           : nodes.filter((n: any) => n.data.nodeType === 'scene' && n.data.videoUrl).pop();
         const previousEventVideoUrl = sourceNode?.data.videoUrl || null;
+        const previousEventDescription = sourceNode?.data.description || null;
+        const previousEventTitle = sourceNode?.data.label || null;
 
         return (
           <FlowCreationPanel
@@ -1768,6 +1770,8 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
             handleSaveToContract={handleSaveToContract}
             handleCreateEvent={handleCreateEvent}
             previousEventVideoUrl={previousEventVideoUrl}
+            previousEventDescription={previousEventDescription}
+            previousEventTitle={previousEventTitle}
             statusMessage={statusMessage}
             setStatusMessage={setStatusMessage}
             selectedImageCharacters={selectedImageCharacters}

@@ -86,6 +86,8 @@ interface FlowCreationPanelProps {
   handleSaveToContract: () => void;
   handleCreateEvent: () => void;
   previousEventVideoUrl?: string | null;
+  previousEventDescription?: string | null;
+  previousEventTitle?: string | null;
   statusMessage?: {
     type: 'error' | 'success' | 'info' | 'warning';
     title: string;
@@ -116,6 +118,8 @@ export function FlowCreationPanel({
   generatedImageUrl,
   isGeneratingImage,
   previousEventVideoUrl,
+  previousEventDescription,
+  previousEventTitle,
   handleGenerateEventImage,
   generatedVideoUrl,
   setGeneratedVideoUrl,
@@ -972,13 +976,38 @@ export function FlowCreationPanel({
                 </div>
               )}
 
+              {/* Context Info */}
+              {(previousEventDescription || selectedCharacters.length > 0) && (
+                <div className="bg-white/5 rounded px-3 py-2 text-xs text-white/70 space-y-1">
+                  {previousEventDescription && (
+                    <div>
+                      <span className="text-white/50">Previous: </span>
+                      <span className="text-white/90">{previousEventDescription.substring(0, 100)}{previousEventDescription.length > 100 ? '...' : ''}</span>
+                    </div>
+                  )}
+                  {selectedCharacters.length > 0 && charactersData?.characters && (
+                    <div>
+                      <span className="text-white/50">Characters: </span>
+                      <span className="text-white/90">
+                        {selectedCharacters.map(charId => {
+                          const char = charactersData.characters.find((c: any) => c.id === charId);
+                          return char?.character_name;
+                        }).filter(Boolean).join(', ')}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Prompt Input */}
               <textarea
                 value={videoDescription}
                 onChange={(e) => setVideoDescription(e.target.value)}
                 placeholder={
                   generationMode === 'text-to-video'
-                    ? "Describe your scene..."
+                    ? previousEventDescription
+                      ? "Continue the story..."
+                      : "Describe your scene..."
                     : imageSource === 'create-frame' && !generatedImageUrl
                     ? "Describe the scene with your characters..."
                     : "Describe how the image should animate..."
