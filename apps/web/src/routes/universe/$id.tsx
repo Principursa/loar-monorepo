@@ -295,9 +295,17 @@ function UniverseTimelineEditor() {
     queryFn: () => trpcClient.wiki.characters.query(),
   });
 
+  // Analyze character image with Gemini
+  const analyzeCharacterMutation = useMutation({
+    mutationFn: async (input: { imageUrl: string; characterName: string; userDescription: string }) => {
+      const result = await trpcClient.fal.analyzeCharacter.mutate(input);
+      return result;
+    },
+  });
+
   // Generate character mutation (with optional DB save)
   const generateCharacterMutation = useMutation({
-    mutationFn: async (input: { name: string; description: string; style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'; saveToDatabase?: boolean }) => {
+    mutationFn: async (input: { name: string; description: string; style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'; saveToDatabase?: boolean; detailedVisualDescription?: string }) => {
       const result = await trpcClient.fal.generateCharacter.mutate({
         ...input,
         saveToDatabase: input.saveToDatabase ?? false // Use input value or default to false
@@ -323,17 +331,16 @@ function UniverseTimelineEditor() {
     }
   });
 
-  // Save character to database mutation
+  // Save character to database mutation (uses existing image URL, no regeneration)
   const saveCharacterMutation = useMutation({
-    mutationFn: async () => {
-      if (!generatedCharacter) throw new Error('No character to save');
-
-      const result = await trpcClient.fal.generateCharacter.mutate({
-        name: generatedCharacter.name,
-        description: generatedCharacter.description,
-        style: generatedCharacter.style as any,
-        saveToDatabase: true
-      });
+    mutationFn: async (input: {
+      name: string;
+      description: string;
+      imageUrl: string;
+      style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk';
+      detailedVisualDescription?: string;
+    }) => {
+      const result = await trpcClient.fal.saveCharacter.mutate(input);
       return result;
     },
     onSuccess: async (data) => {
@@ -1006,6 +1013,19 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
         }))
         .filter(evt => evt.description.length > 0);
 
+      // Determine which character IDs to use based on generation mode
+      // For image-to-video mode, use selectedImageCharacters
+      // For text-to-video mode, use selectedCharacters
+      const characterIdsForWiki = selectedImageCharacters.length > 0
+        ? selectedImageCharacters
+        : (selectedCharacters.length > 0 ? selectedCharacters : undefined);
+
+      console.log('🎭 Characters for wiki generation:', {
+        selectedImageCharacters,
+        selectedCharacters,
+        characterIdsForWiki
+      });
+
       // Generate wiki in background (non-blocking)
       trpcClient.wiki.generateFromVideo.mutate({
         universeId: id,
@@ -1013,7 +1033,7 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
         videoUrl: videoUrlForContract,
         title: videoTitle,
         description: videoDescription,
-        characterIds: selectedCharacters.length > 0 ? selectedCharacters : undefined,
+        characterIds: characterIdsForWiki,
         previousEvents: previousEvents.length > 0 ? previousEvents : undefined
       }).then((wikiResult) => {
         console.log('✅ Wiki generated successfully!', wikiResult);
@@ -1418,7 +1438,13 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
     graphData.nodeIds.forEach((nodeIdStr, index) => {
       const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
       const url = graphData.urls[index] || '';
-      const description = graphData.descriptions[index] || '';
+
+      // Handle description which might be an object {timestamp, description} or a string
+      const rawDesc = graphData.descriptions[index];
+      const description = rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+        ? String((rawDesc as any).description)
+        : String(rawDesc || '');
+
       const previousNode = graphData.previousNodes[index] || '';
       const isCanon = graphData.flags[index] || false;
       const parentId = (previousNode && String(previousNode) !== '0')
@@ -1573,7 +1599,12 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
     setSelectedNode(node);
     if (node.data.nodeType === 'scene') {
       setSelectedEventTitle(node.data.label);
-      setSelectedEventDescription(node.data.description);
+      // Extract description string from object if needed
+      const rawDesc = node.data.description;
+      const description = rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+        ? String((rawDesc as any).description)
+        : String(rawDesc || '');
+      setSelectedEventDescription(description);
 
       // Navigate to event page with specific event
       const universeId = node.data.universeId || id;
@@ -1705,7 +1736,13 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
           ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
           : nodes.filter((n: any) => n.data.nodeType === 'scene' && n.data.videoUrl).pop();
         const previousEventVideoUrl = sourceNode?.data.videoUrl || null;
-        const previousEventDescription = sourceNode?.data.description || null;
+
+        // Handle description which might be an object {timestamp, description} or a string
+        const rawDesc = sourceNode?.data.description;
+        const previousEventDescription = rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+          ? String((rawDesc as any).description)
+          : (rawDesc ? String(rawDesc) : null);
+
         const previousEventTitle = sourceNode?.data.label || null;
 
         return (
@@ -1735,6 +1772,7 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
             generatedCharacter={generatedCharacter}
             setGeneratedCharacter={setGeneratedCharacter}
             generateCharacterMutation={generateCharacterMutation}
+            analyzeCharacterMutation={analyzeCharacterMutation}
             saveCharacterMutation={saveCharacterMutation}
             generatedImageUrl={generatedImageUrl}
             isGeneratingImage={isGeneratingImage}

@@ -161,6 +161,11 @@ export const appRouter = router({
         title: z.string(),
         description: z.string(),
         characterIds: z.array(z.string()).optional(),
+        characters: z.array(z.object({
+          name: z.string(),
+          userDescription: z.string(),
+          visualDescription: z.string().optional(),
+        })).optional(),
         previousEvents: z.array(z.object({
           title: z.string(),
           description: z.string(),
@@ -170,6 +175,25 @@ export const appRouter = router({
         try {
           console.log(`🎬 Generating wiki for ${input.universeId}-${input.eventId}`);
 
+          // If characterIds are provided but not full character data, fetch from DB
+          let characterData = input.characters;
+          if (!characterData && input.characterIds && input.characterIds.length > 0) {
+            console.log(`📥 Fetching character data for IDs: ${input.characterIds.join(', ')}`);
+            const charResults = await Promise.all(
+              input.characterIds.map(id =>
+                db.select().from(characters).where(eq(characters.id, id))
+              )
+            );
+            characterData = charResults
+              .filter(result => result.length > 0)
+              .map(result => ({
+                name: result[0].character_name,
+                userDescription: result[0].description,
+                visualDescription: result[0].detailed_visual_description || undefined,
+              }));
+            console.log(`✅ Fetched ${characterData.length} characters`);
+          }
+
           // Generate wiki using Gemini
           const result = await geminiService.generateWikiFromVideo(
             input.videoUrl,
@@ -178,11 +202,12 @@ export const appRouter = router({
               title: input.title,
               description: input.description,
               characterIds: input.characterIds,
+              characters: characterData,
               previousEvents: input.previousEvents,
             }
           );
 
-          // Save to database
+          // Save to database (upsert to handle regeneration)
           const wikiId = `${input.universeId}-${input.eventId}`;
           const wikiEntry = {
             id: wikiId,
@@ -202,7 +227,23 @@ export const appRouter = router({
             updatedAt: new Date(),
           };
 
-          await db.insert(eventWikis).values(wikiEntry);
+          // Use onConflictDoUpdate to handle regeneration (upsert)
+          await db.insert(eventWikis).values(wikiEntry).onConflictDoUpdate({
+            target: eventWikis.id,
+            set: {
+              wikiData: result.wikiData,
+              videoUrl: input.videoUrl,
+              eventTitle: input.title,
+              eventDescription: input.description,
+              generatedBy: result.metadata.generatedBy,
+              tokensUsed: result.metadata.tokensUsed,
+              inputTokens: result.metadata.inputTokens,
+              outputTokens: result.metadata.outputTokens,
+              costUsd: result.metadata.costUsd.toString(),
+              generatedAt: new Date(),
+              updatedAt: new Date(),
+            }
+          });
 
           console.log(`✅ Wiki saved to database: ${wikiId}`);
 

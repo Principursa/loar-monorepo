@@ -10,6 +10,7 @@ export const characters = pgTable("characters", {
   rarity_percentage: decimal("rarity_percentage", { precision: 5, scale: 2 }),
   image_url: text("image_url").notNull(),
   description: text("description").notNull(),
+  detailed_visual_description: text("detailed_visual_description"),
   created_at: timestamp("created_at").notNull().defaultNow(),
   updated_at: timestamp("updated_at").notNull().defaultNow(),
 });

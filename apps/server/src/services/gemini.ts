@@ -46,12 +46,36 @@ export async function generateWikiFromVideo(
     title: string;
     description: string;
     characterIds?: string[];
+    characters?: Array<{
+      name: string;
+      userDescription: string;
+      visualDescription?: string;
+    }>;
     previousEvents?: Array<{ title: string; description: string }>;
   }
 ): Promise<VideoAnalysisResult> {
   console.log(`🎬 Generating wiki for event ${eventData.eventId}`);
+  console.log(`📝 Characters provided: ${eventData.characters?.length || 0}`);
+  if (eventData.characters && eventData.characters.length > 0) {
+    console.log(`👥 Character names: ${eventData.characters.map(c => c.name).join(', ')}`);
+  }
 
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+
+  // Build context from characters
+  let characterContext = "";
+  let characterNames: string[] = [];
+  if (eventData.characters && eventData.characters.length > 0) {
+    characterContext = "\n\nCHARACTERS IN THIS SCENE:\n";
+    eventData.characters.forEach((char) => {
+      characterNames.push(char.name);
+      characterContext += `- **${char.name}**: ${char.userDescription}`;
+      if (char.visualDescription) {
+        characterContext += `\n  Visual appearance: ${char.visualDescription}`;
+      }
+      characterContext += "\n";
+    });
+  }
 
   // Build context from previous events
   let context = "";
@@ -68,20 +92,24 @@ export async function generateWikiFromVideo(
 EVENT CONTEXT:
 Event ID: ${eventData.eventId}
 User Description: ${eventData.description}
-${context}
+${characterContext}${context}
 
 YOUR TASK:
 1. Watch the video carefully
 2. Identify what is actually visible and happening
 3. Extract key elements (people, objects, actions, setting)
 4. Describe events factually without adding fictional details
+${eventData.characters && eventData.characters.length > 0 ? `5. Use the provided character names and descriptions to identify characters in the video` : ''}
 
 CRITICAL RULES:
 - Describe ONLY what you see in the video
 - Do NOT invent objects, dialogue, or actions not visible
 - Do NOT add dramatic interpretations unless clearly shown
-- Identify characters/subjects based on what's visible (e.g., "person in red shirt", "eagle", "car")
+${eventData.characters && eventData.characters.length > 0
+  ? `- **IMPORTANT**: The following characters are in this scene: ${characterNames.join(', ')}. When you recognize these characters in the video based on their descriptions, you MUST use their exact names (e.g., "${eventData.characters[0]?.name}"). Do NOT use generic terms like "elf", "wizard", "man", "woman" - always use the specific character names provided.`
+  : '- Identify characters/subjects based on what\'s visible (e.g., "person in red shirt", "eagle", "car")'}
 - Focus on observable actions and events
+${eventData.characters && eventData.characters.length > 0 ? '- In the "elements" array, the "name" field should use the provided character names when describing those characters' : ''}
 
 Generate a JSON response:
 {
@@ -202,6 +230,77 @@ Output valid JSON only. Be precise and factual.`;
   }
 }
 
+/**
+ * Analyze character image to generate detailed visual description
+ */
+export async function analyzeCharacterImage(
+  imageUrl: string,
+  userDescription: string,
+  characterName: string
+): Promise<string> {
+  console.log(`🎨 Analyzing character image for: ${characterName}`);
+
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+
+  const prompt = `You are analyzing a character image to create a detailed visual description for narrative consistency.
+
+CHARACTER NAME: ${characterName}
+USER DESCRIPTION: ${userDescription}
+
+YOUR TASK:
+Analyze this character image and provide a detailed visual description that will help maintain consistency when this character appears in different scenes.
+
+FOCUS ON:
+1. Physical appearance (hair color/style, eye color, facial features, skin tone, body type)
+2. Clothing and accessories (colors, style, distinctive items)
+3. Distinctive features or markings (scars, tattoos, jewelry, props)
+4. Pose and expression in this image
+5. Art style characteristics (realistic, anime, stylized, etc.)
+
+CRITICAL RULES:
+- Be specific and precise (e.g., "shoulder-length brown hair" not "dark hair")
+- Focus on visual details that are consistent across scenes
+- Include colors, patterns, and textures
+- Describe distinctive features that make this character recognizable
+- Keep it concise but informative (3-5 sentences)
+- Use present tense
+- No dramatic interpretation, just visual facts
+
+Generate a detailed visual description in plain text (no JSON, no formatting).`;
+
+  try {
+    // Generate content with image
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: "image/png",
+          data: await fetch(imageUrl).then(r => r.arrayBuffer()).then(b => Buffer.from(b).toString('base64'))
+        }
+      },
+      { text: prompt },
+    ]);
+
+    const response = result.response;
+    const description = response.text().trim();
+
+    // Calculate costs
+    const usage = response.usageMetadata;
+    const inputTokens = usage?.promptTokenCount || 0;
+    const outputTokens = usage?.candidatesTokenCount || 0;
+    const costUsd = ((inputTokens / 1_000_000) * 1.25) + ((outputTokens / 1_000_000) * 10.0);
+
+    console.log(`✅ Character analysis complete!`);
+    console.log(`📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`);
+    console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
+
+    return description;
+  } catch (error) {
+    console.error("❌ Character analysis failed:", error);
+    throw error;
+  }
+}
+
 export const geminiService = {
   generateWikiFromVideo,
+  analyzeCharacterImage,
 };

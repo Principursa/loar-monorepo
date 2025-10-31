@@ -51,6 +51,7 @@ interface FlowCreationPanelProps {
   generatedCharacter: any;
   setGeneratedCharacter: (char: any) => void;
   generateCharacterMutation: any;
+  analyzeCharacterMutation?: any;
   saveCharacterMutation: any;
   generatedImageUrl: string | null;
   isGeneratingImage: boolean;
@@ -148,6 +149,7 @@ export function FlowCreationPanel({
   characterDescription,
   setCharacterDescription,
   generateCharacterMutation,
+  analyzeCharacterMutation,
   saveCharacterMutation,
   refetchCharacters,
 }: FlowCreationPanelProps) {
@@ -274,13 +276,31 @@ export function FlowCreationPanel({
         saveToDatabase: true
       });
 
-      // Call generateCharacter again with saveToDatabase: true
-      // This will save the character to the database
-      const result = await generateCharacterMutation.mutateAsync({
+      // Step 1: Analyze character image with Gemini (if available)
+      let detailedVisualDescription: string | undefined;
+      if (analyzeCharacterMutation) {
+        try {
+          console.log('🎨 Analyzing character image with Gemini...');
+          const analysisResult = await analyzeCharacterMutation.mutateAsync({
+            imageUrl: quickCharPreview,
+            characterName: quickCharName,
+            userDescription: quickCharDescription,
+          });
+          detailedVisualDescription = analysisResult.detailedVisualDescription;
+          console.log('✅ Gemini analysis complete:', detailedVisualDescription);
+        } catch (analysisError) {
+          console.warn('⚠️ Gemini analysis failed, continuing without it:', analysisError);
+          // Continue without detailed description - it's optional
+        }
+      }
+
+      // Step 2: Save character with existing image URL (no regeneration)
+      const result = await saveCharacterMutation.mutateAsync({
         name: quickCharName,
         description: quickCharDescription,
+        imageUrl: quickCharPreview, // Use the preview image URL
         style: quickCharStyle,
-        saveToDatabase: true
+        detailedVisualDescription,
       });
 
       console.log('✅ Character save result:', result);

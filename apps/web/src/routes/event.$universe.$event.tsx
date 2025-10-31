@@ -25,7 +25,10 @@ function EventPage() {
   }) : -1;
 
   const eventVideoUrl = eventIndex !== -1 ? String(graphData?.[1]?.[eventIndex] || '') : '';
-  const eventDescription = eventIndex !== -1 ? String(graphData?.[2]?.[eventIndex] || '') : '';
+  const rawDescription = eventIndex !== -1 ? graphData?.[2]?.[eventIndex] : '';
+  const eventDescription = typeof rawDescription === 'object' && rawDescription !== null && 'description' in rawDescription
+    ? String((rawDescription as any).description)
+    : String(rawDescription || '');
 
   // Find previous event (the parent node)
   const previousNodeId = eventIndex !== -1 ? graphData?.[3]?.[eventIndex] : null;
@@ -47,10 +50,16 @@ function EventPage() {
         const childId = graphData[0][idx];
         const childNumeric = typeof childId === 'bigint' ? Number(childId) : parseInt(String(childId));
         nextEventIds.push(childNumeric);
+
+        const rawDesc = graphData[2]?.[idx];
+        const description = typeof rawDesc === 'object' && rawDesc !== null && 'description' in rawDesc
+          ? String((rawDesc as any).description)
+          : String(rawDesc || `Event ${childNumeric}`);
+
         nextEventData.push({
           id: childNumeric,
           videoUrl: String(graphData[1]?.[idx] || ''),
-          description: String(graphData[2]?.[idx] || `Event ${childNumeric}`)
+          description
         });
       }
     });
@@ -64,10 +73,15 @@ function EventPage() {
       return numericId === previousEventId;
     });
     if (prevIndex !== -1) {
+      const rawPrevDesc = graphData[2]?.[prevIndex];
+      const prevDescription = typeof rawPrevDesc === 'object' && rawPrevDesc !== null && 'description' in rawPrevDesc
+        ? String((rawPrevDesc as any).description)
+        : String(rawPrevDesc || `Event ${previousEventId}`);
+
       previousEventData = {
         id: previousEventId,
         videoUrl: String(graphData[1]?.[prevIndex] || ''),
-        description: String(graphData[2]?.[prevIndex] || `Event ${previousEventId}`)
+        description: prevDescription
       };
     }
   }
@@ -438,14 +452,20 @@ function EventPage() {
                 <CardContent className="p-8">
                   <h3 className="text-2xl font-bold mb-6">Key Moments</h3>
                   <ol className="space-y-4">
-                    {wiki.keyMoments.map((moment, idx) => (
-                      <li key={idx} className="flex items-start gap-4">
-                        <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
-                          {idx + 1}
-                        </span>
-                        <span className="text-base leading-relaxed pt-1">{moment}</span>
-                      </li>
-                    ))}
+                    {wiki.keyMoments.map((moment, idx) => {
+                      // Extract string from moment (might be object or string)
+                      const momentText = typeof moment === 'object' && moment !== null && 'description' in moment
+                        ? String((moment as any).description)
+                        : String(moment || '');
+                      return (
+                        <li key={idx} className="flex items-start gap-4">
+                          <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
+                            {idx + 1}
+                          </span>
+                          <span className="text-base leading-relaxed pt-1">{momentText}</span>
+                        </li>
+                      );
+                    })}
                   </ol>
                 </CardContent>
               </Card>
@@ -457,12 +477,18 @@ function EventPage() {
                 <CardContent className="p-8">
                   <h3 className="text-2xl font-bold mb-6">Visual Details</h3>
                   <ul className="grid md:grid-cols-2 gap-3">
-                    {wiki.visualDetails.map((detail, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm">
-                        <span className="text-primary mt-1">✦</span>
-                        <span className="text-muted-foreground">{detail}</span>
-                      </li>
-                    ))}
+                    {wiki.visualDetails.map((detail, idx) => {
+                      // Extract string from detail (might be object or string)
+                      const detailText = typeof detail === 'object' && detail !== null && 'description' in detail
+                        ? String((detail as any).description)
+                        : String(detail || '');
+                      return (
+                        <li key={idx} className="flex items-start gap-2 text-sm">
+                          <span className="text-primary mt-1">✦</span>
+                          <span className="text-muted-foreground">{detailText}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </CardContent>
               </Card>

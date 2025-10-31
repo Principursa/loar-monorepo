@@ -275,7 +275,9 @@ export function UniverseSidebar({
                     {selectedNode.data.label}
                   </div>
                   <div className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed line-clamp-3 bg-amber-100/50 dark:bg-amber-900/20 p-2 rounded">
-                    {selectedNode.data.description}
+                    {typeof selectedNode.data.description === 'object' && selectedNode.data.description !== null && 'description' in selectedNode.data.description
+                      ? String((selectedNode.data.description as any).description)
+                      : String(selectedNode.data.description || '')}
                   </div>
                 </div>
               </CardContent>
