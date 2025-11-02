@@ -14,6 +14,7 @@ import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {ILoarHook} from "./interfaces/ILoarHook.sol";
+import {UniverseGovernor} from "./UniverseGovernor.sol";
 
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
@@ -24,6 +25,7 @@ import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {SafeCast} from "@uniswap/v4-core/src/libraries/SafeCast.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
+import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
 import "./libraries/NodeOptions.sol";
 
 contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
@@ -83,10 +85,14 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             deploymentConfig.poolConfig,
             tokenAddress
         );
+        _deployGovernance(tokenAddress);
         emit TokenCreated();
     }
 
-    function deployGovernance() internal returns (address) {}
+    function _deployGovernance(address tokenAddress) internal returns (address governanceAddress) {
+      UniverseGovernor governor = new UniverseGovernor(IVotes(tokenAddress));
+      governanceAddress = address(governor);
+    }
 
     function setTeamFeeRecipient(address _teamFeeRecipient) public onlyOwner {
         address oldTeamFeeRecipient = teamFeeRecipient;
