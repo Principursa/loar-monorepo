@@ -26,8 +26,15 @@ contract Universe is Ownable, IUniverse {
     ) Ownable(config.universeAdmin) {
         nodeCreationOption = config.nodeCreationOption;
         nodeVisibilityOption = config.nodeVisibilityOption;
+        universeImageUrl = config.imageURL;
+        universeManager = IUniverseManager(config.universeManager);
+        universeDescription = config.description;
+        universeName = config.name;
     }
 
+    string public universeImageUrl;
+    string public universeName;
+    string public universeDescription;
     mapping(uint => VideoNode) public nodes;
     uint public latestNodeId;
     mapping(address user => bool) isWhitelisted;
@@ -36,7 +43,7 @@ contract Universe is Ownable, IUniverse {
     NodeCreationOptions private nodeCreationOption;
     NodeVisibilityOptions private nodeVisibilityOption;
 
-    bool public isTokenMinted;
+    address public associatedToken;
     IUniverseManager public universeManager;
 
     //either put an event here to emit user + node to make it indexable or create data structure that associates addy w user
@@ -143,9 +150,9 @@ contract Universe is Ownable, IUniverse {
         return nodes[id].link;
     }
 
-    function setMedia(uint id, string memory _link) public {
-        //change ownership w gov later
+    function setMedia(uint id, string memory _link) public onlyOwner {
         nodes[id].link = _link;
+        emit MediaUpdated(msg.sender, _link);
     }
 
     function setNodeVisibilityOption(
@@ -205,8 +212,9 @@ contract Universe is Ownable, IUniverse {
     // ---- Canon ----
 
     function setCanon(uint id) public onlyOwner {
-        //governance will handle this
-        require(nodes[id].id != 0, "Node does not exist");
+        if (nodes[id].id == 0) {
+            revert NodeDoesNotExist();
+        }
 
         // Clear old canon (at most one canon at a time)
         for (uint i = 1; i <= latestNodeId; i++) {
@@ -228,15 +236,26 @@ contract Universe is Ownable, IUniverse {
                 break;
             }
         }
-        require(canonId != 0, "No canon set");
+        if (canonId == 0) {
+            revert CanonNotSet();
+        }
         return getTimeline(canonId);
     }
 
     function getToken() public view returns (address) {
-        if (isTokenMinted != true) {
+        if (associatedToken == address(0)) {
             revert TokenDoesNotExist();
+        } else {
+            return associatedToken;
         }
-        //impl get token from universemanager
+    }
+
+    //add onlyManagerModifier
+    function setToken(address token) external {
+        if (msg.sender == address(universeManager)) {
+            revert CallerNotManager();
+        }
+        associatedToken = token;
     }
     //Might work as well to have a function that gets the canon status of an indiviudal node
 }

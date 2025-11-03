@@ -14,8 +14,9 @@ import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {WETH9} from "./tokens/WETH9.sol";
 //import {LoarHook} from "../src/hooks/LoarHook.sol";
 import {LoarHookStaticFee} from "../src/hooks/LoarHookStaticFee.sol";
+import {HookTest} from "./HookTest.sol";
 
-contract UniverseManagerTest is Test, Deployers {
+contract UniverseManagerTest is HookTest {
     UniverseManager public universeManager;
     PoolManager public poolManager;
     PoolModifyLiquidityTest public poolModifyPosition;
@@ -34,6 +35,7 @@ contract UniverseManagerTest is Test, Deployers {
         poolManager = new PoolManager(address(this));
         console.log(address(poolManager), "PoolManager Address");
         poolModifyPosition = new PoolModifyLiquidityTest(poolManager);
+        deployFreshManagerAndRouters();
         console.log(address(poolModifyPosition), "poolModifyPosition Address");
         universeManager = new UniverseManager(msg.sender);
         console.log(address(universeManager), "UniverseManager Address");

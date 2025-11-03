@@ -60,7 +60,8 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             initialOwner,
             name,
             imageURL,
-            description
+            description,
+            address(this)
         );
         Universe universe = new Universe(config);
         UniverseData memory data = UniverseData(
@@ -97,6 +98,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             _deployGovernance(tokenAddress)
         );
         universeDatas[id].hook = poolkey.hooks;
+        universe.setToken(tokenAddress);
         emit TokenCreated(
             msg.sender,
             tokenAddress,

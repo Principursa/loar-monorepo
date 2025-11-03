@@ -10,8 +10,9 @@ interface IUniverseManager {
         NodeVisibilityOptions nodeVisibilityOption;
         address universeAdmin;
         string name;
-        string ImageURL;
+        string imageURL;
         string description;
+        address universeManager;
     }
     struct TokenConfig {
         address tokenAdmin;
