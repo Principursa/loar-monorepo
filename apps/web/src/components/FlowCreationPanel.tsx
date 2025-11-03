@@ -829,6 +829,32 @@ export function FlowCreationPanel({
               </div>
 
               {/* Content Based on Tab Selection */}
+              {generationMode === 'text-to-video' && (
+                <div className="space-y-3">
+                  {/* Show video preview if generated */}
+                  {generatedVideoUrl && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] text-white/70 flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3 text-green-400" />
+                          Video Ready
+                        </Label>
+                      </div>
+                      <div className="relative rounded-lg overflow-hidden bg-black aspect-video border border-green-500/30">
+                        <video
+                          src={generatedVideoUrl}
+                          controls
+                          autoPlay
+                          loop
+                          muted
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {generationMode === 'image-to-video' && (
                 <div className="space-y-3">
                   {/* Show video preview if generated, otherwise show extracted frame for Previous Event tab */}
