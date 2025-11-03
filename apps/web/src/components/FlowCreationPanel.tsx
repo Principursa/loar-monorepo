@@ -923,7 +923,8 @@ export function FlowCreationPanel({
                         </div>
                       ) : null}
 
-                      {/* Character Grid - Always visible, more compact */}
+                      {/* Character Grid - Hidden when preview is shown */}
+                      {!generatedImageUrl && !generatedVideoUrl && (
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -991,6 +992,7 @@ export function FlowCreationPanel({
                           </div>
                         )}
                       </div>
+                      )}
                     </div>
                   )}
                 </div>
