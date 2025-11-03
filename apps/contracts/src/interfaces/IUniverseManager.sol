@@ -25,7 +25,7 @@ interface IUniverseManager {
     struct PoolConfig {
         address hook;
         address pairedToken;
-        int24 tickIfToken0IsLoar; //Not sure why the protocol name is in here
+        int24 tickIfToken0IsLoar; 
         int24 tickSpacing;
         bytes poolData;
     }
@@ -52,24 +52,25 @@ interface IUniverseManager {
         address indexed recipient,
         uint256 amount
     );
-    //event TokenCreated(
-    //    address msgSender,
-    //    address indexed tokenAddress,
-    //    address indexed tokenAdmin,
-    //    string tokenImage,
-    //    string tokenName,
-    //    string tokenSymbol,
-    //    string tokenMetadata,
-    //    string tokenContext,
-    //    int24 startingTick,
-    //    address poolHook,
-    //    PoolId poolId,
-    //    address pairedToken
-    //);
-    event TokenCreated();
+    event TokenCreated(
+        address msgSender,
+        address indexed tokenAddress,
+        address indexed tokenAdmin,
+        string tokenImage,
+        string tokenName,
+        string tokenSymbol,
+        string tokenMetadata,
+        string tokenContext,
+        int24 startingTick,
+        address poolHook,
+        PoolId poolId,
+        address pairedToken
+    );
+    event SetDeprecated(bool deprecated);
 
     error Deprecated();
     error TeamFeeRecipientNotSet();
+    error DeployerIsNotOwner();
     error HookNotEnabled();
 
     function createUniverse(

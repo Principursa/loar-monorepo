@@ -10,4 +10,6 @@ interface IUniverse {
   event NodeCanonized(uint id,address canonizer);
   event NodeCreated(uint id, uint previous, address creator);
 
+  function owner() external returns (address);
+
 }
