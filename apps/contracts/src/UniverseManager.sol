@@ -16,6 +16,7 @@ import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {ILoarHook} from "./interfaces/ILoarHook.sol";
 import {UniverseGovernor} from "./UniverseGovernor.sol";
 import {IGovernor} from "@openzeppelin/governance/IGovernor.sol";
+import {IOwnable} from "./interfaces/IOwnable.sol";
 
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -36,8 +37,6 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     address teamFeeRecipient;
     uint256 public constant TOKEN_SUPPLY = 100_000_000_000e18; // 100b with 18 decimals
     uint256 public constant BPS = 10_000;
-
-    //mapping(PoolId id => Pool.State) internal _pools;
     mapping(uint id => UniverseData) universeDatas;
     mapping(address hook => bool enabled) enabledHooks;
     uint latestId; //See if EnumerableSetLib fixes this
@@ -54,7 +53,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         NodeCreationOptions nodeCreationOptions,
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner
-    ) public nonReentrant returns (uint256 _id) {
+    ) public nonReentrant returns (uint256 _id, address) {
         UniverseConfig memory config = UniverseConfig(
             nodeCreationOptions,
             nodeVisibilityOptions,
@@ -71,7 +70,9 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             IHooks(address(0))
         );
         universeDatas[latestId] = data;
+        uint current_id = latestId;
         latestId++;
+        return (current_id, address(universe));
     }
 
     function deployUniverseToken(
@@ -79,14 +80,13 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         uint id
     ) public payable nonReentrant returns (address tokenAddress) {
         IUniverse universe = universeDatas[id].universe;
-        if (universe.owner() != msg.sender) {
+        if (IOwnable(address(universe)).owner() != msg.sender) {
             revert DeployerIsNotOwner();
         }
         tokenAddress = LoarDeployer.deployToken(
             deploymentConfig.tokenConfig,
             TOKEN_SUPPLY
         );
-        //TODO: the system for getting the universedata isn't up to par
 
         PoolKey memory poolkey = _initializePool(
             deploymentConfig.poolConfig,
@@ -101,7 +101,15 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             msg.sender,
             tokenAddress,
             deploymentConfig.tokenConfig.tokenAdmin,
-            DeploymentConfig.tokenConfig.tokenImage,
+            deploymentConfig.tokenConfig.imageURL,
+            deploymentConfig.tokenConfig.name,
+            deploymentConfig.tokenConfig.symbol,
+            deploymentConfig.tokenConfig.metadata,
+            deploymentConfig.tokenConfig.context,
+            deploymentConfig.poolConfig.tickIfToken0IsLoar,
+            deploymentConfig.poolConfig.hook,
+            poolkey.toId(),
+            deploymentConfig.poolConfig.pairedToken
         );
     }
 

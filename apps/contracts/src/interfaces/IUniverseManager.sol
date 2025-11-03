@@ -25,7 +25,7 @@ interface IUniverseManager {
     struct PoolConfig {
         address hook;
         address pairedToken;
-        int24 tickIfToken0IsLoar; 
+        int24 tickIfToken0IsLoar;
         int24 tickSpacing;
         bytes poolData;
     }
@@ -80,9 +80,10 @@ interface IUniverseManager {
         NodeCreationOptions nodeCreationOptions,
         NodeVisibilityOptions nodeVisibilityOptions,
         address initialOwner
-    ) external returns (uint _id);
+    ) external returns (uint _id, address);
 
     function deployUniverseToken(
-        DeploymentConfig memory deploymentConfig
+        DeploymentConfig memory deploymentConfig,
+        uint id
     ) external payable returns (address tokenAddress);
 }
