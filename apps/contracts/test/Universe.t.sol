@@ -25,4 +25,30 @@ contract UniverseTest is Test {
             });
         universe = new Universe(config);
     }
+
+    function test_createNode() public {
+        uint id = createNode();
+        (
+            uint nid,
+            string memory link,
+            string memory plot,
+            uint prev,
+            uint[] memory next,
+            bool canon,
+            address creator
+        ) = universe.getNode(id);
+        console.log(plot);
+        assertNotEq(plot, "");
+    }
+
+    function test_getTimeline() public {}
+
+    function test_setMedia() public {}
+
+    function test_setCanon() public {}
+
+    function createNode() internal returns (uint) {
+        uint id = universe.createNode("testlink.org", "test plot", 0);
+        return id;
+    }
 }
