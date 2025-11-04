@@ -44,12 +44,58 @@ function CinematicUniverseCreate() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentStep, setDeploymentStep] = useState<string>("");
   const [universeSaved, setUniverseSaved] = useState(false);
+  const [isGeneratingCover, setIsGeneratingCover] = useState(false);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
   const handleSwitchNetwork = async () => {
     try {
       await switchChain({ chainId: 11155111 });
     } catch (error) {
       console.error("Failed to switch network:", error);
+    }
+  };
+
+  // Cover image generation mutation
+  const generateCoverMutation = useMutation({
+    mutationFn: async () => {
+      const prompt = `Epic cinematic universe cover art for "${tokenName}". ${description}. Professional movie poster style, high quality, dramatic lighting`;
+
+      const result = await trpcClient.fal.generateImage.mutate({
+        prompt,
+        model: "fal-ai/nano-banana",
+        imageSize: "landscape_16_9"
+      });
+
+      return result;
+    },
+    onSuccess: (data) => {
+      if (data?.imageUrl) {
+        setCoverPreview(data.imageUrl);
+        setImageUrl(data.imageUrl);
+      }
+    },
+    onError: (error) => {
+      console.error("Cover generation failed:", error);
+      alert("Failed to generate cover. Please try again.");
+    }
+  });
+
+  const handleGenerateCover = async () => {
+    if (!tokenName) {
+      alert("Please enter a universe name first");
+      return;
+    }
+    setIsGeneratingCover(true);
+    try {
+      await generateCoverMutation.mutateAsync();
+    } finally {
+      setIsGeneratingCover(false);
+    }
+  };
+
+  const handleUseCover = () => {
+    if (coverPreview) {
+      setImageUrl(coverPreview);
     }
   };
 
@@ -381,16 +427,42 @@ function CinematicUniverseCreate() {
 
               <div>
                 <Label htmlFor="imageUrl" className="text-sm font-semibold mb-2 block">
-                  Cover Image URL
+                  Cover Image
                 </Label>
-                <Input
-                  id="imageUrl"
-                  placeholder="https://example.com/cover.jpg"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  disabled={isDeploying}
-                  className="h-11"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="imageUrl"
+                    placeholder="Enter image URL or generate one"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    disabled={isDeploying}
+                    className="h-11 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleGenerateCover}
+                    disabled={isGeneratingCover || isDeploying || !tokenName}
+                    variant="outline"
+                    className="h-11"
+                  >
+                    {isGeneratingCover ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {coverPreview && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Cover generated! Preview shown on the right.
+                  </p>
+                )}
               </div>
 
               <div className="flex-1 flex flex-col">

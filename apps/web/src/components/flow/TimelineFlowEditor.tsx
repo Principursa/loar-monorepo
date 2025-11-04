@@ -176,7 +176,12 @@ export function TimelineFlowEditor({
       setSelectedNode(node);
       if (node.data.nodeType === 'scene') {
         setSelectedEventTitle(node.data.label);
-        setSelectedEventDescription(node.data.description);
+        // Extract description string from object if needed
+        const rawDesc = node.data.description;
+        const description = rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+          ? String((rawDesc as any).description)
+          : String(rawDesc || '');
+        setSelectedEventDescription(description);
       }
     }
   }, [readOnly]);

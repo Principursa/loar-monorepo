@@ -3,11 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Film,
   Sparkles,
   Loader2,
   UserPlus,
-  Wand2,
   Video,
   AlertCircle,
   CheckCircle2,
@@ -15,9 +13,6 @@ import {
   XCircle,
   X,
   Settings2,
-  ArrowRight,
-  Volume2,
-  ChevronDown,
   Image as ImageIcon,
   Type,
 } from "lucide-react";
@@ -29,8 +24,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { VideoTimeline } from "@/components/segments";
-import type { VideoModel } from "@/types/segments";
 
 interface FlowCreationPanelProps {
   showVideoDialog: boolean;
@@ -58,6 +51,7 @@ interface FlowCreationPanelProps {
   generatedCharacter: any;
   setGeneratedCharacter: (char: any) => void;
   generateCharacterMutation: any;
+  analyzeCharacterMutation?: any;
   saveCharacterMutation: any;
   generatedImageUrl: string | null;
   isGeneratingImage: boolean;
@@ -93,6 +87,8 @@ interface FlowCreationPanelProps {
   handleSaveToContract: () => void;
   handleCreateEvent: () => void;
   previousEventVideoUrl?: string | null;
+  previousEventDescription?: string | null;
+  previousEventTitle?: string | null;
   statusMessage?: {
     type: 'error' | 'success' | 'info' | 'warning';
     title: string;
@@ -106,6 +102,7 @@ interface FlowCreationPanelProps {
   selectedImageCharacters?: string[];
   setSelectedImageCharacters?: (chars: string[]) => void;
   handleGenerateCharacterFrame?: () => Promise<void>;
+  refetchCharacters?: () => void;
 }
 
 export function FlowCreationPanel({
@@ -122,6 +119,8 @@ export function FlowCreationPanel({
   generatedImageUrl,
   isGeneratingImage,
   previousEventVideoUrl,
+  previousEventDescription,
+  previousEventTitle,
   handleGenerateEventImage,
   generatedVideoUrl,
   setGeneratedVideoUrl,
@@ -145,6 +144,14 @@ export function FlowCreationPanel({
   selectedImageCharacters: externalSelectedImageCharacters,
   setSelectedImageCharacters: externalSetSelectedImageCharacters,
   handleGenerateCharacterFrame,
+  characterName,
+  setCharacterName,
+  characterDescription,
+  setCharacterDescription,
+  generateCharacterMutation,
+  analyzeCharacterMutation,
+  saveCharacterMutation,
+  refetchCharacters,
 }: FlowCreationPanelProps) {
   const [extractedFrameUrl, setExtractedFrameUrl] = useState<string | null>(null);
   const [isExtractingFrame, setIsExtractingFrame] = useState(false);
@@ -152,6 +159,13 @@ export function FlowCreationPanel({
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [generationMode, setGenerationMode] = useState<'text-to-video' | 'image-to-video'>('text-to-video');
   const [showModeDropdown, setShowModeDropdown] = useState(false);
+  const [showQuickCharacterDialog, setShowQuickCharacterDialog] = useState(false);
+  const [quickCharName, setQuickCharName] = useState('');
+  const [quickCharDescription, setQuickCharDescription] = useState('');
+  const [quickCharStyle, setQuickCharStyle] = useState<'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'>('realistic');
+  const [isCreatingQuickChar, setIsCreatingQuickChar] = useState(false);
+  const [quickCharPreview, setQuickCharPreview] = useState<string | null>(null);
+  const [isSavingQuickChar, setIsSavingQuickChar] = useState(false);
 
   // Image source selection: 'last-frame' or 'create-frame'
   const [imageSource, setImageSource] = useState<'last-frame' | 'create-frame'>('create-frame');
@@ -217,6 +231,115 @@ export function FlowCreationPanel({
     }
   };
 
+  // Quick character generation handler (just generate, don't save)
+  const handleQuickCharacterGenerate = async () => {
+    if (!quickCharName.trim() || !quickCharDescription.trim()) return;
+
+    setIsCreatingQuickChar(true);
+    try {
+      // Generate character using nano-banana (without saving to DB)
+      const generatedChar = await generateCharacterMutation.mutateAsync({
+        name: quickCharName,
+        description: quickCharDescription,
+        style: quickCharStyle,
+        saveToDatabase: false
+      });
+
+      // Set preview image
+      if (generatedChar?.imageUrl) {
+        setQuickCharPreview(generatedChar.imageUrl);
+      }
+    } catch (error) {
+      console.error('Failed to generate character:', error);
+      if (setStatusMessage) {
+        setStatusMessage({
+          type: 'error',
+          title: 'Generation Failed',
+          description: 'Failed to generate character. Please try again.'
+        });
+      }
+    } finally {
+      setIsCreatingQuickChar(false);
+    }
+  };
+
+  // Quick character save handler
+  const handleQuickCharacterSave = async () => {
+    if (!quickCharName.trim() || !quickCharDescription.trim() || !quickCharPreview) return;
+
+    setIsSavingQuickChar(true);
+    try {
+      console.log('💾 Saving character to database with params:', {
+        name: quickCharName,
+        description: quickCharDescription,
+        style: quickCharStyle,
+        saveToDatabase: true
+      });
+
+      // Step 1: Analyze character image with Gemini (if available)
+      let detailedVisualDescription: string | undefined;
+      if (analyzeCharacterMutation) {
+        try {
+          console.log('🎨 Analyzing character image with Gemini...');
+          const analysisResult = await analyzeCharacterMutation.mutateAsync({
+            imageUrl: quickCharPreview,
+            characterName: quickCharName,
+            userDescription: quickCharDescription,
+          });
+          detailedVisualDescription = analysisResult.detailedVisualDescription;
+          console.log('✅ Gemini analysis complete:', detailedVisualDescription);
+        } catch (analysisError) {
+          console.warn('⚠️ Gemini analysis failed, continuing without it:', analysisError);
+          // Continue without detailed description - it's optional
+        }
+      }
+
+      // Step 2: Save character with existing image URL (no regeneration)
+      const result = await saveCharacterMutation.mutateAsync({
+        name: quickCharName,
+        description: quickCharDescription,
+        imageUrl: quickCharPreview, // Use the preview image URL
+        style: quickCharStyle,
+        detailedVisualDescription,
+      });
+
+      console.log('✅ Character save result:', result);
+
+      // Refetch characters to update the list
+      if (refetchCharacters) {
+        console.log('🔄 Refetching characters list...');
+        await refetchCharacters();
+      }
+
+      // Reset form and close dialog
+      setQuickCharName('');
+      setQuickCharDescription('');
+      setQuickCharStyle('realistic');
+      setQuickCharPreview(null);
+      setShowQuickCharacterDialog(false);
+
+      // Show success message
+      if (setStatusMessage) {
+        setStatusMessage({
+          type: 'success',
+          title: 'Character Saved',
+          description: `${quickCharName} has been saved successfully!`
+        });
+      }
+    } catch (error) {
+      console.error('❌ Failed to save character:', error);
+      if (setStatusMessage) {
+        setStatusMessage({
+          type: 'error',
+          title: 'Save Failed',
+          description: error instanceof Error ? error.message : 'Failed to save character to database. Please try again.'
+        });
+      }
+    } finally {
+      setIsSavingQuickChar(false);
+    }
+  };
+
 
   // Reset when dialog closes
   useEffect(() => {
@@ -246,6 +369,141 @@ export function FlowCreationPanel({
 
   return (
     <>
+      {/* Quick Character Creation Dialog */}
+      <Dialog open={showQuickCharacterDialog} onOpenChange={setShowQuickCharacterDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Character</DialogTitle>
+            <DialogDescription>Quick character creation using AI</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {!quickCharPreview ? (
+              <>
+                {/* Character Name */}
+                <div className="space-y-2">
+                  <Label>Character Name</Label>
+                  <Input
+                    value={quickCharName}
+                    onChange={(e) => setQuickCharName(e.target.value)}
+                    placeholder="Enter character name..."
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Character Description */}
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <textarea
+                    value={quickCharDescription}
+                    onChange={(e) => setQuickCharDescription(e.target.value)}
+                    placeholder="Describe the character's appearance..."
+                    rows={4}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                  />
+                </div>
+
+                {/* Style Selection */}
+                <div className="space-y-2">
+                  <Label>Style</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['realistic', 'anime', 'cute', 'fantasy', 'cyberpunk'] as const).map((style) => (
+                      <button
+                        key={style}
+                        onClick={() => setQuickCharStyle(style)}
+                        className={`px-3 py-2 text-sm rounded-md border transition-colors capitalize ${
+                          quickCharStyle === style
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-input bg-background hover:bg-muted"
+                        }`}
+                      >
+                        {style}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Preview Image - Only show this when preview exists */
+              <div className="space-y-2">
+                <div className="relative rounded-lg overflow-hidden border bg-muted aspect-square">
+                  <img
+                    src={quickCharPreview}
+                    alt={quickCharName}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2">
+              {!quickCharPreview ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowQuickCharacterDialog(false);
+                      setQuickCharName('');
+                      setQuickCharDescription('');
+                      setQuickCharStyle('realistic');
+                      setQuickCharPreview(null);
+                    }}
+                    disabled={isCreatingQuickChar}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleQuickCharacterGenerate}
+                    disabled={!quickCharName.trim() || !quickCharDescription.trim() || isCreatingQuickChar}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                  >
+                    {isCreatingQuickChar ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate Character
+                      </>
+                    )}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setQuickCharPreview(null)}
+                    disabled={isSavingQuickChar}
+                  >
+                    Regenerate
+                  </Button>
+                  <Button
+                    onClick={handleQuickCharacterSave}
+                    disabled={isSavingQuickChar}
+                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                  >
+                    {isSavingQuickChar ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving Character...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Save Character
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Save to Timeline Dialog */}
       <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
         <DialogContent className="max-w-md">
@@ -571,6 +829,32 @@ export function FlowCreationPanel({
               </div>
 
               {/* Content Based on Tab Selection */}
+              {generationMode === 'text-to-video' && (
+                <div className="space-y-3">
+                  {/* Show video preview if generated */}
+                  {generatedVideoUrl && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] text-white/70 flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3 text-green-400" />
+                          Video Ready
+                        </Label>
+                      </div>
+                      <div className="relative rounded-lg overflow-hidden bg-black aspect-video border border-green-500/30">
+                        <video
+                          src={generatedVideoUrl}
+                          controls
+                          autoPlay
+                          loop
+                          muted
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {generationMode === 'image-to-video' && (
                 <div className="space-y-3">
                   {/* Show video preview if generated, otherwise show extracted frame for Previous Event tab */}
@@ -665,12 +949,24 @@ export function FlowCreationPanel({
                         </div>
                       ) : null}
 
-                      {/* Character Grid - Always visible, more compact */}
+                      {/* Character Grid - Hidden when preview is shown */}
+                      {!generatedImageUrl && !generatedVideoUrl && (
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <Label className="text-xs text-white font-medium">
-                            Characters ({selectedImageCharacters.length}/2)
-                          </Label>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-white font-medium">
+                              Characters ({selectedImageCharacters.length}/2)
+                            </Label>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowQuickCharacterDialog(true)}
+                              className="h-5 w-5 p-0 text-white/70 hover:text-white hover:bg-white/20 rounded-full"
+                              title="Create new character"
+                            >
+                              <UserPlus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                           {selectedImageCharacters.length > 0 && (
                             <button
                               onClick={() => setSelectedImageCharacters([])}
@@ -722,6 +1018,30 @@ export function FlowCreationPanel({
                           </div>
                         )}
                       </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Context Info */}
+              {(previousEventDescription || selectedCharacters.length > 0) && (
+                <div className="bg-white/5 rounded px-3 py-2 text-xs text-white/70 space-y-1">
+                  {previousEventDescription && (
+                    <div>
+                      <span className="text-white/50">Previous: </span>
+                      <span className="text-white/90">{previousEventDescription.substring(0, 100)}{previousEventDescription.length > 100 ? '...' : ''}</span>
+                    </div>
+                  )}
+                  {selectedCharacters.length > 0 && charactersData?.characters && (
+                    <div>
+                      <span className="text-white/50">Characters: </span>
+                      <span className="text-white/90">
+                        {selectedCharacters.map(charId => {
+                          const char = charactersData.characters.find((c: any) => c.id === charId);
+                          return char?.character_name;
+                        }).filter(Boolean).join(', ')}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -733,7 +1053,9 @@ export function FlowCreationPanel({
                 onChange={(e) => setVideoDescription(e.target.value)}
                 placeholder={
                   generationMode === 'text-to-video'
-                    ? "Describe your scene..."
+                    ? previousEventDescription
+                      ? "Continue the story..."
+                      : "Describe your scene..."
                     : imageSource === 'create-frame' && !generatedImageUrl
                     ? "Describe the scene with your characters..."
                     : "Describe how the image should animate..."

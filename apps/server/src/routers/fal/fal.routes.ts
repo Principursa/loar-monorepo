@@ -3,6 +3,7 @@ import { z } from "zod";
 import { falService } from "../../services/fal";
 import { db } from "../../db";
 import { characters } from "../../db/schema/characters";
+import { geminiService } from "../../services/gemini";
 
 export const falRouter = router({
   // Test FAL connection
@@ -125,6 +126,7 @@ export const falRouter = router({
         description: z.string().min(1),
         style: z.enum(["cute", "realistic", "anime", "fantasy", "cyberpunk"]).optional(),
         saveToDatabase: z.boolean().optional().default(true),
+        detailedVisualDescription: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -153,12 +155,16 @@ export const falRouter = router({
       let characterId: string | undefined;
       let localImageUrl: string | undefined;
 
+      console.log('💾 saveToDatabase flag:', input.saveToDatabase);
+
       if (input.saveToDatabase) {
+        console.log('✅ Saving character to database...');
         // Use the original FAL image URL directly instead of uploading to Walrus
         localImageUrl = imageResult.imageUrl;
 
         characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        await db.insert(characters).values({
+
+        const characterData = {
           id: characterId,
           character_name: input.name,
           collection: "Nano Banana AI",
@@ -172,9 +178,22 @@ export const falRouter = router({
           rarity_percentage: null,
           image_url: localImageUrl,
           description: input.description,
+          detailed_visual_description: input.detailedVisualDescription || null,
           created_at: new Date(),
           updated_at: new Date(),
-        });
+        };
+
+        console.log('📝 Character data to insert:', characterData);
+
+        try {
+          await db.insert(characters).values(characterData);
+          console.log('✅ Character saved successfully with ID:', characterId);
+        } catch (dbError) {
+          console.error('❌ Database insert failed:', dbError);
+          throw dbError;
+        }
+      } else {
+        console.log('⏭️  Skipping database save (saveToDatabase: false)');
       }
 
       return {
@@ -186,6 +205,92 @@ export const falRouter = router({
         seed: imageResult.seed,
         prompt: fullPrompt,
       };
+    }),
+
+  // Analyze character image with Gemini
+  analyzeCharacter: publicProcedure
+    .input(
+      z.object({
+        imageUrl: z.string().min(1, "Image URL is required"),
+        characterName: z.string().min(1, "Character name is required"),
+        userDescription: z.string().min(1, "Description is required"),
+      })
+    )
+    .mutation(async ({ input }) => {
+      console.log(`🔍 Analyzing character: ${input.characterName}`);
+
+      try {
+        const detailedDescription = await geminiService.analyzeCharacterImage(
+          input.imageUrl,
+          input.userDescription,
+          input.characterName
+        );
+
+        return {
+          success: true,
+          characterName: input.characterName,
+          detailedVisualDescription: detailedDescription,
+        };
+      } catch (error) {
+        console.error("❌ Character analysis failed:", error);
+        throw new Error(
+          error instanceof Error ? error.message : "Failed to analyze character image"
+        );
+      }
+    }),
+
+  // Save character with existing image URL (no regeneration)
+  saveCharacter: publicProcedure
+    .input(
+      z.object({
+        name: z.string().min(1, "Character name is required"),
+        description: z.string().min(1, "Description is required"),
+        imageUrl: z.string().min(1, "Image URL is required"),
+        style: z.enum(["cute", "realistic", "anime", "fantasy", "cyberpunk"]),
+        detailedVisualDescription: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      console.log(`💾 Saving character: ${input.name} with existing image`);
+
+      const characterId = `nano-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+      const characterData = {
+        id: characterId,
+        character_name: input.name,
+        collection: "Nano Banana AI",
+        token_id: characterId,
+        traits: {
+          style: input.style,
+          generated_with: "nano-banana",
+        },
+        rarity_rank: 0,
+        rarity_percentage: null,
+        image_url: input.imageUrl, // Use provided URL instead of generating
+        description: input.description,
+        detailed_visual_description: input.detailedVisualDescription || null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      console.log('📝 Saving character data:', characterData);
+
+      try {
+        await db.insert(characters).values(characterData);
+        console.log('✅ Character saved successfully with ID:', characterId);
+
+        return {
+          success: true,
+          characterId,
+          characterName: input.name,
+          imageUrl: input.imageUrl,
+        };
+      } catch (dbError) {
+        console.error('❌ Database insert failed:', dbError);
+        throw new Error(
+          dbError instanceof Error ? dbError.message : "Failed to save character to database"
+        );
+      }
     }),
 
   // Character + Video pipeline

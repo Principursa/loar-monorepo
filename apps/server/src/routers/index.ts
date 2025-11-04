@@ -16,6 +16,8 @@ import { falRouter } from "./fal/fal.routes";
 import { synapseService } from "../services/synapse";
 import { wikiaService } from "../services/wikia";
 import { minioService } from "../services/minio";
+import { geminiService } from "../services/gemini";
+import { eventWikis } from "../db/schema";
 
 
 export const appRouter = router({
@@ -147,6 +149,159 @@ export const appRouter = router({
         } catch (error) {
           console.error("Failed to generate storyline:", error);
           throw new Error("Could not generate storyline");
+        }
+      }),
+
+    // Generate wiki from video using Gemini 2.5 Pro
+    generateFromVideo: publicProcedure
+      .input(z.object({
+        universeId: z.string(),
+        eventId: z.string(),
+        videoUrl: z.string(),
+        title: z.string(),
+        description: z.string(),
+        characterIds: z.array(z.string()).optional(),
+        characters: z.array(z.object({
+          name: z.string(),
+          userDescription: z.string(),
+          visualDescription: z.string().optional(),
+        })).optional(),
+        previousEvents: z.array(z.object({
+          title: z.string(),
+          description: z.string(),
+        })).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          console.log(`🎬 Generating wiki for ${input.universeId}-${input.eventId}`);
+
+          // If characterIds are provided but not full character data, fetch from DB
+          let characterData = input.characters;
+          if (!characterData && input.characterIds && input.characterIds.length > 0) {
+            console.log(`📥 Fetching character data for IDs: ${input.characterIds.join(', ')}`);
+            const charResults = await Promise.all(
+              input.characterIds.map(id =>
+                db.select().from(characters).where(eq(characters.id, id))
+              )
+            );
+            characterData = charResults
+              .filter(result => result.length > 0)
+              .map(result => ({
+                name: result[0].character_name,
+                userDescription: result[0].description,
+                visualDescription: result[0].detailed_visual_description || undefined,
+              }));
+            console.log(`✅ Fetched ${characterData.length} characters`);
+          }
+
+          // Generate wiki using Gemini
+          const result = await geminiService.generateWikiFromVideo(
+            input.videoUrl,
+            {
+              eventId: input.eventId,
+              title: input.title,
+              description: input.description,
+              characterIds: input.characterIds,
+              characters: characterData,
+              previousEvents: input.previousEvents,
+            }
+          );
+
+          // Save to database (upsert to handle regeneration)
+          const wikiId = `${input.universeId}-${input.eventId}`;
+          const wikiEntry = {
+            id: wikiId,
+            universeId: input.universeId,
+            eventId: input.eventId,
+            wikiData: result.wikiData,
+            videoUrl: input.videoUrl,
+            eventTitle: input.title,
+            eventDescription: input.description,
+            characterIds: input.characterIds || null,
+            generatedBy: result.metadata.generatedBy,
+            tokensUsed: result.metadata.tokensUsed,
+            inputTokens: result.metadata.inputTokens,
+            outputTokens: result.metadata.outputTokens,
+            costUsd: result.metadata.costUsd.toString(),
+            generatedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          // Use onConflictDoUpdate to handle regeneration (upsert)
+          await db.insert(eventWikis).values(wikiEntry).onConflictDoUpdate({
+            target: eventWikis.id,
+            set: {
+              wikiData: result.wikiData,
+              videoUrl: input.videoUrl,
+              eventTitle: input.title,
+              eventDescription: input.description,
+              characterIds: input.characterIds || null,
+              generatedBy: result.metadata.generatedBy,
+              tokensUsed: result.metadata.tokensUsed,
+              inputTokens: result.metadata.inputTokens,
+              outputTokens: result.metadata.outputTokens,
+              costUsd: result.metadata.costUsd.toString(),
+              generatedAt: new Date(),
+              updatedAt: new Date(),
+            }
+          });
+
+          console.log(`✅ Wiki saved to database: ${wikiId}`);
+
+          return {
+            success: true,
+            wikiId,
+            wikiData: result.wikiData,
+            metadata: result.metadata,
+          };
+        } catch (error) {
+          console.error("Failed to generate wiki:", error);
+          throw new Error(`Wiki generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }),
+
+    // Get wiki by ID
+    getWiki: publicProcedure
+      .input(z.object({
+        universeId: z.string(),
+        eventId: z.string(),
+      }))
+      .query(async ({ input }) => {
+        try {
+          const wikiId = `${input.universeId}-${input.eventId}`;
+          const wiki = await db.select()
+            .from(eventWikis)
+            .where(eq(eventWikis.id, wikiId))
+            .limit(1);
+
+          if (wiki.length === 0) {
+            return null;
+          }
+
+          return wiki[0];
+        } catch (error) {
+          console.error("Failed to fetch wiki:", error);
+          throw new Error("Could not fetch wiki");
+        }
+      }),
+
+    // Get all wikis for a universe
+    getUniverseWikis: publicProcedure
+      .input(z.object({
+        universeId: z.string(),
+      }))
+      .query(async ({ input }) => {
+        try {
+          const wikis = await db.select()
+            .from(eventWikis)
+            .where(eq(eventWikis.universeId, input.universeId))
+            .orderBy(eventWikis.createdAt);
+
+          return wikis;
+        } catch (error) {
+          console.error("Failed to fetch universe wikis:", error);
+          throw new Error("Could not fetch universe wikis");
         }
       }),
   }),

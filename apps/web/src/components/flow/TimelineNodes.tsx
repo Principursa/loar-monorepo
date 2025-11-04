@@ -13,6 +13,7 @@ export interface TimelineNodeData {
   timelineName?: string;
   isRoot?: boolean;
   eventId?: string;
+  blockchainNodeId?: number; // Actual blockchain node ID for navigation
   displayName?: string; // User-friendly display name for UI
   timelineId?: string;
   universeId?: string;
@@ -67,21 +68,30 @@ export function TimelineEventNode({ data }: { data: TimelineNodeData }) {
   }, [isHovered, videoElement]);
 
   const handleClick = () => {
-    if (data.eventId && data.universeId) {
-      console.log('Navigating to timeline:', {
-        universeId: data.universeId,
-        eventId: data.eventId
-      });
-      // Navigate to timeline viewer with specific event
-      const timelineUrl = `/timeline?universe=${data.universeId}&event=${data.eventId}`;
-      window.location.href = timelineUrl;
+    if (!data.universeId) return;
+
+    // Use blockchainNodeId if available (the actual blockchain node ID)
+    // Otherwise fall back to parsing eventId
+    let eventIdToUse: string | number;
+
+    if (data.blockchainNodeId !== undefined) {
+      // Use the actual blockchain node ID
+      eventIdToUse = data.blockchainNodeId;
+    } else if (data.eventId) {
+      // Fallback: Extract numeric ID from eventId (e.g., "4b" -> 4, "10" -> 10)
+      eventIdToUse = data.eventId;
+      if (typeof eventIdToUse === 'string') {
+        const match = eventIdToUse.match(/^\d+/);
+        if (match) {
+          eventIdToUse = match[0];
+        }
+      }
     } else {
-      console.log('Missing navigation data:', {
-        eventId: data.eventId,
-        universeId: data.universeId,
-        data
-      });
+      return;
     }
+
+    const eventUrl = `/event/${data.universeId}/${eventIdToUse}`;
+    window.location.href = eventUrl;
   };
 
   // Add Event Node - just a + button

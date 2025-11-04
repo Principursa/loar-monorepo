@@ -10,22 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UniversesRouteImport } from './routes/universes'
-import { Route as TimelineRouteImport } from './routes/timeline'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CinematicUniverseCreateRouteImport } from './routes/cinematicUniverseCreate'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
+import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 
 const UniversesRoute = UniversesRouteImport.update({
   id: '/universes',
   path: '/universes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TimelineRoute = TimelineRouteImport.update({
-  id: '/timeline',
-  path: '/timeline',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketRoute = MarketRouteImport.update({
@@ -58,6 +53,11 @@ const UniverseIdRoute = UniverseIdRouteImport.update({
   path: '/universe/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EventUniverseEventRoute = EventUniverseEventRouteImport.update({
+  id: '/event/$universe/$event',
+  path: '/event/$universe/$event',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -65,9 +65,9 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
-  '/timeline': typeof TimelineRoute
   '/universes': typeof UniversesRoute
   '/universe/$id': typeof UniverseIdRoute
+  '/event/$universe/$event': typeof EventUniverseEventRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -75,9 +75,9 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
-  '/timeline': typeof TimelineRoute
   '/universes': typeof UniversesRoute
   '/universe/$id': typeof UniverseIdRoute
+  '/event/$universe/$event': typeof EventUniverseEventRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -86,9 +86,9 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
-  '/timeline': typeof TimelineRoute
   '/universes': typeof UniversesRoute
   '/universe/$id': typeof UniverseIdRoute
+  '/event/$universe/$event': typeof EventUniverseEventRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -98,9 +98,9 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/market'
-    | '/timeline'
     | '/universes'
     | '/universe/$id'
+    | '/event/$universe/$event'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -108,9 +108,9 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/market'
-    | '/timeline'
     | '/universes'
     | '/universe/$id'
+    | '/event/$universe/$event'
   id:
     | '__root__'
     | '/'
@@ -118,9 +118,9 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/market'
-    | '/timeline'
     | '/universes'
     | '/universe/$id'
+    | '/event/$universe/$event'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -129,9 +129,9 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
   MarketRoute: typeof MarketRoute
-  TimelineRoute: typeof TimelineRoute
   UniversesRoute: typeof UniversesRoute
   UniverseIdRoute: typeof UniverseIdRoute
+  EventUniverseEventRoute: typeof EventUniverseEventRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -141,13 +141,6 @@ declare module '@tanstack/react-router' {
       path: '/universes'
       fullPath: '/universes'
       preLoaderRoute: typeof UniversesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/timeline': {
-      id: '/timeline'
-      path: '/timeline'
-      fullPath: '/timeline'
-      preLoaderRoute: typeof TimelineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/market': {
@@ -192,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UniverseIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/event/$universe/$event': {
+      id: '/event/$universe/$event'
+      path: '/event/$universe/$event'
+      fullPath: '/event/$universe/$event'
+      preLoaderRoute: typeof EventUniverseEventRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -201,9 +201,9 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
   MarketRoute: MarketRoute,
-  TimelineRoute: TimelineRoute,
   UniversesRoute: UniversesRoute,
   UniverseIdRoute: UniverseIdRoute,
+  EventUniverseEventRoute: EventUniverseEventRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

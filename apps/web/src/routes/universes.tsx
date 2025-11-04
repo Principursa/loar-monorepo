@@ -85,7 +85,7 @@ function HeroBanner({ universe, onSelect }: { universe: any; onSelect: (id: stri
               <Button
                 size="lg"
                 className="bg-white text-black hover:bg-white/90 px-10 text-lg h-14 font-bold shadow-2xl"
-                onClick={() => navigate({ to: "/timeline", search: { universe: universe.id } })}
+                onClick={() => navigate({ to: `/event/${universe.id}/1` })}
               >
                 <Play className="h-6 w-6 mr-3 fill-black" />
                 Watch Timeline
@@ -252,7 +252,7 @@ function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: st
                 className="flex-1 bg-white text-black hover:bg-white/90 font-semibold h-10"
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigate({ to: "/timeline", search: { universe: universe.id } });
+                  navigate({ to: `/event/${universe.id}/1` });
                 }}
               >
                 <Play className="h-4 w-4 mr-2" />

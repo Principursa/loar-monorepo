@@ -238,6 +238,18 @@ function UniverseTimelineEditor() {
 
   const { data: canonChainData, isLoading: isLoadingCanonChain, refetch: refetchCanonChain } = useUniverseCanonChain(timelineContractAddress);
 
+  // Fetch latestNodeId from the contract
+  const { data: latestNodeIdData, refetch: refetchLatestNodeId } = useReadContract({
+    abi: timelineAbi,
+    address: timelineContractAddress as Address,
+    functionName: 'latestNodeId',
+    query: {
+      enabled: !!timelineContractAddress && isBlockchainUniverse
+    }
+  });
+
+  const latestNodeId = latestNodeIdData ? Number(latestNodeIdData) : 0;
+
   // Get timeline data: use blockchain data if available, otherwise dummy data
   const graphData = useMemo(() => {
     console.log('=== GRAPH DATA DEBUG ===');
@@ -295,12 +307,20 @@ function UniverseTimelineEditor() {
     queryFn: () => trpcClient.wiki.characters.query(),
   });
 
-  // Generate character mutation (without saving to DB)
+  // Analyze character image with Gemini
+  const analyzeCharacterMutation = useMutation({
+    mutationFn: async (input: { imageUrl: string; characterName: string; userDescription: string }) => {
+      const result = await trpcClient.fal.analyzeCharacter.mutate(input);
+      return result;
+    },
+  });
+
+  // Generate character mutation (with optional DB save)
   const generateCharacterMutation = useMutation({
-    mutationFn: async (input: { name: string; description: string; style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk' }) => {
+    mutationFn: async (input: { name: string; description: string; style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk'; saveToDatabase?: boolean; detailedVisualDescription?: string }) => {
       const result = await trpcClient.fal.generateCharacter.mutate({
         ...input,
-        saveToDatabase: false // Don't save automatically
+        saveToDatabase: input.saveToDatabase ?? false // Use input value or default to false
       });
       return result;
     },
@@ -323,17 +343,16 @@ function UniverseTimelineEditor() {
     }
   });
 
-  // Save character to database mutation
+  // Save character to database mutation (uses existing image URL, no regeneration)
   const saveCharacterMutation = useMutation({
-    mutationFn: async () => {
-      if (!generatedCharacter) throw new Error('No character to save');
-
-      const result = await trpcClient.fal.generateCharacter.mutate({
-        name: generatedCharacter.name,
-        description: generatedCharacter.description,
-        style: generatedCharacter.style as any,
-        saveToDatabase: true
-      });
+    mutationFn: async (input: {
+      name: string;
+      description: string;
+      imageUrl: string;
+      style: 'cute' | 'realistic' | 'anime' | 'fantasy' | 'cyberpunk';
+      detailedVisualDescription?: string;
+    }) => {
+      const result = await trpcClient.fal.saveCharacter.mutate(input);
       return result;
     },
     onSuccess: async (data) => {
@@ -994,6 +1013,56 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
         duration: 8000
       });
 
+      // Step 4: Generate wiki entry in background (non-blocking)
+      console.log('Step 3: Generating wiki entry in background...');
+
+      // Gather previous events for context (last 2-3 events)
+      const previousEvents = graphData.nodeIds
+        .slice(-3) // Get last 3 events
+        .map((nodeId, idx) => ({
+          title: graphData.descriptions[graphData.nodeIds.length - 3 + idx] || `Event ${nodeId}`,
+          description: graphData.descriptions[graphData.nodeIds.length - 3 + idx] || ''
+        }))
+        .filter(evt => evt.description.length > 0);
+
+      // Determine which character IDs to use based on generation mode
+      // For image-to-video mode, use selectedImageCharacters
+      // For text-to-video mode, use selectedCharacters
+      const characterIdsForWiki = selectedImageCharacters.length > 0
+        ? selectedImageCharacters
+        : (selectedCharacters.length > 0 ? selectedCharacters : undefined);
+
+      console.log('🎭 Characters for wiki generation:', {
+        selectedImageCharacters,
+        selectedCharacters,
+        characterIdsForWiki
+      });
+
+      // Generate wiki in background (non-blocking)
+      // Use latestNodeId + 1 as the new event ID (this is how the Timeline contract assigns IDs)
+      const newEventId = latestNodeId + 1;
+      console.log(`📝 Generating wiki for new event ID: ${newEventId} (latestNodeId: ${latestNodeId})`);
+
+      trpcClient.wiki.generateFromVideo.mutate({
+        universeId: id,
+        eventId: String(newEventId), // Use latestNodeId + 1, not previousNodeId + 1
+        videoUrl: videoUrlForContract,
+        title: videoTitle,
+        description: videoDescription,
+        characterIds: characterIdsForWiki,
+        previousEvents: previousEvents.length > 0 ? previousEvents : undefined
+      }).then((wikiResult) => {
+        console.log('✅ Wiki generated successfully!', wikiResult);
+        toast.success('Wiki Generated!', {
+          description: 'AI-powered wiki entry created for your event.',
+          duration: 4000
+        });
+      }).catch((wikiError) => {
+        console.error('❌ Wiki generation failed:', wikiError);
+        // Don't show error to user - wiki can be generated later
+        console.warn('Event saved but wiki generation failed. Wiki can be regenerated later.');
+      });
+
       // Refresh the blockchain data to show the new node
       setTimeout(async () => {
         if (isBlockchainUniverse) {
@@ -1001,6 +1070,7 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
           await refetchLeaves();
           await refetchFullGraph();
           await refetchCanonChain();
+          await refetchLatestNodeId();
           console.log('Refetched blockchain data after contract save');
         }
         // Invalidate all queries as fallback
@@ -1018,7 +1088,7 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       setIsSavingToContract(false);
       setIsSavingToStorage(false);
     }
-  }, [generatedVideoUrl, videoTitle, videoDescription, graphData.nodeIds, writeContractAsync, isBlockchainUniverse, id, chainId]);
+  }, [generatedVideoUrl, videoTitle, videoDescription, graphData.nodeIds, writeContractAsync, isBlockchainUniverse, id, chainId, latestNodeId]);
 
   // Manual refresh function
   const handleRefreshTimeline = useCallback(async () => {
@@ -1028,11 +1098,12 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       await refetchLeaves();
       await refetchFullGraph();
       await refetchCanonChain();
+      await refetchLatestNodeId();
       console.log('Refetched blockchain data for universe:', id);
     }
     // Also invalidate all queries as fallback
     await queryClient.invalidateQueries();
-  }, [queryClient, isBlockchainUniverse, refetchLeaves, refetchFullGraph, refetchCanonChain, id]);
+  }, [queryClient, isBlockchainUniverse, refetchLeaves, refetchFullGraph, refetchCanonChain, refetchLatestNodeId, id]);
 
   // Handle opening governance sidebar
   const handleOpenGovernance = useCallback(() => {
@@ -1385,7 +1456,13 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
     graphData.nodeIds.forEach((nodeIdStr, index) => {
       const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
       const url = graphData.urls[index] || '';
-      const description = graphData.descriptions[index] || '';
+
+      // Handle description which might be an object {timestamp, description} or a string
+      const rawDesc = graphData.descriptions[index];
+      const description = rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+        ? String((rawDesc as any).description)
+        : String(rawDesc || '');
+
       const previousNode = graphData.previousNodes[index] || '';
       const isCanon = graphData.flags[index] || false;
       const parentId = (previousNode && String(previousNode) !== '0')
@@ -1432,7 +1509,13 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
 
       // Debug: Log the node creation data
       console.log(`Creating node ${nodeId} (${eventLabel}):`, {
-        url, description, previousNode, parentId, position: { x, y }
+        blockchainNodeId: nodeId,
+        eventLabel,
+        url,
+        description,
+        previousNode,
+        parentId,
+        position: { x, y }
       });
 
       blockchainNodes.push({
@@ -1442,13 +1525,14 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
         data: {
           label: description && description.length > 0 && description !== `Timeline event ${nodeId}`
             ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
-            : `Event ${eventLabel}`,
-          description: description || `Timeline event ${eventLabel}`,
+            : `Event ${nodeId}`, // Always show actual blockchain node ID
+          description: description || `Timeline event ${nodeId}`,
           videoUrl: url,
           timelineColor: color,
           nodeType: 'scene',
-          eventId: eventLabel, // Use the proper event label (e.g., "2b" for branches)
-          displayName: eventLabel, // User-friendly display name
+          eventId: nodeId.toString(), // Use actual blockchain node ID for navigation
+          blockchainNodeId: nodeId, // Store actual blockchain node ID for navigation
+          displayName: nodeId.toString(), // Display actual blockchain node ID (not branch labels)
           timelineId: `timeline-1`,
           universeId: finalUniverse?.id || id,
           isRoot: String(previousNode) === '0' || !previousNode,
@@ -1533,16 +1617,31 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
     setSelectedNode(node);
     if (node.data.nodeType === 'scene') {
       setSelectedEventTitle(node.data.label);
-      setSelectedEventDescription(node.data.description);
+      // Extract description string from object if needed
+      const rawDesc = node.data.description;
+      const description = rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+        ? String((rawDesc as any).description)
+        : String(rawDesc || '');
+      setSelectedEventDescription(description);
 
-      // Navigate to timeline viewer with specific event
+      // Navigate to event page with specific event
       const universeId = node.data.universeId || id;
-      const eventId = node.data.eventId;
+      // Use blockchainNodeId if available (for blockchain nodes), otherwise use eventId
+      const eventId = node.data.blockchainNodeId || node.data.eventId;
+
+      console.log('🎯 Node clicked:', {
+        eventId: node.data.eventId,
+        blockchainNodeId: node.data.blockchainNodeId,
+        selectedEventId: eventId,
+        label: node.data.label,
+        universeId
+      });
 
       if (eventId && universeId) {
-        // Navigate to timeline page with universe and event parameters
-        const timelineUrl = `/timeline?universe=${universeId}&event=${eventId}`;
-        window.location.href = timelineUrl;
+        // Navigate to event page with universe and event parameters
+        const eventUrl = `/event/${universeId}/${eventId}`;
+        console.log('🔗 Navigating to:', eventUrl);
+        window.location.href = eventUrl;
       }
     }
   }, [id]);
@@ -1650,11 +1749,19 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
 
       {/* Bottom Panel - Event Creation (Google Veo Flow Style) */}
       {(() => {
-        // Find previous event's video URL - always use the last event or the source node
+        // Find previous event's video URL and description - always use the last event or the source node
         const sourceNode = sourceNodeId
           ? nodes.find(n => n.data.eventId === sourceNodeId || n.id === sourceNodeId)
           : nodes.filter((n: any) => n.data.nodeType === 'scene' && n.data.videoUrl).pop();
         const previousEventVideoUrl = sourceNode?.data.videoUrl || null;
+
+        // Handle description which might be an object {timestamp, description} or a string
+        const rawDesc = sourceNode?.data.description;
+        const previousEventDescription = rawDesc && typeof rawDesc === 'object' && 'description' in rawDesc
+          ? String((rawDesc as any).description)
+          : (rawDesc ? String(rawDesc) : null);
+
+        const previousEventTitle = sourceNode?.data.label || null;
 
         return (
           <FlowCreationPanel
@@ -1683,6 +1790,7 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
             generatedCharacter={generatedCharacter}
             setGeneratedCharacter={setGeneratedCharacter}
             generateCharacterMutation={generateCharacterMutation}
+            analyzeCharacterMutation={analyzeCharacterMutation}
             saveCharacterMutation={saveCharacterMutation}
             generatedImageUrl={generatedImageUrl}
             isGeneratingImage={isGeneratingImage}
@@ -1718,11 +1826,14 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
             handleSaveToContract={handleSaveToContract}
             handleCreateEvent={handleCreateEvent}
             previousEventVideoUrl={previousEventVideoUrl}
+            previousEventDescription={previousEventDescription}
+            previousEventTitle={previousEventTitle}
             statusMessage={statusMessage}
             setStatusMessage={setStatusMessage}
             selectedImageCharacters={selectedImageCharacters}
             setSelectedImageCharacters={setSelectedImageCharacters}
             handleGenerateCharacterFrame={handleGenerateCharacterFrame}
+            refetchCharacters={refetchCharacters}
           />
         );
       })()}
