@@ -165,6 +165,17 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         emit SetDeprecated(deprecated_);
     }
 
+    function setHook(address hook, bool enabled) external onlyOwner {
+        // check that the hook supports the IClankerHook interface
+        if (!ILoarHook(hook).supportsInterface(type(ILoarHook).interfaceId)) {
+            revert InvalidHook();
+        }
+
+        enabledHooks[hook] = enabled;
+
+        emit SetHook(hook, enabled);
+    }
+
     function getUniverse(uint id) public returns (UniverseData memory system) {
         return universeDatas[id];
     }

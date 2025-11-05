@@ -16,6 +16,7 @@ import {WETH9} from "./tokens/WETH9.sol";
 //import {LoarHook} from "../src/hooks/LoarHook.sol";
 import {LoarHookStaticFee} from "../src/hooks/LoarHookStaticFee.sol";
 import {HookTest} from "./HookTest.sol";
+import {IUniverseManager} from "../src/interfaces/IUniverseManager.sol";
 
 contract UniverseManagerTest is HookTest {
     UniverseManager public universeManager;
@@ -74,12 +75,16 @@ contract UniverseManagerTest is HookTest {
     }
 
     function test_CreateUniverse() public {
-        address universeAddress = createUniverse();
+        (,address universeAddress) = createUniverse();
         assertNotEq(address(0), universeAddress);
     }
 
     function test_deployUniverseToken() public {
-      UniverseManager.TokenConfig tokenConfig = UniverseManager.TokenConfig({
+      bytes memory poolData;
+      int24 tickIfToken0IsLoar = -230400;
+      int24 tickSpacing = 200;
+      
+      IUniverseManager.TokenConfig memory tokenConfig = IUniverseManager.TokenConfig({
         tokenAdmin: msg.sender,
         name: "Test Token",
         symbol:"TT",
@@ -87,26 +92,27 @@ contract UniverseManagerTest is HookTest {
         metadata: "{'description':'testdescription}",
         context: "{'interface':'loar.fun, 'platform':'','messageId':''}"
       });
-      UniverseManager.PoolConfig poolConfig = UniverseManager.PoolConfig({
-        hook:,
-        pairedToken:,
-        tickIfToken0IsLoar:,
-        tickSpacing:,
-        poolData:,
+      IUniverseManager.PoolConfig memory poolConfig = IUniverseManager.PoolConfig({
+        hook:address(loarHook),
+        pairedToken: address(WETH),
+        tickIfToken0IsLoar: tickIfToken0IsLoar,
+        tickSpacing:tickSpacing,
+        poolData: poolData 
 
-      })
-      UniverseManager.DeploymentConfig deployConfig = UniverseManager.DeploymentConfig({
+      });
+      IUniverseManager.DeploymentConfig memory deployConfig = IUniverseManager.DeploymentConfig({
         tokenConfig: tokenConfig,
         poolConfig: poolConfig
       });
-
-      address universeAddress = createUniverse();
-      address tokenAddress = deployUniverseToken()
+      universeManager.setHook(address(loarHook),true);
+      (uint id, address universeAddress) = createUniverse();
+      address tokenAddress = universeManager.deployUniverseToken(deployConfig, id);
+      assertNotEq(tokenAddress, address(0));
     }
 
     function test_claimFee() public {}
 
-    function createUniverse() public returns (address) {
+    function createUniverse() public returns (uint, address) {
         (uint id, address universeAddress) = universeManager.createUniverse(
             "One Piece",
             "random.png",
@@ -115,6 +121,6 @@ contract UniverseManagerTest is HookTest {
             NodeVisibilityOptions.PUBLIC,
             address(this)
         );
-        return universeAddress;
+        return (id, universeAddress);
     }
 }

@@ -68,11 +68,12 @@ interface IUniverseManager {
         address pairedToken
     );
     event SetDeprecated(bool deprecated);
-
+    event SetHook(address hook, bool enabled);
     error Deprecated();
     error TeamFeeRecipientNotSet();
     error DeployerIsNotOwner();
     error HookNotEnabled();
+    error InvalidHook();
 
     function createUniverse(
         string memory name,
