@@ -74,10 +74,35 @@ contract UniverseManagerTest is HookTest {
     }
 
     function test_CreateUniverse() public {
+        address universeAddress = createUniverse();
         assertNotEq(address(0), universeAddress);
     }
 
-    function test_deployUniverseToken() public {}
+    function test_deployUniverseToken() public {
+      UniverseManager.TokenConfig tokenConfig = UniverseManager.TokenConfig({
+        tokenAdmin: msg.sender,
+        name: "Test Token",
+        symbol:"TT",
+        imageURL: "testimage.org",
+        metadata: "{'description':'testdescription}",
+        context: "{'interface':'loar.fun, 'platform':'','messageId':''}"
+      });
+      UniverseManager.PoolConfig poolConfig = UniverseManager.PoolConfig({
+        hook:,
+        pairedToken:,
+        tickIfToken0IsLoar:,
+        tickSpacing:,
+        poolData:,
+
+      })
+      UniverseManager.DeploymentConfig deployConfig = UniverseManager.DeploymentConfig({
+        tokenConfig: tokenConfig,
+        poolConfig: poolConfig
+      });
+
+      address universeAddress = createUniverse();
+      address tokenAddress = deployUniverseToken()
+    }
 
     function test_claimFee() public {}
 
