@@ -35,13 +35,13 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
 
     constructor(
         address owner_,
-        address factory_, // Address of the clanker factory
+        address factory_, // Address of the loar factory
         address feeLocker_,
         address positionManager_, // Address of the position manager
         address permit2_ // address of the permit2 contract
     ) Ownable(owner_) {
         factory = factory_;
-        feeLocker = IClankerFeeLocker(feeLocker_);
+        feeLocker = ILoarFeeLocker(feeLocker_);
         positionManager = IPositionManager(positionManager_);
         permit2 = IPermit2(permit2_);
     }
@@ -187,7 +187,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
             ) {
                 revert TicksNotMultipleOfTickSpacing();
             }
-            if (lockerConfig.tickLower[i] < poolConfig.tickIfToken0IsClanker) {
+            if (lockerConfig.tickLower[i] < poolConfig.tickIfToken0IsLoar) {
                 revert TickRangeLowerThanStartingTick();
             }
 
@@ -397,7 +397,7 @@ contract LoarLpLockerMultiple is ILoarLpLockerMultiple, ReentrancyGuard, Ownable
         external
         returns (bytes4)
     {
-        // Only Clanker Factory can send NFTs here
+        // Only Loar Factory can send NFTs here
         if (from != factory) {
             revert Unauthorized();
         }

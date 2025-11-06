@@ -70,7 +70,8 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             IUniverse(universe),
             IERC20(address(0)),
             IGovernor(address(0)),
-            IHooks(address(0))
+            IHooks(address(0)),
+            ILoarLpLocker(address(0))
         );
         universeDatas[latestId] = data;
         uint current_id = latestId;
@@ -199,7 +200,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     }
 
     function setHook(address hook, bool enabled) external onlyOwner {
-        // check that the hook supports the IClankerHook interface
+        // check that the hook supports the ILoarHook interface
         if (!ILoarHook(hook).supportsInterface(type(ILoarHook).interfaceId)) {
             revert InvalidHook();
         }
@@ -210,7 +211,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     }
 
     function setLocker(address locker, address hook, bool enabled) external onlyOwner {
-        // check that the locker supports the IClankerLpLocker interface
+        // check that the locker supports the ILoarLpLocker interface
         if (!ILoarLpLocker(locker).supportsInterface(type(ILoarLpLocker).interfaceId)) {
             revert InvalidLocker();
         }

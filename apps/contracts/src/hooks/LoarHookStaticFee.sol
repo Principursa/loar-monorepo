@@ -46,7 +46,7 @@ contract LoarHookStaticFee is LoarHook, ILoarHookStaticFee {
         );
     }
 
-    // set the LP fee according to the clanker/paired fee configuration
+    // set the LP fee according to the loar/paired fee configuration
     function _setFee(
         PoolKey calldata poolKey,
         SwapParams calldata swapParams

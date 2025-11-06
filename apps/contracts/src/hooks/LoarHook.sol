@@ -212,7 +212,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         // into the hook's account
         if (!isExactInput && !swappingForLoar) {
             // we increase the protocol fee here because we want to better match
-            // the ExactOutput !swappingForClanker scenario
+            // the ExactOutput !swappingForLoar scenario
             uint128 scaledProtocolFee = (uint128(protocolFee) * 1e18) /
                 (1_000_000 - protocolFee);
             int128 fee = int128(
@@ -243,12 +243,12 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         bool swappingForLoar = swapParams.zeroForOne != token0IsLoar;
         bool isExactInput = swapParams.amountSpecified < 0;
 
-        // case: specified amount clanker in, unspecified amount paired out
+        // case: specified amount loar in, unspecified amount paired out
         // want to: take fee on amount out
         // how: the change in unspecified delta is debited to the swaps account post swap,
         // in this case the amount out given to the swapper is decreased
         if (isExactInput && !swappingForLoar) {
-            // grab non-clanker amount out
+            // grab non-loar amount out
             int128 amountOut = token0IsLoar ? delta.amount1() : delta.amount0();
             // take fee from it
             unspecifiedDelta =
@@ -263,12 +263,12 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             );
         }
 
-        // case: specified amount clanker out, unspecified amount paired in
+        // case: specified amount loar out, unspecified amount paired in
         // want to: take fee on amount in
         // how: the change in unspecified delta is debited to the swapper's account post swap,
         // in this case the amount taken from the swapper's account is increased
         if (!isExactInput && swappingForLoar) {
-            // grab non-clanker amount in
+            // grab non-loar amount in
             int128 amountIn = token0IsLoar ? delta.amount1() : delta.amount0();
             // take fee from amount int
             unspecifiedDelta =
