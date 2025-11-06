@@ -5,24 +5,29 @@ libs = ["lib", "dependencies"]
 
 solc_version="0.8.30"
 optimizer=true
-optimizer_runs=10000
+optimizer_runs=1
 via_ir=true
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
 [rpc_endpoints]
-#mainnet = "${RPC_1}"
-#sepolia = "${RPC_11155111}"
+mainnet = "${RPC_1}"
+sepolia = "${RPC_11155111}"
 
 [fmt]
 line_length = 100
 
 [etherscan]
+sepolia = { key = "${VERIFICATION_KEY_1}" }
 
 [dependencies]
 forge-std = "1.10.0"
 "@openzeppelin-contracts" = "5.0.2"
 solady = "0.1.26"
+uniswap-v4-core = "4"
+uniswap-v4-periphery = "60cd93803ac2b7fa65fd6cd351fd5fd4cc8c9db5"
+uniswap-permit2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+solmate = "89365b880c4f3c786bdd453d4b8e8fe410344a69"
 # Chain-specific API keys using standardized environment variables
 # Format: VERIFICATION_KEY_{chainId}
 # mainnet = { key = "${VERIFICATION_KEY_1}" }

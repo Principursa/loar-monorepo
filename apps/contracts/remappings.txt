@@ -1,4 +1,8 @@
 @/=./src/
 @openzeppelin/=dependencies/@openzeppelin-contracts-5.0.2/
+@uniswap/v4-core/=dependencies/v4-core/
+@uniswap/v4-periphery/=dependencies/v4-periphery/
 forge-std/=dependencies/forge-std-1.10.0/src
+permit2/=dependencies/uniswap-permit2-0x000000000022D473030F116dDEE9F6B43aC78BA3/
 solady/=dependencies/solady-0.1.26/
+solmate/=dependencies/solmate-89365b880c4f3c786bdd453d4b8e8fe410344a69/

@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Script, console} from "forge-std/Script.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {IUniverse} from "./interfaces/IUniverse.sol";
+import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
+import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
 
-contract Timeline is Ownable {
+contract Universe is Ownable, IUniverse {
+    //Maybe include some sort of hook system with custom contracts for creation and visibility options later, for now this is good enough
+    //Either that or functions on this contract that
+
     struct VideoNode {
         string link;
         uint id;
@@ -12,18 +17,46 @@ contract Timeline is Ownable {
         uint previous;
         uint[] next;
         bool canon;
+        address creator;
     }
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    constructor(
+        IUniverseManager.UniverseConfig memory config
+    ) Ownable(config.universeAdmin) {
+        nodeCreationOption = config.nodeCreationOption;
+        nodeVisibilityOption = config.nodeVisibilityOption;
+        universeImageUrl = config.imageURL;
+        universeManager = IUniverseManager(config.universeManager);
+        universeDescription = config.description;
+        universeName = config.name;
+    }
 
+    string public universeImageUrl;
+    string public universeName;
+    string public universeDescription;
     mapping(uint => VideoNode) public nodes;
     uint public latestNodeId;
     mapping(address user => bool) isWhitelisted;
 
-    event NodeCanonized(uint id,address canonizer);
-    event NodeCreated(uint id, uint previous, address creator);
+    //WIP: better structure types
+    NodeCreationOptions private nodeCreationOption;
+    NodeVisibilityOptions private nodeVisibilityOption;
+
+    address public associatedToken;
+    IUniverseManager public universeManager;
+
     //either put an event here to emit user + node to make it indexable or create data structure that associates addy w user
     //for profile -> videos created by user
+
+    //use this for converting internal uint id to frontend display id
+    //if necessary truncate it to six chars like github
+    function nodeIDToHex(uint id) public view returns (bytes32) {
+        if (id <= latestNodeId) {
+            revert NodeDoesNotExist();
+        }
+        bytes32 hash = keccak256(abi.encode(id));
+        return hash;
+    }
 
     function createNode(
         string memory _link,
@@ -58,10 +91,18 @@ contract Timeline is Ownable {
     )
         public
         view
-        returns (uint, string memory, string memory, uint, uint[] memory, bool)
+        returns (
+            uint,
+            string memory,
+            string memory,
+            uint,
+            uint[] memory,
+            bool,
+            address
+        )
     {
         VideoNode storage n = nodes[id];
-        return (n.id, n.link, n.plot, n.previous, n.next, n.canon);
+        return (n.id, n.link, n.plot, n.previous, n.next, n.canon, n.creator);
     }
 
     function getTimeline(uint fromId) public view returns (uint[] memory) {
@@ -108,9 +149,21 @@ contract Timeline is Ownable {
         return nodes[id].link;
     }
 
-    function setMedia(uint id, string memory _link) public {
-        //change ownership w gov later
+    function setMedia(uint id, string memory _link) public onlyOwner {
         nodes[id].link = _link;
+        emit MediaUpdated(msg.sender, _link);
+    }
+
+    function setNodeVisibilityOption(
+        NodeVisibilityOptions _option
+    ) public onlyOwner {
+        nodeVisibilityOption = _option;
+    }
+
+    function setNodeCreationOption(
+        NodeCreationOptions _option
+    ) public onlyOwner {
+        nodeCreationOption = _option;
     }
 
     function getFullGraph()
@@ -158,8 +211,9 @@ contract Timeline is Ownable {
     // ---- Canon ----
 
     function setCanon(uint id) public onlyOwner {
-        //governance will handle this
-        require(nodes[id].id != 0, "Node does not exist");
+        if (nodes[id].id == 0) {
+            revert NodeDoesNotExist();
+        }
 
         // Clear old canon (at most one canon at a time)
         for (uint i = 1; i <= latestNodeId; i++) {
@@ -181,8 +235,26 @@ contract Timeline is Ownable {
                 break;
             }
         }
-        require(canonId != 0, "No canon set");
+        if (canonId == 0) {
+            revert CanonNotSet();
+        }
         return getTimeline(canonId);
+    }
+
+    function getToken() public view returns (address) {
+        if (associatedToken == address(0)) {
+            revert TokenDoesNotExist();
+        } else {
+            return associatedToken;
+        }
+    }
+
+    //add onlyManagerModifier
+    function setToken(address token) external {
+        if (msg.sender != address(universeManager)) {
+            revert CallerNotManager();
+        }
+        associatedToken = token;
     }
     //Might work as well to have a function that gets the canon status of an indiviudal node
 }

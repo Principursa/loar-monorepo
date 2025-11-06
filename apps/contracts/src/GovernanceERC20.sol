@@ -7,27 +7,42 @@ import {ERC20Votes} from "@openzeppelin/token/ERC20/extensions/ERC20Votes.sol";
 import {Nonces} from "@openzeppelin/utils/Nonces.sol";
 
 contract GovernanceERC20 is ERC20, ERC20Permit, ERC20Votes {
-    constructor(string memory _name, string memory _symbol) ERC20(_name,_symbol) ERC20Permit(_name) {
-        // Mint initial supply to the deployer (1 million tokens with 18 decimals)
-        _mint(msg.sender, 1_000_000 * 10**decimals());
+    string public imageUrl;
+    string public metadata;
+    string public context;
+    address public admin;
+    address public universe;
+
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        uint _maxSupply,
+        address _admin,
+        string memory _imageUrl,
+        string memory _metadata,
+        string memory _context
+    ) ERC20(_name, _symbol) ERC20Permit(_name) {
+        imageUrl = _imageUrl;
+        metadata = _metadata;
+        context = _context;
+        admin = _admin;
+        // Mint initial supply to the deployer
+        _mint(msg.sender, _maxSupply);
     }
 
     // The following functions are overrides required by Solidity.
 
-    function _update(address from, address to, uint256 value)
-        internal
-        override(ERC20, ERC20Votes)
-    {
+    function _update(
+        address from,
+        address to,
+        uint256 value
+    ) internal override(ERC20, ERC20Votes) {
         super._update(from, to, value);
     }
 
-    function nonces(address owner)
-        public
-        view
-        override(ERC20Permit, Nonces)
-        returns (uint256)
-    {
+    function nonces(
+        address owner
+    ) public view override(ERC20Permit, Nonces) returns (uint256) {
         return super.nonces(owner);
     }
 }
-
