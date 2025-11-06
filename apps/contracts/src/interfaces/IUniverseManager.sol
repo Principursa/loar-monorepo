@@ -34,6 +34,20 @@ interface IUniverseManager {
     struct DeploymentConfig {
         TokenConfig tokenConfig;
         PoolConfig poolConfig;
+        LockerConfig lockerConfig;
+    }
+
+    struct LockerConfig {
+        address locker;
+        // reward info
+        address[] rewardAdmins;
+        address[] rewardRecipients;
+        uint16[] rewardBps;
+        // liquidity placement info
+        int24[] tickLower;
+        int24[] tickUpper;
+        uint16[] positionBps;
+        bytes lockerData;
     }
 
     event UniverseCreated(
@@ -65,8 +79,10 @@ interface IUniverseManager {
         int24 startingTick,
         address poolHook,
         PoolId poolId,
-        address pairedToken
+        address pairedToken,
+        address locker
     );
+    event SetLocker(address locker, address hook, bool enabled);
     event SetDeprecated(bool deprecated);
     event SetHook(address hook, bool enabled);
     error Deprecated();
@@ -74,6 +90,8 @@ interface IUniverseManager {
     error DeployerIsNotOwner();
     error HookNotEnabled();
     error InvalidHook();
+    error InvalidLocker();
+    error LockerNotEnabled();
 
     function createUniverse(
         string memory name,

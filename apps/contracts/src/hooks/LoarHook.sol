@@ -11,6 +11,7 @@ import {Hooks, IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {IPositionManager} from "@uniswap/v4-periphery/src/interfaces/IPositionManager.sol";
+import {ILoarLpLocker} from "../interfaces/ILoarLpLocker.sol";
 
 import {IERC20} from "@openzeppelin/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
@@ -90,6 +91,7 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         address pairedToken,
         int24 tickIfToken0IsLoar,
         int24 tickSpacing,
+        address _locker,
         bytes calldata poolData
     ) public onlyFactory returns (PoolKey memory) {
         // initialize the pool
@@ -107,7 +109,8 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             loar: loar,
             poolId: poolKey.toId(),
             tickIfToken0IsLoar: tickIfToken0IsLoar,
-            tickSpacing: tickSpacing
+            tickSpacing: tickSpacing,
+            locker: _locker
         });
 
         return poolKey;
@@ -160,12 +163,10 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
     function _beforeSwap(
         address,
         PoolKey calldata poolKey,
-        SwapParams calldata swapParams,
-        bytes calldata mevModuleSwapData
+        SwapParams calldata swapParams
     )
         internal
         virtual
-        override
         returns (bytes4, BeforeSwapDelta delta, uint24)
     {
         // set the fee for this swap
@@ -173,6 +174,8 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
 
         // trigger hook fee claim
         _hookFeeClaim(poolKey);
+
+        _lpLockerFeeClaim(poolKey);
 
         // variables to determine how to collect protocol fee
         bool token0IsLoar = loarIsToken0[poolKey.toId()];
@@ -233,9 +236,8 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         address,
         PoolKey calldata poolKey,
         SwapParams calldata swapParams,
-        BalanceDelta delta,
-        bytes calldata mevModuleSwapData
-    ) internal override returns (bytes4, int128 unspecifiedDelta) {
+        BalanceDelta delta
+    ) internal returns (bytes4, int128 unspecifiedDelta) {
         // variables to determine how to collect protocol fee
         bool token0IsLoar = loarIsToken0[poolKey.toId()];
         bool swappingForLoar = swapParams.zeroForOne != token0IsLoar;
@@ -305,6 +307,21 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
         bytes calldata
     ) internal virtual override returns (bytes4) {
         return BaseHook.beforeAddLiquidity.selector;
+    }
+
+    function _lpLockerFeeClaim(PoolKey calldata poolKey) internal {
+        // if this wasn't initialized to claim fees, skip the claim
+        if (locker[poolKey.toId()] == address(0)) {
+            return;
+        }
+
+        // determine the token
+        address token = loarIsToken0[poolKey.toId()]
+            ? Currency.unwrap(poolKey.currency0)
+            : Currency.unwrap(poolKey.currency1);
+
+        // trigger the fee claim
+        ILoarLpLocker(locker[poolKey.toId()]).collectRewardsWithoutUnlock(token);
     }
 
 

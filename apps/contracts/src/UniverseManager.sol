@@ -17,6 +17,7 @@ import {ILoarHook} from "./interfaces/ILoarHook.sol";
 import {UniverseGovernor} from "./UniverseGovernor.sol";
 import {IGovernor} from "@openzeppelin/governance/IGovernor.sol";
 import {IOwnable} from "./interfaces/IOwnable.sol";
+import {ILoarLpLocker} from "./interfaces/ILoarLpLocker.sol";
 
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -39,6 +40,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     uint256 public constant BPS = 10_000;
     mapping(uint id => UniverseData) universeDatas;
     mapping(address hook => bool enabled) enabledHooks;
+    mapping(address locker => mapping(address hook => bool enabled)) public enabledLockers;
     uint latestId; //See if EnumerableSetLib fixes this
     bool public deprecated;
 
@@ -89,15 +91,28 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             TOKEN_SUPPLY
         );
 
+        uint256 poolSupply = TOKEN_SUPPLY;
+
         PoolKey memory poolkey = _initializePool(
             deploymentConfig.poolConfig,
+            deploymentConfig.lockerConfig.locker,
             tokenAddress
         );
+        
+        _initializeLiquidity(
+            deploymentConfig.lockerConfig,
+            deploymentConfig.poolConfig,
+            poolkey,
+            poolSupply,
+            tokenAddress
+        );
+
         universeDatas[id].token = IERC20(tokenAddress);
         universeDatas[id].universeGovernor = IGovernor(
             _deployGovernance(tokenAddress)
         );
         universeDatas[id].hook = poolkey.hooks;
+        universeDatas[id].locker = ILoarLpLocker(deploymentConfig.lockerConfig.locker);
         universe.setToken(tokenAddress);
         emit TokenCreated(
             msg.sender,
@@ -111,7 +126,8 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             deploymentConfig.poolConfig.tickIfToken0IsLoar,
             deploymentConfig.poolConfig.hook,
             poolkey.toId(),
-            deploymentConfig.poolConfig.pairedToken
+            deploymentConfig.poolConfig.pairedToken,
+            deploymentConfig.lockerConfig.locker
         );
     }
 
@@ -138,6 +154,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
 
     function _initializePool(
         PoolConfig memory poolConfig,
+        address locker,
         address newToken
     ) internal returns (PoolKey memory poolKey) {
         if (!enabledHooks[poolConfig.hook]) {
@@ -149,16 +166,32 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             poolConfig.pairedToken,
             poolConfig.tickIfToken0IsLoar,
             poolConfig.tickSpacing,
+            locker,
             poolConfig.poolData
         );
     }
 
-    //function _initializeLiquidity(
-    //    IUniverseManager.PoolConfig memory poolConfig,
-    //   PoolKey memory poolKey,
-    //    uint256 poolSupply,
-    //    address token
-    //) internal {}
+    function _initializeLiquidity(
+        LockerConfig memory lockerConfig,
+        IUniverseManager.PoolConfig memory poolConfig,
+        PoolKey memory poolKey,
+        uint256 poolSupply,
+        address token
+    ) internal {
+        // check that the locker is enabled
+        if (!enabledLockers[lockerConfig.locker][poolConfig.hook]) {
+            revert LockerNotEnabled();
+        }
+
+        // approve the liquidity locker to take the pool's token supply
+        IERC20(token).approve(address(lockerConfig.locker), poolSupply);
+
+        // have the locker mint liquidity
+        ILoarLpLocker(lockerConfig.locker).placeLiquidity(
+            lockerConfig, poolConfig, poolKey, poolSupply, token
+        );
+
+    }
 
     function setDeprecated(bool deprecated_) external onlyOwner {
         deprecated = deprecated_;
@@ -176,7 +209,18 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         emit SetHook(hook, enabled);
     }
 
-    function getUniverse(uint id) public returns (UniverseData memory system) {
+    function setLocker(address locker, address hook, bool enabled) external onlyOwner {
+        // check that the locker supports the IClankerLpLocker interface
+        if (!ILoarLpLocker(locker).supportsInterface(type(ILoarLpLocker).interfaceId)) {
+            revert InvalidLocker();
+        }
+
+        enabledLockers[locker][hook] = enabled;
+
+        emit SetLocker(locker, hook, enabled);
+    }
+
+    function getUniverseData(uint id) public view returns (UniverseData memory system) {
         return universeDatas[id];
     }
 }

@@ -11,7 +11,6 @@ interface ILoarHook {
     error OnlyFactory();
     error UnsupportedInitializePath();
     error PastCreationTimestamp();
-    error MevModuleEnabled();
     error WethCannotBeLoar();
 
     event PoolCreatedOpen(
@@ -27,7 +26,8 @@ interface ILoarHook {
         address indexed loar,
         PoolId poolId,
         int24 tickIfToken0IsLoar,
-        int24 tickSpacing
+        int24 tickSpacing,
+        address locker
     );
 
     event ClaimProtocolFees(address indexed token, uint256 amount);
@@ -38,6 +38,7 @@ interface ILoarHook {
         address pairedToken,
         int24 tickIfToken0IsLoar,
         int24 tickSpacing,
+        address locker,
         bytes calldata poolData
     ) external returns (PoolKey memory);
 

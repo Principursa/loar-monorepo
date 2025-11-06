@@ -252,7 +252,7 @@ contract Universe is Ownable, IUniverse {
 
     //add onlyManagerModifier
     function setToken(address token) external {
-        if (msg.sender == address(universeManager)) {
+        if (msg.sender != address(universeManager)) {
             revert CallerNotManager();
         }
         associatedToken = token;
