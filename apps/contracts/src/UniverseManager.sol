@@ -1,35 +1,22 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.30;
 
-import {Script, console} from "forge-std/Script.sol";
-import {GovernanceERC20} from "./GovernanceERC20.sol";
-import {UniverseGovernor} from "./UniverseGovernor.sol";
 import {Universe} from "./Universe.sol";
+import {UniverseGovernor} from "./UniverseGovernor.sol";
 import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
-import {EnumerableSetLib} from "solady/src/utils/EnumerableSetLib.sol";
 import {LoarDeployer} from "./utils/LoarDeployer.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {ILoarHook} from "./interfaces/ILoarHook.sol";
-import {UniverseGovernor} from "./UniverseGovernor.sol";
 import {IGovernor} from "@openzeppelin/governance/IGovernor.sol";
 import {IOwnable} from "./interfaces/IOwnable.sol";
 import {ILoarLpLocker} from "./interfaces/ILoarLpLocker.sol";
-
-import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
-import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
-import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
-import {BeforeSwapDelta, BeforeSwapDeltaLibrary, toBeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
-import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
-import {Hooks, IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
-import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
-import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
-import {SafeCast} from "@uniswap/v4-core/src/libraries/SafeCast.sol";
-import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import "./libraries/NodeOptions.sol";
 import "./types/UniverseData.sol";
 
@@ -41,7 +28,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     mapping(uint id => UniverseData) universeDatas;
     mapping(address hook => bool enabled) enabledHooks;
     mapping(address locker => mapping(address hook => bool enabled)) public enabledLockers;
-    uint latestId; //See if EnumerableSetLib fixes this
+    uint latestId;
     bool public deprecated;
 
     constructor(address _teamFeeRecipient) Ownable(msg.sender) {

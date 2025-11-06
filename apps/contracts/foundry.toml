@@ -5,19 +5,20 @@ libs = ["lib", "dependencies"]
 
 solc_version="0.8.30"
 optimizer=true
-optimizer_runs=10000
+optimizer_runs=1
 via_ir=true
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
 [rpc_endpoints]
-#mainnet = "${RPC_1}"
-#sepolia = "${RPC_11155111}"
+mainnet = "${RPC_1}"
+sepolia = "${RPC_11155111}"
 
 [fmt]
 line_length = 100
 
 [etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
 
 [dependencies]
 forge-std = "1.10.0"
