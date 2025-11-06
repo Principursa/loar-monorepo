@@ -3,6 +3,11 @@ pragma solidity ^0.8.30;
 
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "../libraries/NodeOptions.sol";
+import {IUniverse} from "./IUniverse.sol";
+import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
+import {IGovernor} from "@openzeppelin/governance/IGovernor.sol";
+import {IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {ILoarLpLocker} from "./ILoarLpLocker.sol";
 
 interface IUniverseManager {
     struct UniverseConfig {
@@ -106,4 +111,16 @@ interface IUniverseManager {
         DeploymentConfig memory deploymentConfig,
         uint id
     ) external payable returns (address tokenAddress);
+
+    function enabledHooks(address hook) external view returns (bool);
+
+    function enabledLockers(address locker, address hook) external view returns (bool);
+
+    function getUniverseData(uint id) external view returns (
+        IUniverse universe,
+        IERC20 token,
+        IGovernor universeGovernor,
+        IHooks hook,
+        ILoarLpLocker locker
+    );
 }

@@ -2,37 +2,53 @@
 pragma solidity ^0.8.30;
 
 import {Universe} from "./Universe.sol";
-import {UniverseGovernor} from "./UniverseGovernor.sol";
 import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
-import {LoarDeployer} from "./utils/LoarDeployer.sol";
 import {ReentrancyGuard} from "solady/src/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/access/Ownable.sol";
+import {IOwnable} from "./interfaces/IOwnable.sol";
 import {IERC20} from "@openzeppelin/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {ILoarHook} from "./interfaces/ILoarHook.sol";
 import {IGovernor} from "@openzeppelin/governance/IGovernor.sol";
-import {IOwnable} from "./interfaces/IOwnable.sol";
 import {ILoarLpLocker} from "./interfaces/ILoarLpLocker.sol";
-import {IVotes} from "@openzeppelin/governance/utils/IVotes.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import "./libraries/NodeOptions.sol";
 import "./types/UniverseData.sol";
 
+interface IUniverseTokenDeployer {
+    function deployTokenAndGovernance(
+        IUniverseManager.DeploymentConfig memory deploymentConfig,
+        uint256 universeId
+    ) external returns (
+        address tokenAddress,
+        address governor
+    );
+}
+
 contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
     uint public teamFee;
-    address teamFeeRecipient;
+    address public teamFeeRecipient;
+    address public tokenDeployer;
     uint256 public constant TOKEN_SUPPLY = 100_000_000_000e18; // 100b with 18 decimals
     uint256 public constant BPS = 10_000;
     mapping(uint id => UniverseData) universeDatas;
-    mapping(address hook => bool enabled) enabledHooks;
+    mapping(address hook => bool enabled) public enabledHooks;
     mapping(address locker => mapping(address hook => bool enabled)) public enabledLockers;
     uint latestId;
     bool public deprecated;
 
+    event SetTokenDeployer(address oldTokenDeployer, address newTokenDeployer);
+
     constructor(address _teamFeeRecipient) Ownable(msg.sender) {
         teamFeeRecipient = _teamFeeRecipient;
+    }
+
+    function setTokenDeployer(address _tokenDeployer) external onlyOwner {
+        address oldTokenDeployer = tokenDeployer;
+        tokenDeployer = _tokenDeployer;
+        emit SetTokenDeployer(oldTokenDeployer, _tokenDeployer);
     }
 
     function createUniverse(
@@ -71,23 +87,36 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         uint id
     ) public payable nonReentrant returns (address tokenAddress) {
         IUniverse universe = universeDatas[id].universe;
-        if (IOwnable(address(universe)).owner() != msg.sender) {
-            revert DeployerIsNotOwner();
+        require(IOwnable(address(universe)).owner() == msg.sender, "Not universe owner");
+
+        if (!enabledHooks[deploymentConfig.poolConfig.hook]) {
+            revert HookNotEnabled();
         }
-        tokenAddress = LoarDeployer.deployToken(
-            deploymentConfig.tokenConfig,
-            TOKEN_SUPPLY
+
+        if (!enabledLockers[deploymentConfig.lockerConfig.locker][deploymentConfig.poolConfig.hook]) {
+            revert LockerNotEnabled();
+        }
+
+        (address _tokenAddress, address governor) =
+            IUniverseTokenDeployer(tokenDeployer).deployTokenAndGovernance(
+                deploymentConfig,
+                id
+            );
+
+        tokenAddress = _tokenAddress;
+
+        PoolKey memory poolkey = ILoarHook(deploymentConfig.poolConfig.hook).initializePool(
+            tokenAddress,
+            deploymentConfig.poolConfig.pairedToken,
+            deploymentConfig.poolConfig.tickIfToken0IsLoar,
+            deploymentConfig.poolConfig.tickSpacing,
+            deploymentConfig.lockerConfig.locker,
+            deploymentConfig.poolConfig.poolData
         );
 
         uint256 poolSupply = TOKEN_SUPPLY;
-
-        PoolKey memory poolkey = _initializePool(
-            deploymentConfig.poolConfig,
-            deploymentConfig.lockerConfig.locker,
-            tokenAddress
-        );
-        
-        _initializeLiquidity(
+        IERC20(tokenAddress).approve(address(deploymentConfig.lockerConfig.locker), poolSupply);
+        ILoarLpLocker(deploymentConfig.lockerConfig.locker).placeLiquidity(
             deploymentConfig.lockerConfig,
             deploymentConfig.poolConfig,
             poolkey,
@@ -96,12 +125,12 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         );
 
         universeDatas[id].token = IERC20(tokenAddress);
-        universeDatas[id].universeGovernor = IGovernor(
-            _deployGovernance(tokenAddress)
-        );
+        universeDatas[id].universeGovernor = IGovernor(governor);
         universeDatas[id].hook = poolkey.hooks;
         universeDatas[id].locker = ILoarLpLocker(deploymentConfig.lockerConfig.locker);
+
         universe.setToken(tokenAddress);
+
         emit TokenCreated(
             msg.sender,
             tokenAddress,
@@ -119,13 +148,6 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         );
     }
 
-    function _deployGovernance(
-        address tokenAddress
-    ) internal returns (IGovernor) {
-        UniverseGovernor governor = new UniverseGovernor(IVotes(tokenAddress));
-        return IGovernor(governor);
-    }
-
     function setTeamFeeRecipient(address _teamFeeRecipient) public onlyOwner {
         address oldTeamFeeRecipient = teamFeeRecipient;
         teamFeeRecipient = _teamFeeRecipient;
@@ -138,47 +160,6 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         uint256 balance = IERC20(token).balanceOf(address(this));
         SafeERC20.safeTransfer(IERC20(token), teamFeeRecipient, balance);
         emit ClaimTeamFees(token, teamFeeRecipient, balance);
-    }
-
-    function _initializePool(
-        PoolConfig memory poolConfig,
-        address locker,
-        address newToken
-    ) internal returns (PoolKey memory poolKey) {
-        if (!enabledHooks[poolConfig.hook]) {
-            revert HookNotEnabled();
-        }
-
-        poolKey = ILoarHook(poolConfig.hook).initializePool(
-            newToken,
-            poolConfig.pairedToken,
-            poolConfig.tickIfToken0IsLoar,
-            poolConfig.tickSpacing,
-            locker,
-            poolConfig.poolData
-        );
-    }
-
-    function _initializeLiquidity(
-        LockerConfig memory lockerConfig,
-        IUniverseManager.PoolConfig memory poolConfig,
-        PoolKey memory poolKey,
-        uint256 poolSupply,
-        address token
-    ) internal {
-        // check that the locker is enabled
-        if (!enabledLockers[lockerConfig.locker][poolConfig.hook]) {
-            revert LockerNotEnabled();
-        }
-
-        // approve the liquidity locker to take the pool's token supply
-        IERC20(token).approve(address(lockerConfig.locker), poolSupply);
-
-        // have the locker mint liquidity
-        ILoarLpLocker(lockerConfig.locker).placeLiquidity(
-            lockerConfig, poolConfig, poolKey, poolSupply, token
-        );
-
     }
 
     function setDeprecated(bool deprecated_) external onlyOwner {
@@ -208,7 +189,14 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         emit SetLocker(locker, hook, enabled);
     }
 
-    function getUniverseData(uint id) public view returns (UniverseData memory system) {
-        return universeDatas[id];
+    function getUniverseData(uint id) public view returns (
+        IUniverse universe,
+        IERC20 token,
+        IGovernor universeGovernor,
+        IHooks hook,
+        ILoarLpLocker locker
+    ) {
+        UniverseData memory data = universeDatas[id];
+        return (data.universe, data.token, data.universeGovernor, data.hook, data.locker);
     }
 }

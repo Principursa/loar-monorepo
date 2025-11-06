@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import {Script, console} from "forge-std/Script.sol";
 import {UniverseManager} from "../src/UniverseManager.sol";
+import {UniverseTokenDeployer} from "../src/UniverseTokenDeployer.sol";
 import {LoarFeeLocker} from "../src/LoarFeeLocker.sol";
 import {LoarLpLockerMultiple} from "../src/lp-lockers/LoarLpLockerMultiple.sol";
 import {LoarHookStaticFee} from "../src/hooks/LoarHookStaticFee.sol";
@@ -24,6 +25,7 @@ import {HookMiner} from "@uniswap/v4-periphery/src/utils/HookMiner.sol";
  */
 contract DeployProtocolScript is Script {
     UniverseManager public universeManager;
+    UniverseTokenDeployer public tokenDeployer;
     LoarFeeLocker public feeLocker;
     LoarLpLockerMultiple public lpLocker;
     LoarHookStaticFee public hook;
@@ -86,17 +88,27 @@ contract DeployProtocolScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // 1. Deploy UniverseManager
-        console.log("1/4 Deploying UniverseManager...");
+        console.log("1/6 Deploying UniverseManager...");
         universeManager = new UniverseManager(teamFeeRecipient);
         console.log("   UniverseManager deployed at:", address(universeManager));
 
-        // 2. Deploy FeeLocker
-        console.log("2/4 Deploying LoarFeeLocker...");
+        // 2. Deploy UniverseTokenDeployer
+        console.log("2/6 Deploying UniverseTokenDeployer...");
+        tokenDeployer = new UniverseTokenDeployer(address(universeManager));
+        console.log("   UniverseTokenDeployer deployed at:", address(tokenDeployer));
+
+        // 3. Set TokenDeployer on UniverseManager
+        console.log("3/6 Setting TokenDeployer on UniverseManager...");
+        universeManager.setTokenDeployer(address(tokenDeployer));
+        console.log("   TokenDeployer set successfully");
+
+        // 4. Deploy FeeLocker
+        console.log("4/6 Deploying LoarFeeLocker...");
         feeLocker = new LoarFeeLocker(deployerAddress);
         console.log("   LoarFeeLocker deployed at:", address(feeLocker));
 
-        // 3. Deploy LpLocker
-        console.log("3/4 Deploying LoarLpLockerMultiple...");
+        // 5. Deploy LpLocker
+        console.log("5/6 Deploying LoarLpLockerMultiple...");
         lpLocker = new LoarLpLockerMultiple(
             deployerAddress, // owner
             address(universeManager), // factory
@@ -106,8 +118,8 @@ contract DeployProtocolScript is Script {
         );
         console.log("   LoarLpLockerMultiple deployed at:", address(lpLocker));
 
-        // 4. Deploy Hook with deterministic address using CREATE2
-        console.log("4/4 Deploying LoarHookStaticFee...");
+        // 6. Deploy Hook with deterministic address using CREATE2
+        console.log("6/6 Deploying LoarHookStaticFee...");
 
         // Calculate the required hook address flags
         uint160 flags = uint160(
@@ -160,6 +172,7 @@ contract DeployProtocolScript is Script {
 
         console.log("\n=== Deployment Complete ===\n");
         console.log("UniverseManager:", address(universeManager));
+        console.log("UniverseTokenDeployer:", address(tokenDeployer));
         console.log("LoarFeeLocker:", address(feeLocker));
         console.log("LoarLpLockerMultiple:", address(lpLocker));
         console.log("LoarHookStaticFee:", address(hook));

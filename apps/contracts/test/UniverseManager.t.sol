@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
 import {UniverseManager} from "../src/UniverseManager.sol";
+import {UniverseTokenDeployer} from "../src/UniverseTokenDeployer.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "../src/libraries/NodeOptions.sol";
 import {LoarLpLockerMultiple} from "../src/lp-lockers/LoarLpLockerMultiple.sol";
 import {LoarFeeLocker} from "../src/LoarFeeLocker.sol";
@@ -26,6 +27,7 @@ import {ILoarHookStaticFee} from "../src/interfaces/ILoarHookStaticFee.sol";
 
 contract UniverseManagerTest is HookTest {
     UniverseManager public universeManager;
+    UniverseTokenDeployer public tokenDeployer;
     PoolManager public poolManager;
     LoarHookStaticFee public loarHook;
     LoarFeeLocker public feeLocker;
@@ -50,6 +52,11 @@ contract UniverseManagerTest is HookTest {
 
         universeManager = new UniverseManager(msg.sender);
         console.log(address(universeManager), "UniverseManager Address");
+
+        tokenDeployer = new UniverseTokenDeployer(address(universeManager));
+        console.log(address(tokenDeployer), "UniverseTokenDeployer Address");
+
+        universeManager.setTokenDeployer(address(tokenDeployer));
 
         WETH = WETH9(payable(address(123)));
         console.log(address(WETH), "WETH Address");

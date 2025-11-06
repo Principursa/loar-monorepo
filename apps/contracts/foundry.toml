@@ -18,7 +18,7 @@ sepolia = "${RPC_11155111}"
 line_length = 100
 
 [etherscan]
-sepolia = { key = "${ETHERSCAN_API_KEY}" }
+sepolia = { key = "${VERIFICATION_KEY_1}" }
 
 [dependencies]
 forge-std = "1.10.0"
