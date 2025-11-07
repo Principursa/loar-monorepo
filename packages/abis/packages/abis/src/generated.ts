@@ -1949,6 +1949,13 @@ export const universeAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'getAdmin',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'getCanonChain',
     outputs: [{ name: '', internalType: 'uint256[]', type: 'uint256[]' }],
     stateMutability: 'view',
@@ -2040,15 +2047,8 @@ export const universeAbi = [
   },
   {
     type: 'function',
-    inputs: [],
-    name: 'owner',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'renounceOwnership',
+    inputs: [{ name: 'newAdmin', internalType: 'address', type: 'address' }],
+    name: 'setAdmin',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -2104,10 +2104,10 @@ export const universeAbi = [
   },
   {
     type: 'function',
-    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
-    name: 'transferOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
+    inputs: [],
+    name: 'universeAdmin',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -2214,37 +2214,13 @@ export const universeAbi = [
     name: 'NodeVisibilityOptionUpdated',
   },
   {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'previousOwner',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'newOwner',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-    ],
-    name: 'OwnershipTransferred',
+    type: 'error',
+    inputs: [{ name: 'caller', internalType: 'address', type: 'address' }],
+    name: 'CallerNotAdmin',
   },
   { type: 'error', inputs: [], name: 'CallerNotManager' },
   { type: 'error', inputs: [], name: 'CanonNotSet' },
   { type: 'error', inputs: [], name: 'NodeDoesNotExist' },
-  {
-    type: 'error',
-    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
-    name: 'OwnableInvalidOwner',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
-    name: 'OwnableUnauthorizedAccount',
-  },
   { type: 'error', inputs: [], name: 'TokenDoesNotExist' },
 ] as const
 
@@ -3530,6 +3506,12 @@ export const universeManagerAbi = [
         type: 'address',
         indexed: false,
       },
+      {
+        name: 'governor',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
     ],
     name: 'TokenCreated',
   },
@@ -3563,6 +3545,7 @@ export const universeManagerAbi = [
     inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
     name: 'AddressInsufficientBalance',
   },
+  { type: 'error', inputs: [], name: 'CallerIsNotOwner' },
   { type: 'error', inputs: [], name: 'DeployerIsNotOwner' },
   { type: 'error', inputs: [], name: 'Deprecated' },
   { type: 'error', inputs: [], name: 'FailedInnerCall' },
@@ -3587,6 +3570,7 @@ export const universeManagerAbi = [
     name: 'SafeERC20FailedOperation',
   },
   { type: 'error', inputs: [], name: 'TeamFeeRecipientNotSet' },
+  { type: 'error', inputs: [], name: 'TokenAlreadyDeployed' },
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5098,6 +5082,14 @@ export const useUniverse_AssociatedToken_read =
   })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"getAdmin"`
+ */
+export const useUniverse_GetAdmin_read = /*#__PURE__*/ createUseReadContract({
+  abi: universeAbi,
+  functionName: 'getAdmin',
+})
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"getCanonChain"`
  */
 export const useUniverse_GetCanonChain_read =
@@ -5179,12 +5171,13 @@ export const useUniverse_Nodes_read = /*#__PURE__*/ createUseReadContract({
 })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"owner"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"universeAdmin"`
  */
-export const useUniverse_Owner_read = /*#__PURE__*/ createUseReadContract({
-  abi: universeAbi,
-  functionName: 'owner',
-})
+export const useUniverse_UniverseAdmin_read =
+  /*#__PURE__*/ createUseReadContract({
+    abi: universeAbi,
+    functionName: 'universeAdmin',
+  })
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"universeDescription"`
@@ -5239,13 +5232,12 @@ export const useUniverse_CreateNode_write =
   })
 
 /**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"renounceOwnership"`
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setAdmin"`
  */
-export const useUniverse_RenounceOwnership_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeAbi,
-    functionName: 'renounceOwnership',
-  })
+export const useUniverse_SetAdmin_write = /*#__PURE__*/ createUseWriteContract({
+  abi: universeAbi,
+  functionName: 'setAdmin',
+})
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setCanon"`
@@ -5290,15 +5282,6 @@ export const useUniverse_SetToken_write = /*#__PURE__*/ createUseWriteContract({
 })
 
 /**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"transferOwnership"`
- */
-export const useUniverse_TransferOwnership_write =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: universeAbi,
-    functionName: 'transferOwnership',
-  })
-
-/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__
  */
 export const useUniverse_undefined_simulate =
@@ -5314,12 +5297,12 @@ export const useUniverse_CreateNode_simulate =
   })
 
 /**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"renounceOwnership"`
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"setAdmin"`
  */
-export const useUniverse_RenounceOwnership_simulate =
+export const useUniverse_SetAdmin_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeAbi,
-    functionName: 'renounceOwnership',
+    functionName: 'setAdmin',
   })
 
 /**
@@ -5365,15 +5348,6 @@ export const useUniverse_SetToken_simulate =
   /*#__PURE__*/ createUseSimulateContract({
     abi: universeAbi,
     functionName: 'setToken',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link universeAbi}__ and `functionName` set to `"transferOwnership"`
- */
-export const useUniverse_TransferOwnership_simulate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: universeAbi,
-    functionName: 'transferOwnership',
   })
 
 /**
@@ -5425,15 +5399,6 @@ export const useUniverse_NodeVisibilityOptionUpdated_watch =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: universeAbi,
     eventName: 'NodeVisibilityOptionUpdated',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link universeAbi}__ and `eventName` set to `"OwnershipTransferred"`
- */
-export const useUniverse_OwnershipTransferred_watch =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: universeAbi,
-    eventName: 'OwnershipTransferred',
   })
 
 /**
