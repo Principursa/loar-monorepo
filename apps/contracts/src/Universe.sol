@@ -6,7 +6,7 @@ import {IUniverse} from "./interfaces/IUniverse.sol";
 import {IUniverseManager} from "./interfaces/IUniverseManager.sol";
 import {NodeCreationOptions, NodeVisibilityOptions} from "./libraries/NodeOptions.sol";
 
-contract Universe is Ownable, IUniverse {
+contract Universe is IUniverse {
     //Maybe include some sort of hook system with custom contracts for creation and visibility options later, for now this is good enough
     //Either that or functions on this contract that
 
@@ -22,13 +22,14 @@ contract Universe is Ownable, IUniverse {
 
     constructor(
         IUniverseManager.UniverseConfig memory config
-    ) Ownable(config.universeAdmin) {
+    ) {
         nodeCreationOption = config.nodeCreationOption;
         nodeVisibilityOption = config.nodeVisibilityOption;
         universeImageUrl = config.imageURL;
         universeManager = IUniverseManager(config.universeManager);
         universeDescription = config.description;
         universeName = config.name;
+        universeAdmin = config.universeAdmin;
     }
 
     string public universeImageUrl;
@@ -44,13 +45,27 @@ contract Universe is Ownable, IUniverse {
 
     address public associatedToken;
     IUniverseManager public universeManager;
+    address public universeAdmin;
 
     //either put an event here to emit user + node to make it indexable or create data structure that associates addy w user
     //for profile -> videos created by user
 
     //use this for converting internal uint id to frontend display id
     //if necessary truncate it to six chars like github
-    function nodeIDToHex(uint id) public view returns (bytes32) {
+    modifier onlyAdmin() {
+      if (universeAdmin != msg.sender) {
+        revert CallerNotAdmin(msg.sender);
+      }
+      _;
+    }
+    modifier onlyManager() {
+      if (address(universeManager) != msg.sender) {
+        revert CallerNotManager();
+      } 
+      _;
+    }
+
+    function nodeIDToHex(uint id) public view returns (bytes32){
         if (id <= latestNodeId) {
             revert NodeDoesNotExist();
         }
@@ -149,20 +164,20 @@ contract Universe is Ownable, IUniverse {
         return nodes[id].link;
     }
 
-    function setMedia(uint id, string memory _link) public onlyOwner {
+    function setMedia(uint id, string memory _link) public onlyAdmin {
         nodes[id].link = _link;
         emit MediaUpdated(msg.sender, _link);
     }
 
     function setNodeVisibilityOption(
         NodeVisibilityOptions _option
-    ) public onlyOwner {
+    ) public onlyAdmin {
         nodeVisibilityOption = _option;
     }
 
     function setNodeCreationOption(
         NodeCreationOptions _option
-    ) public onlyOwner {
+    ) public onlyAdmin {
         nodeCreationOption = _option;
     }
 
@@ -210,7 +225,7 @@ contract Universe is Ownable, IUniverse {
 
     // ---- Canon ----
 
-    function setCanon(uint id) public onlyOwner {
+    function setCanon(uint id) public onlyAdmin {
         if (nodes[id].id == 0) {
             revert NodeDoesNotExist();
         }
@@ -242,19 +257,17 @@ contract Universe is Ownable, IUniverse {
     }
 
     function getToken() public view returns (address) {
-        if (associatedToken == address(0)) {
-            revert TokenDoesNotExist();
-        } else {
-            return associatedToken;
-        }
+      return associatedToken;
     }
 
-    //add onlyManagerModifier
-    function setToken(address token) external {
-        if (msg.sender != address(universeManager)) {
-            revert CallerNotManager();
-        }
+    function setToken(address token) external onlyManager{
         associatedToken = token;
+    }
+    function setAdmin(address newAdmin) public onlyManager {
+      universeAdmin = newAdmin;
+    }
+    function getAdmin() external view returns(address) {
+      return universeAdmin;
     }
     //Might work as well to have a function that gets the canon status of an indiviudal node
 }

@@ -83,7 +83,8 @@ interface IUniverseManager {
         address poolHook,
         PoolId poolId,
         address pairedToken,
-        address locker
+        address locker,
+        address governor
     );
     event SetLocker(address locker, address hook, bool enabled);
     event SetDeprecated(bool deprecated);
@@ -95,6 +96,9 @@ interface IUniverseManager {
     error InvalidHook();
     error InvalidLocker();
     error LockerNotEnabled();
+    error CallerIsNotOwner();
+    error TokenAlreadyDeployed();
+
 
     function createUniverse(
         string memory name,
