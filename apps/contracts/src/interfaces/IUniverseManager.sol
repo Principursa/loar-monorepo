@@ -56,13 +56,11 @@ interface IUniverseManager {
     }
 
     event UniverseCreated(
-        address creator,
         address universe,
-        address token,
-        address governance
+        address creator
     );
     event TokenDeployed();
-    event TokenGraduation();
+    //event TokenGraduation();
     event SetTeamFeeRecipient(
         address oldTeamFeeRecipient,
         address newTeamFeeRecipient

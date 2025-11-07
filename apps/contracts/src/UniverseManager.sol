@@ -77,6 +77,8 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             ILoarLpLocker(address(0))
         );
         universeDatas[latestId] = data;
+        //add universe created event
+        emit UniverseCreated(address(universe),msg.sender);
         uint current_id = latestId;
         latestId++;
         return (current_id, address(universe));
