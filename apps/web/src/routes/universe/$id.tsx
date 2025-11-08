@@ -1763,6 +1763,13 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
 
         const previousEventTitle = sourceNode?.data.label || null;
 
+        // Get previous event wiki data if available
+        const previousEventWiki = sourceNode?.data.wiki ? {
+          title: sourceNode.data.wiki.title || previousEventTitle || '',
+          summary: sourceNode.data.wiki.summary || '',
+          plot: sourceNode.data.wiki.plot,
+        } : null;
+
         return (
           <FlowCreationPanel
             showVideoDialog={showVideoDialog}
@@ -1828,6 +1835,7 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
             previousEventVideoUrl={previousEventVideoUrl}
             previousEventDescription={previousEventDescription}
             previousEventTitle={previousEventTitle}
+            previousEventWiki={previousEventWiki}
             statusMessage={statusMessage}
             setStatusMessage={setStatusMessage}
             selectedImageCharacters={selectedImageCharacters}

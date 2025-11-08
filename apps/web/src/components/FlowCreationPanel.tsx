@@ -15,6 +15,7 @@ import {
   Settings2,
   Image as ImageIcon,
   Type,
+  Wand2,
 } from "lucide-react";
 import { useState, useEffect } from 'react';
 import {
@@ -24,6 +25,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { trpcClient } from '@/utils/trpc';
 
 interface FlowCreationPanelProps {
   showVideoDialog: boolean;
@@ -89,6 +91,11 @@ interface FlowCreationPanelProps {
   previousEventVideoUrl?: string | null;
   previousEventDescription?: string | null;
   previousEventTitle?: string | null;
+  previousEventWiki?: {
+    title: string;
+    summary: string;
+    plot?: string;
+  } | null;
   statusMessage?: {
     type: 'error' | 'success' | 'info' | 'warning';
     title: string;
@@ -121,6 +128,7 @@ export function FlowCreationPanel({
   previousEventVideoUrl,
   previousEventDescription,
   previousEventTitle,
+  previousEventWiki,
   handleGenerateEventImage,
   generatedVideoUrl,
   setGeneratedVideoUrl,
@@ -179,6 +187,9 @@ export function FlowCreationPanel({
   // Local state for event description (separate from videoDescription which is for prompts)
   const [eventDescription, setEventDescription] = useState('');
 
+  // AI prompt improvement state
+  const [isImprovingPrompt, setIsImprovingPrompt] = useState(false);
+
   // Extract last frame from previous event video
   const extractLastFrame = async () => {
     if (!previousEventVideoUrl) return;
@@ -213,6 +224,42 @@ export function FlowCreationPanel({
       console.error('Error extracting frame:', error);
     } finally {
       setIsExtractingFrame(false);
+    }
+  };
+
+  // Improve prompt with AI
+  const handleImprovePrompt = async () => {
+    if (!videoDescription.trim()) return;
+
+    setIsImprovingPrompt(true);
+    try {
+      // Build character context if characters are selected
+      let characterContext: Array<{ name: string; description: string }> | undefined;
+      if (selectedCharacters.length > 0 && charactersData?.characters) {
+        characterContext = selectedCharacters
+          .map((charId) => {
+            const char = charactersData.characters.find((c: any) => c.id === charId);
+            return char ? {
+              name: char.character_name,
+              description: char.visual_description || char.user_description
+            } : null;
+          })
+          .filter(Boolean) as Array<{ name: string; description: string }>;
+      }
+
+      const result = await trpcClient.wiki.improvePrompt.mutate({
+        prompt: videoDescription,
+        characters: characterContext,
+        previousEvent: previousEventWiki || undefined,
+      });
+
+      if (result.success && result.improvedPrompt) {
+        setVideoDescription(result.improvedPrompt);
+      }
+    } catch (error) {
+      console.error('Error improving prompt:', error);
+    } finally {
+      setIsImprovingPrompt(false);
     }
   };
 
@@ -1048,21 +1095,46 @@ export function FlowCreationPanel({
               )}
 
               {/* Prompt Input */}
-              <textarea
-                value={videoDescription}
-                onChange={(e) => setVideoDescription(e.target.value)}
-                placeholder={
-                  generationMode === 'text-to-video'
-                    ? previousEventDescription
-                      ? "Continue the story..."
-                      : "Describe your scene..."
-                    : imageSource === 'create-frame' && !generatedImageUrl
-                    ? "Describe the scene with your characters..."
-                    : "Describe how the image should animate..."
-                }
-                rows={2}
-                className="w-full rounded border-0 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 resize-none"
-              />
+              <div className="space-y-2">
+                <textarea
+                  value={videoDescription}
+                  onChange={(e) => setVideoDescription(e.target.value)}
+                  placeholder={
+                    generationMode === 'text-to-video'
+                      ? previousEventDescription
+                        ? "Continue the story..."
+                        : "Describe your scene..."
+                      : imageSource === 'create-frame' && !generatedImageUrl
+                      ? "Describe the scene with your characters..."
+                      : "Describe how the image should animate..."
+                  }
+                  rows={3}
+                  className="w-full rounded border-0 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 resize-none"
+                />
+
+                {/* Improve with AI button */}
+                {videoDescription.trim() && (
+                  <Button
+                    onClick={handleImprovePrompt}
+                    disabled={isImprovingPrompt}
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs bg-white/5 border-white/20 hover:bg-white/10 text-white"
+                  >
+                    {isImprovingPrompt ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                        Improving...
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-3 w-3 mr-1.5" />
+                        Improve with AI
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
 
               {/* Action Buttons */}
               {!generatedVideoUrl ? (

@@ -304,6 +304,38 @@ export const appRouter = router({
           throw new Error("Could not fetch universe wikis");
         }
       }),
+
+    // Improve video prompt with AI
+    improvePrompt: publicProcedure
+      .input(z.object({
+        prompt: z.string(),
+        characters: z.array(z.object({
+          name: z.string(),
+          description: z.string(),
+        })).optional(),
+        previousEvent: z.object({
+          title: z.string(),
+          summary: z.string(),
+          plot: z.string().optional(),
+        }).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const improvedPrompt = await geminiService.improveVideoPrompt(
+            input.prompt,
+            input.characters,
+            input.previousEvent
+          );
+
+          return {
+            success: true,
+            improvedPrompt,
+          };
+        } catch (error) {
+          console.error("Failed to improve prompt:", error);
+          throw new Error(`Prompt improvement failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }),
   }),
   video: router({
     // Use Fal AI service for video generation
