@@ -1,6 +1,8 @@
 import { createConfig, factory } from "ponder";
 import { parseAbiItem } from "viem";
 import { universeManagerAbi, universeAbi, universeGovernorAbi } from "@loar/abis/generated"
+import { PoolManagerAbi } from "./abis/PoolManager";
+import { ERC20Abi } from "./abis/ERC20Abi";
 import { sepolia } from "viem/chains";
 import UniverseManagerDeploy from "../contracts/broadcast/DeployProtocol.s.sol/11155111/run-latest.json"
 import { getAddress, hexToNumber } from "viem/utils";
@@ -49,6 +51,22 @@ export default createConfig({
         event: tokenCreatedEvent,
         parameter: "governor",
       }),
+      startBlock: startBlock,
+    },
+    GovernanceToken: {
+      chain: "sepolia",
+      abi: ERC20Abi,
+      address: factory({
+        address: address,
+        event: tokenCreatedEvent,
+        parameter: "tokenAddress",
+      }),
+      startBlock: startBlock,
+    },
+    PoolManager: {
+      chain: "sepolia",
+      abi: PoolManagerAbi,
+      address: "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
       startBlock: startBlock,
     },
   },

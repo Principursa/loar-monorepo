@@ -85,6 +85,92 @@ export const nodeCanonization = onchainTable(
   })
 );
 
+export const nodeContent = onchainTable(
+  "node_content",
+  (t) => ({
+    id: t.text().primaryKey(), // universe:nodeId
+    videoLink: t.text().notNull(),
+    plot: t.text().notNull(),
+  })
+);
+
+// ============= Token Transfer Tracking =============
+
+export const tokenTransfer = onchainTable(
+  "token_transfer",
+  (t) => ({
+    id: t.text().primaryKey(),
+    tokenAddress: t.hex().notNull(),
+    from: t.hex().notNull(),
+    to: t.hex().notNull(),
+    value: t.text().notNull(), // bigint as string
+    timestamp: t.integer().notNull(),
+    blockNumber: t.integer().notNull(),
+  }),
+  (table) => ({
+    tokenIdx: index("transfer_token_idx").on(table.tokenAddress),
+    fromIdx: index("transfer_from_idx").on(table.from),
+    toIdx: index("transfer_to_idx").on(table.to),
+  })
+);
+
+export const tokenHolder = onchainTable(
+  "token_holder",
+  (t) => ({
+    id: t.text().primaryKey(), // tokenAddress:holderAddress
+    tokenAddress: t.hex().notNull(),
+    holderAddress: t.hex().notNull(),
+    balance: t.text().notNull(), // bigint as string
+  }),
+  (table) => ({
+    tokenIdx: index("holder_token_idx").on(table.tokenAddress),
+    holderIdx: index("holder_address_idx").on(table.holderAddress),
+  })
+);
+
+// ============= Uniswap v4 Pool Tracking =============
+
+export const pool = onchainTable(
+  "pool",
+  (t) => ({
+    poolId: t.hex().primaryKey(),
+    currency0: t.hex().notNull(),
+    currency1: t.hex().notNull(),
+    fee: t.integer().notNull(),
+    tickSpacing: t.integer().notNull(),
+    hooks: t.hex().notNull(),
+    sqrtPriceX96: t.text(), // bigint as string
+    tick: t.integer(),
+    creationBlock: t.integer().notNull(),
+  }),
+  (table) => ({
+    currency0Idx: index("pool_currency0_idx").on(table.currency0),
+    currency1Idx: index("pool_currency1_idx").on(table.currency1),
+    hooksIdx: index("pool_hooks_idx").on(table.hooks),
+  })
+);
+
+export const swap = onchainTable(
+  "swap",
+  (t) => ({
+    id: t.text().primaryKey(),
+    poolId: t.hex().notNull(),
+    sender: t.hex().notNull(),
+    amount0: t.text().notNull(), // bigint as string
+    amount1: t.text().notNull(), // bigint as string
+    sqrtPriceX96: t.text().notNull(), // bigint as string
+    liquidity: t.text().notNull(), // bigint as string
+    tick: t.integer().notNull(),
+    timestamp: t.integer().notNull(),
+    blockNumber: t.integer().notNull(),
+  }),
+  (table) => ({
+    poolIdIdx: index("swap_pool_idx").on(table.poolId),
+    senderIdx: index("swap_sender_idx").on(table.sender),
+    blockIdx: index("swap_block_idx").on(table.blockNumber),
+  })
+);
+
 // ============= UniverseGovernor Events =============
 
 export const proposal = onchainTable(

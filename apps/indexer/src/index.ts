@@ -5,6 +5,11 @@ import {
   hookEvent,
   node,
   nodeCanonization,
+  nodeContent,
+  tokenTransfer,
+  tokenHolder,
+  pool,
+  swap,
   proposal,
   proposalExecution,
   proposalCancellation,
@@ -69,6 +74,7 @@ ponder.on("Universe:NodeCreated", async ({ event, context }) => {
   const universeAddress = getAddress(event.log.address);
   const nodeId = Number(event.args.id);
 
+  // Insert node
   await context.db.insert(node).values({
     id: `${universeAddress}:${nodeId}`,
     universeAddress: universeAddress,
@@ -77,6 +83,28 @@ ponder.on("Universe:NodeCreated", async ({ event, context }) => {
     creator: getAddress(event.args.creator),
     createdAt: Number(event.block.timestamp),
   });
+
+  // Read node content from Universe contract
+  try {
+    const nodeData = await context.client.readContract({
+      abi: context.contracts.Universe.abi,
+      address: universeAddress,
+      functionName: "getNode",
+      args: [BigInt(nodeId)],
+      cache: "immutable",
+    });
+
+    // nodeData returns: (id, link, plot, previous, next[], canon, creator)
+    const [, videoLink, plot] = nodeData as [bigint, string, string, bigint, bigint[], boolean, string];
+
+    await context.db.insert(nodeContent).values({
+      id: `${universeAddress}:${nodeId}`,
+      videoLink,
+      plot,
+    });
+  } catch (error) {
+    console.error(`Failed to read node content for ${universeAddress}:${nodeId}:`, error);
+  }
 
   // Increment node count for the universe
   const universeRecord = await context.db.find(universe, { id: universeAddress });
@@ -187,5 +215,88 @@ ponder.on("UniverseGovernor:VoteCast", async ({ event, context }) => {
     weight: event.args.weight.toString(),
     reason: event.args.reason || null,
     timestamp: Number(event.block.timestamp),
+  });
+});
+
+// ============= Token Transfer Tracking =============
+
+ponder.on("GovernanceToken:Transfer", async ({ event, context }) => {
+  const tokenAddress = getAddress(event.log.address);
+  const from = getAddress(event.args.from);
+  const to = getAddress(event.args.to);
+  const value = event.args.value;
+
+  // Record transfer
+  await context.db.insert(tokenTransfer).values({
+    id: event.id,
+    tokenAddress,
+    from,
+    to,
+    value: value.toString(),
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
+  });
+
+  // Update holder balances (skip mint/burn from/to zero address for balance tracking)
+  if (from !== "0x0000000000000000000000000000000000000000") {
+    const fromHolder = await context.db.find(tokenHolder, { id: `${tokenAddress}:${from}` });
+    if (fromHolder) {
+      const newBalance = BigInt(fromHolder.balance) - value;
+      if (newBalance > 0n) {
+        await context.db
+          .update(tokenHolder, { id: `${tokenAddress}:${from}` })
+          .set({ balance: newBalance.toString() });
+      } else {
+        // Balance is zero, could delete the record but we'll keep it
+        await context.db
+          .update(tokenHolder, { id: `${tokenAddress}:${from}` })
+          .set({ balance: "0" });
+      }
+    }
+  }
+
+  if (to !== "0x0000000000000000000000000000000000000000") {
+    await context.db
+      .insert(tokenHolder)
+      .values({
+        id: `${tokenAddress}:${to}`,
+        tokenAddress,
+        holderAddress: to,
+        balance: value.toString(),
+      })
+      .onConflictDoUpdate((row) => ({
+        balance: (BigInt(row.balance) + value).toString(),
+      }));
+  }
+});
+
+// ============= Uniswap v4 Pool Tracking =============
+
+ponder.on("PoolManager:Initialize", async ({ event, context }) => {
+  await context.db.insert(pool).values({
+    poolId: event.args.id,
+    currency0: getAddress(event.args.currency0),
+    currency1: getAddress(event.args.currency1),
+    fee: event.args.fee,
+    tickSpacing: event.args.tickSpacing,
+    hooks: getAddress(event.args.hooks),
+    sqrtPriceX96: event.args.sqrtPriceX96.toString(),
+    tick: event.args.tick,
+    creationBlock: Number(event.block.number),
+  });
+});
+
+ponder.on("PoolManager:Swap", async ({ event, context }) => {
+  await context.db.insert(swap).values({
+    id: event.id,
+    poolId: event.args.id,
+    sender: getAddress(event.args.sender),
+    amount0: event.args.amount0.toString(),
+    amount1: event.args.amount1.toString(),
+    sqrtPriceX96: event.args.sqrtPriceX96.toString(),
+    liquidity: event.args.liquidity.toString(),
+    tick: event.args.tick,
+    timestamp: Number(event.block.timestamp),
+    blockNumber: Number(event.block.number),
   });
 });
