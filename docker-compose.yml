@@ -57,6 +57,29 @@ services:
       caddy.2_route: /*
       caddy.2_route.reverse_proxy: "{{upstreams 80}}"
 
+  indexer:
+    image: oven/bun:1.1.8-alpine
+    container_name: loar-indexer
+    working_dir: /app
+    volumes:
+      - .:/app
+    env_file:
+      - ./apps/indexer/.env.local
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
+    command: ["sh", "-c", "cd apps/indexer && bun run start"]
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - loar-network
+    labels:
+      caddy: loartech.xyz
+      caddy.3_route: /indexer/*
+      caddy.3_route.reverse_proxy: "{{upstreams 42069}}"
+      caddy.3_route.strip_prefix: /indexer
+
 
 
   postgres:
