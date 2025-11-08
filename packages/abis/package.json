@@ -1,0 +1,22 @@
+{
+  "name": "@loar/abis",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/generated.ts",
+  "types": "src/generated.ts",
+  "scripts": {
+    "generate": "bunx wagmi generate",
+    "build:ts": "bunx tsc --build",
+    "generate:all":"bun run generate && bun run build:ts"
+  },
+  "typesVersions": {
+    "*": {
+      "addresses": ["src/addresses.ts"],
+      "generated": ["src/generated.ts"]
+    }
+  },
+  "exports": {
+    "./addresses": "./dist/addresses.js",
+    "./generated": "./dist/generated.js"
+  }
+}

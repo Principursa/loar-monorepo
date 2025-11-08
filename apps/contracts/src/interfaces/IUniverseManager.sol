@@ -56,13 +56,11 @@ interface IUniverseManager {
     }
 
     event UniverseCreated(
-        address creator,
         address universe,
-        address token,
-        address governance
+        address creator
     );
     event TokenDeployed();
-    event TokenGraduation();
+    //event TokenGraduation();
     event SetTeamFeeRecipient(
         address oldTeamFeeRecipient,
         address newTeamFeeRecipient
@@ -85,7 +83,8 @@ interface IUniverseManager {
         address poolHook,
         PoolId poolId,
         address pairedToken,
-        address locker
+        address locker,
+        address governor
     );
     event SetLocker(address locker, address hook, bool enabled);
     event SetDeprecated(bool deprecated);
@@ -97,6 +96,9 @@ interface IUniverseManager {
     error InvalidHook();
     error InvalidLocker();
     error LockerNotEnabled();
+    error CallerIsNotOwner();
+    error TokenAlreadyDeployed();
+
 
     function createUniverse(
         string memory name,

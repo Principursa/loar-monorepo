@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    // Type checking
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@loar/abis/addresses": ["../../packages/abis/src/addresses.ts"],
+      "@loar/abis/generated": ["../../packages/abis/src/generated.ts"]
+    },
+    "baseUrl": ".",
+
+    // Interop constraints
+    "verbatimModuleSyntax": false,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+
+    // Language and environment
+    "moduleResolution": "bundler",
+    "module": "ESNext",
+    "noEmit": true,
+    "lib": ["ES2022"],
+    "target": "ES2022",
+
+    // Skip type checking for node modules
+    "skipLibCheck": true,
+
+    // Include Ponder types
+    "types": ["ponder/virtual"],
+    "typeRoots": ["node_modules/@types", "node_modules"]
+  },
+  "include": ["./**/*.ts", "ponder-env.d.ts"],
+  "exclude": ["node_modules"]
+}

@@ -77,6 +77,8 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             ILoarLpLocker(address(0))
         );
         universeDatas[latestId] = data;
+        //add universe created event
+        emit UniverseCreated(address(universe),msg.sender);
         uint current_id = latestId;
         latestId++;
         return (current_id, address(universe));
@@ -87,7 +89,14 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         uint id
     ) public payable nonReentrant returns (address tokenAddress) {
         IUniverse universe = universeDatas[id].universe;
-        require(IOwnable(address(universe)).owner() == msg.sender, "Not universe owner");
+        require(universe.getAdmin() == msg.sender, "Not universe owner");
+        if (universe.getAdmin() != msg.sender) {
+          revert CallerIsNotOwner();
+        }
+        if (universe.getToken() != address(0)) {
+          revert TokenAlreadyDeployed();
+        }
+      
 
         if (!enabledHooks[deploymentConfig.poolConfig.hook]) {
             revert HookNotEnabled();
@@ -129,6 +138,7 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
         universeDatas[id].hook = poolkey.hooks;
         universeDatas[id].locker = ILoarLpLocker(deploymentConfig.lockerConfig.locker);
 
+        universe.setAdmin(governor);
         universe.setToken(tokenAddress);
 
         emit TokenCreated(
@@ -144,7 +154,8 @@ contract UniverseManager is IUniverseManager, ReentrancyGuard, Ownable {
             deploymentConfig.poolConfig.hook,
             poolkey.toId(),
             deploymentConfig.poolConfig.pairedToken,
-            deploymentConfig.lockerConfig.locker
+            deploymentConfig.lockerConfig.locker,
+            governor
         );
     }
 

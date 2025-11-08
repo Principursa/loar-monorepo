@@ -31,6 +31,7 @@
     "@openai/agents": "^0.0.17",
     "@tanstack/react-query": "^5.85.3",
     "@types/node": "^24.3.0",
+    "@wagmi/cli": "^0.0.0-canary-20251023193249",
     "dotenv": "^17.2.1",
     "install": "^0.13.0",
     "jsonwebtoken": "^9.0.2",

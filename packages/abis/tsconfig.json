@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "composite": true,       // allows project references
+    "declaration": true,     // generate .d.ts files
+    "declarationMap": true,
+    "outDir": "dist",        // optional, if you want a build step
+    "rootDir": "src",        // point to source folder
+    "strict": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "target": "ES2022",
+    "skipLibCheck": true
+
+  },
+  "include": ["src"]
+}
