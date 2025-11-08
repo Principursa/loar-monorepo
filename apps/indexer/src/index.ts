@@ -20,13 +20,46 @@ import { getAddress } from "viem";
 // ============= UniverseManager Events =============
 
 ponder.on("UniverseManager:UniverseCreated", async ({ event, context }) => {
-  const universeAddress = getAddress(event.args.universe);
+  const universeAddress = getAddress(event.args.universe).toLowerCase();
+
+  // Read metadata directly from the Universe contract
+  let universeName = "Untitled Universe";
+  let universeDescription = "A narrative universe";
+  let imageURL = "";
+
+  try {
+    const nameResult = await context.client.readContract({
+      abi: context.contracts.Universe.abi,
+      address: universeAddress,
+      functionName: "universeName",
+    });
+    universeName = nameResult as string;
+
+    const descResult = await context.client.readContract({
+      abi: context.contracts.Universe.abi,
+      address: universeAddress,
+      functionName: "universeDescription",
+    });
+    universeDescription = descResult as string;
+
+    const imageResult = await context.client.readContract({
+      abi: context.contracts.Universe.abi,
+      address: universeAddress,
+      functionName: "universeImageUrl",
+    });
+    imageURL = imageResult as string;
+  } catch (error) {
+    console.error(`Failed to read universe metadata for ${universeAddress}:`, error);
+  }
 
   await context.db.insert(universe).values({
     id: universeAddress,
     universeId: null, // We don't have direct access to the ID in the event
     creator: getAddress(event.args.creator),
     createdAt: Number(event.block.timestamp),
+    name: universeName,
+    description: universeDescription,
+    imageURL: imageURL,
     tokenAddress: null,
     governorAddress: null,
     nodeCount: 0,
@@ -71,7 +104,7 @@ ponder.on("UniverseManager:SetHook", async ({ event, context }) => {
 // ============= Universe (Dynamic Contract) Events =============
 
 ponder.on("Universe:NodeCreated", async ({ event, context }) => {
-  const universeAddress = getAddress(event.log.address);
+  const universeAddress = getAddress(event.log.address).toLowerCase();
   const nodeId = Number(event.args.id);
 
   // Insert node
@@ -117,7 +150,7 @@ ponder.on("Universe:NodeCreated", async ({ event, context }) => {
 });
 
 ponder.on("Universe:NodeCanonized", async ({ event, context }) => {
-  const universeAddress = getAddress(event.log.address);
+  const universeAddress = getAddress(event.log.address).toLowerCase();
   const nodeId = Number(event.args.id);
 
   await context.db.insert(nodeCanonization).values({

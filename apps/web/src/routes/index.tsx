@@ -3,81 +3,64 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Play, Sparkles, Database, Users, GitBranch, ChevronRight } from "lucide-react";
-import { useAccount, useReadContract } from "wagmi";
-import { useQuery } from "@tanstack/react-query";
-import { trpc } from "@/utils/trpc";
-import { timelineAbi } from "@/generated";
+import { useAccount } from "wagmi";
+import { usePonderQuery } from "@ponder/react";
+import { desc } from "@ponder/client";
+import { universe, token, node, nodeContent } from "../../../indexer/ponder.schema";
 import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/")({
   component: HomeComponent,
 });
 
-// Timeline Events Section - fetches events from blockchain
+// Timeline Events Section - fetches events from Ponder indexer
 function TimelineEventsSection() {
-  // Fetch universes from database
-  const { data: universesResponse } = useQuery(trpc.cinematicUniverses.getAll.queryOptions());
-
-  // Get universe addresses from the database (limit to 3 to avoid too many calls)
-  const universeAddresses = useMemo(() => {
-    if (!universesResponse?.data) return [];
-    return universesResponse.data
-      .filter((u: any) => u.address && u.address.startsWith('0x'))
-      .slice(0, 3) // Limit to first 3 universes
-      .map((u: any) => u.address as `0x${string}`);
-  }, [universesResponse]);
-
-  // Fetch timeline data for each universe dynamically
-  const universe1Data = useReadContract({
-    abi: timelineAbi,
-    address: universeAddresses[0],
-    functionName: 'getFullGraph',
-    query: { enabled: !!universeAddresses[0], retry: 1 }
+  // Query recent nodes with content from Ponder
+  const { data: nodesData } = usePonderQuery({
+    queryFn: (db) =>
+      db
+        .select()
+        .from(node as any)
+        .orderBy(desc((node as any).createdAt))
+        .limit(10),
   });
 
-  const universe2Data = useReadContract({
-    abi: timelineAbi,
-    address: universeAddresses[1],
-    functionName: 'getFullGraph',
-    query: { enabled: !!universeAddresses[1], retry: 1 }
-  });
-
-  const universe3Data = useReadContract({
-    abi: timelineAbi,
-    address: universeAddresses[2],
-    functionName: 'getFullGraph',
-    query: { enabled: !!universeAddresses[2], retry: 1 }
+  // Query node content
+  const { data: nodeContentData } = usePonderQuery({
+    queryFn: (db) => db.select().from(nodeContent as any),
   });
 
   const events = useMemo(() => {
-    const allEvents: Array<{ videoUrl: string; description: string; eventId: string; universeId: string }> = [];
+    if (!nodesData || !nodeContentData) return [];
 
-    const processUniverse = (data: any, universeId: string) => {
-      if (!data) return;
+    type NodeRow = typeof node.$inferSelect;
+    type NodeContentRow = typeof nodeContent.$inferSelect;
 
-      const graphData = data as readonly [readonly bigint[], readonly string[], readonly string[], readonly bigint[], readonly (readonly bigint[])[], readonly boolean[]];
-      const [ids, links, plots] = graphData;
+    // Create a map of node content by id
+    const contentMap = new Map<string, NodeContentRow>();
+    (nodeContentData as NodeContentRow[]).forEach((c) => {
+      contentMap.set(c.id, c);
+    });
 
-      links.forEach((url, index) => {
-        if (url && url.startsWith('http')) {
-          allEvents.push({
-            videoUrl: url,
-            description: plots[index] || 'Timeline Event',
-            eventId: `${universeId}-${ids[index]?.toString() || index}`,
-            universeId,
-          });
+    // Combine nodes with their content, filter for video links
+    return (nodesData as NodeRow[])
+      .map((n) => {
+        const content = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
+        if (!content || !content.videoLink || !content.videoLink.startsWith("http")) {
+          return null;
         }
-      });
-    };
 
-    // Process all universe data
-    if (universeAddresses[0]) processUniverse(universe1Data.data, universeAddresses[0]);
-    if (universeAddresses[1]) processUniverse(universe2Data.data, universeAddresses[1]);
-    if (universeAddresses[2]) processUniverse(universe3Data.data, universeAddresses[2]);
-
-    // Return up to 3 events total
-    return allEvents.slice(0, 3);
-  }, [universe1Data.data, universe2Data.data, universe3Data.data, universeAddresses]);
+        return {
+          videoUrl: content.videoLink,
+          description: content.plot || "Timeline Event",
+          eventId: n.id,
+          universeId: n.universeAddress,
+          nodeId: n.nodeId,
+        };
+      })
+      .filter((e): e is NonNullable<typeof e> => e !== null)
+      .slice(0, 3); // Show top 3 recent events
+  }, [nodesData, nodeContentData]);
 
   if (!events || events.length === 0) {
     return null; // Don't show section if no events
@@ -100,21 +83,19 @@ function TimelineEventsSection() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {events.map((event, index) => (
             <div key={event.eventId} className="group relative">
-              <div className={`absolute -inset-2 bg-gradient-to-r ${index % 3 === 0 ? 'from-primary/20 to-purple-500/20' : index % 3 === 1 ? 'from-purple-500/20 to-pink-500/20' : 'from-pink-500/20 to-primary/20'} rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity`} />
+              <div
+                className={`absolute -inset-2 bg-gradient-to-r ${
+                  index % 3 === 0
+                    ? "from-primary/20 to-purple-500/20"
+                    : index % 3 === 1
+                    ? "from-purple-500/20 to-pink-500/20"
+                    : "from-pink-500/20 to-primary/20"
+                } rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity`}
+              />
               <div className="relative bg-card rounded-2xl border-2 border-border overflow-hidden">
                 <div className="aspect-video bg-black">
-                  <video
-                    className="w-full h-full object-cover"
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    preload="metadata"
-                  >
-                    <source
-                      src={event.videoUrl}
-                      type="video/mp4"
-                    />
+                  <video className="w-full h-full object-cover" autoPlay loop muted playsInline preload="metadata">
+                    <source src={event.videoUrl} type="video/mp4" />
                     Your browser does not support the video tag.
                   </video>
                 </div>
@@ -138,71 +119,68 @@ function TimelineEventsSection() {
   );
 }
 
-// Universe Card Component (reused from universes page)
-function UniverseCard({ universe, onSelect }: { universe: any; onSelect: (id: string) => void }) {
+// Universe Card Component
+function UniverseCard({ universeData, onSelect }: { universeData: any; onSelect: (id: string) => void }) {
   const [isHovered, setIsHovered] = useState(false);
 
-  const { data: nodeCount } = useReadContract({
-    abi: timelineAbi,
-    address: universe.address as `0x${string}`,
-    functionName: 'latestNodeId',
-    query: {
-      enabled: !!universe.address && universe.address.startsWith('0x'),
-      select: (data) => data ? Number(data) : 0,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    }
-  });
+  const hasNodes = universeData.nodeCount && universeData.nodeCount > 0;
+  const tokenData = universeData.tokenData;
 
   return (
     <div
       className="relative flex-shrink-0 w-[320px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:z-30"
-      onClick={() => onSelect(universe.id)}
+      onClick={() => onSelect(universeData.id)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="relative aspect-video rounded-lg overflow-hidden bg-muted shadow-2xl">
-        {universe.image_url ? (
-          <img
-            src={universe.image_url}
-            alt={universe.name}
-            className="w-full h-full object-cover"
-          />
+        {universeData.imageURL || tokenData?.imageURL ? (
+          <img src={universeData.imageURL || tokenData.imageURL} alt={universeData.name || tokenData?.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500" />
         )}
 
-        <div className={`absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+        <div
+          className={`absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent transition-opacity duration-300 ${
+            isHovered ? "opacity-100" : "opacity-0"
+          }`}
+        >
           <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
-            <h3 className="text-white font-bold text-lg truncate drop-shadow-lg">{universe.name}</h3>
+            <h3 className="text-white font-bold text-lg truncate drop-shadow-lg">
+              {universeData.name || tokenData?.name || `Universe ${universeData.id.slice(0, 8)}`}
+            </h3>
             <p className="text-gray-200 text-sm line-clamp-2 leading-relaxed">
-              {universe.description || "Explore this narrative universe"}
+              {universeData.description || tokenData?.metadata || "Explore this narrative universe"}
             </p>
             <div className="flex items-center gap-2 pt-1">
-              {universe.address && (
-                <Badge className="bg-white/30 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
-                  <Database className="h-3 w-3 mr-1" />
-                  {nodeCount || 0} nodes
+              <Badge className="bg-white/30 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
+                <Database className="h-3 w-3 mr-1" />
+                {universeData.nodeCount || 0} nodes
+              </Badge>
+              {tokenData && (
+                <Badge className="bg-primary/80 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
+                  ${tokenData.symbol}
                 </Badge>
               )}
-              <Badge className="bg-primary/80 backdrop-blur-sm text-white border-0 text-xs px-2 py-1">
-                {universe.address ? 'On-chain' : 'Off-chain'}
-              </Badge>
             </div>
           </div>
         </div>
 
-        <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+        <div
+          className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${
+            isHovered ? "opacity-100" : "opacity-0"
+          }`}
+        >
           <div className="bg-white/30 backdrop-blur-md rounded-full p-3 border-2 border-white shadow-2xl">
             <Play className="h-8 w-8 text-white fill-white" />
           </div>
         </div>
 
-        {!isHovered && universe.address && (
+        {!isHovered && hasNodes && (
           <div className="absolute top-2 right-2">
             <Badge className="bg-black/70 backdrop-blur-sm text-white border-0 text-xs">
               <Database className="h-2.5 w-2.5 mr-1" />
-              {nodeCount || 0}
+              {universeData.nodeCount}
             </Badge>
           </div>
         )}
@@ -215,17 +193,40 @@ function HomeComponent() {
   const { isConnected } = useAccount();
   const navigate = Route.useNavigate();
 
-  // Fetch universes
-  const { data: universesResponse } = useQuery(trpc.cinematicUniverses.getAll.queryOptions());
+  // Query universes from Ponder
+  const { data: universesData } = usePonderQuery({
+    queryFn: (db) =>
+      db
+        .select()
+        .from(universe as any)
+        .orderBy(desc((universe as any).createdAt))
+        .limit(20),
+  });
 
+  // Query tokens from Ponder
+  const { data: tokensData } = usePonderQuery({
+    queryFn: (db) => db.select().from(token as any),
+  });
+
+  // Combine universe and token data
   const universes = useMemo(() => {
-    if (!universesResponse?.data) return [];
-    return universesResponse.data.map((universe: any) => ({
-      ...universe,
-      name: `Universe ${universe.id.slice(0, 8)}`,
-      createdAt: universe.created_at,
+    if (!universesData) return [];
+
+    type UniverseRow = typeof universe.$inferSelect;
+    type TokenRow = typeof token.$inferSelect;
+
+    const tokenMap = new Map<string, TokenRow>();
+    if (tokensData) {
+      (tokensData as TokenRow[]).forEach((t) => {
+        tokenMap.set(t.universeAddress.toLowerCase(), t);
+      });
+    }
+
+    return (universesData as UniverseRow[]).map((u) => ({
+      ...u,
+      tokenData: tokenMap.get(u.id.toLowerCase()) || null,
     }));
-  }, [universesResponse]);
+  }, [universesData, tokensData]);
 
   const recentUniverses = universes.slice(0, 6);
 
@@ -238,7 +239,7 @@ function HomeComponent() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section with Video */}
+      {/* Hero Section */}
       <section className="relative py-24 px-4 overflow-hidden">
         {/* Background pattern */}
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
@@ -259,12 +260,16 @@ function HomeComponent() {
             </h1>
 
             <p className="text-xl text-muted-foreground leading-relaxed">
-              Create collaborative cinematic universes where your community decides the canon.
-              Build branching timelines, vote on events, and own your stories forever.
+              Create collaborative cinematic universes where your community decides the canon. Build branching timelines,
+              vote on events, and own your stories forever.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="text-lg px-10 h-14 font-semibold shadow-lg shadow-primary/20" asChild>
+              <Button
+                size="lg"
+                className="text-lg px-10 h-14 font-semibold shadow-lg shadow-primary/20"
+                asChild
+              >
                 <Link to="/universes">
                   <Play className="w-5 h-5 mr-2" />
                   Explore Universes
@@ -307,8 +312,8 @@ function HomeComponent() {
 
             <div className="overflow-x-auto scrollbar-hide">
               <div className="flex gap-4 px-4 pb-4">
-                {recentUniverses.map((universe) => (
-                  <UniverseCard key={universe.id} universe={universe} onSelect={selectUniverse} />
+                {recentUniverses.map((u) => (
+                  <UniverseCard key={u.id} universeData={u} onSelect={selectUniverse} />
                 ))}
               </div>
             </div>
@@ -391,19 +396,26 @@ function HomeComponent() {
           <p className="text-xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed">
             {isConnected
               ? "Deploy your universe and invite collaborators to shape the story together"
-              : "Connect your wallet to start creating collaborative narratives"
-            }
+              : "Connect your wallet to start creating collaborative narratives"}
           </p>
 
           {isConnected ? (
-            <Button size="lg" className="text-lg px-12 h-16 font-bold shadow-2xl shadow-primary/20" asChild>
+            <Button
+              size="lg"
+              className="text-lg px-12 h-16 font-bold shadow-2xl shadow-primary/20"
+              asChild
+            >
               <Link to="/cinematicuniversecreate">
                 <Sparkles className="w-5 h-5 mr-2" />
                 Create Your Universe
               </Link>
             </Button>
           ) : (
-            <Button size="lg" className="text-lg px-12 h-16 font-bold shadow-2xl shadow-primary/20" asChild>
+            <Button
+              size="lg"
+              className="text-lg px-12 h-16 font-bold shadow-2xl shadow-primary/20"
+              asChild
+            >
               <Link to="/universes">
                 <Play className="w-5 h-5 mr-2" />
                 Explore Universes
