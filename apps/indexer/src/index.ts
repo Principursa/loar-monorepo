@@ -33,32 +33,11 @@ ponder.on("UniverseManager:TokenCreated", async ({ event, context }) => {
   const deployer = getAddress(event.args.msgSender);
   const governorAddress = getAddress(event.args.governor);
 
-  // Find which universe was created by this deployer (most recent one without a token)
-  const universes = await context.db
-    .select()
-    .from(universe)
-    .where((u) => u.creator === deployer && u.tokenAddress === null)
-    .orderBy((u) => u.createdAt, "desc")
-    .limit(1);
-
-  let universeAddress = null;
-
-  if (universes.length > 0) {
-    universeAddress = universes[0].id;
-
-    // Update the universe with token and governor addresses
-    await context.db
-      .update(universe, { id: universeAddress })
-      .set({
-        tokenAddress: tokenAddress,
-        governorAddress: governorAddress,
-      });
-  }
-
   // Create token record
+  // Note: universeAddress will be linked via API queries using creator/governor
   await context.db.insert(token).values({
     id: tokenAddress,
-    universeAddress: universeAddress || "0x0000000000000000000000000000000000000000",
+    universeAddress: "0x0000000000000000000000000000000000000000", // Will query via creator
     deployer: deployer,
     tokenAdmin: getAddress(event.args.tokenAdmin),
     name: event.args.tokenName,
@@ -77,7 +56,7 @@ ponder.on("UniverseManager:TokenCreated", async ({ event, context }) => {
 
 ponder.on("UniverseManager:SetHook", async ({ event, context }) => {
   await context.db.insert(hookEvent).values({
-    id: event.log.id,
+    id: event.id,
     timestamp: Number(event.block.timestamp),
     hook_address: getAddress(event.args.hook),
     enabled: event.args.enabled,
@@ -100,16 +79,12 @@ ponder.on("Universe:NodeCreated", async ({ event, context }) => {
   });
 
   // Increment node count for the universe
-  const universeRecord = await context.db
-    .select()
-    .from(universe)
-    .where((u) => u.id === universeAddress)
-    .limit(1);
+  const universeRecord = await context.db.find(universe, { id: universeAddress });
 
-  if (universeRecord.length > 0) {
+  if (universeRecord) {
     await context.db
       .update(universe, { id: universeAddress })
-      .set({ nodeCount: universeRecord[0].nodeCount + 1 });
+      .set({ nodeCount: universeRecord.nodeCount + 1 });
   }
 });
 
@@ -118,7 +93,7 @@ ponder.on("Universe:NodeCanonized", async ({ event, context }) => {
   const nodeId = Number(event.args.id);
 
   await context.db.insert(nodeCanonization).values({
-    id: `${universeAddress}:${nodeId}:${event.log.id}`,
+    id: `${universeAddress}:${nodeId}:${event.id}`,
     universeAddress: universeAddress,
     nodeId: nodeId,
     canonizer: getAddress(event.args.canonizer),
@@ -173,7 +148,7 @@ ponder.on("UniverseGovernor:ProposalExecuted", async ({ event, context }) => {
 
   // Record execution event
   await context.db.insert(proposalExecution).values({
-    id: event.log.id,
+    id: event.id,
     proposalId: proposalId,
     governorAddress: governorAddress,
     timestamp: Number(event.block.timestamp),
@@ -191,7 +166,7 @@ ponder.on("UniverseGovernor:ProposalCanceled", async ({ event, context }) => {
 
   // Record cancellation event
   await context.db.insert(proposalCancellation).values({
-    id: event.log.id,
+    id: event.id,
     proposalId: proposalId,
     governorAddress: governorAddress,
     timestamp: Number(event.block.timestamp),

@@ -5,8 +5,8 @@ import { sepolia } from "viem/chains";
 import UniverseManagerDeploy from "../contracts/broadcast/DeployProtocol.s.sol/11155111/run-latest.json"
 import { getAddress, hexToNumber } from "viem/utils";
 
-const address = getAddress(UniverseManagerDeploy.transactions[1]!.contractAddress);
-const startBlock = hexToNumber(UniverseManagerDeploy.receipts[1]!.blockNumber) - 100;
+const address = getAddress(UniverseManagerDeploy.transactions[0]!.contractAddress);
+const startBlock = hexToNumber(UniverseManagerDeploy.receipts[0]!.blockNumber);
 
 const universeCreatedEvent = parseAbiItem(
   "event UniverseCreated(address universe, address creator)"
