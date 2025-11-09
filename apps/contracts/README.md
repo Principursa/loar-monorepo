@@ -45,8 +45,8 @@ There are plans to research into more hooks which have rather interesting featur
 
 
 ## Scripts
-DeployProtocol.s.sol deploys the entire protocol given a poolmanager address
-DeployUniverse.s.sol deploys a universe given universeManager, name, description, hook and lp locker.
-DeployHook.s.sol deploys new hook.
-DeployHook.s.sol deploys new LPLocker.
+DeployProtocol.s.sol deploys the entire protocol given a poolmanager address.  
+DeployUniverse.s.sol deploys a universe given universeManager, name, description, hook and lp locker.  
+DeployHook.s.sol deploys new hook.  
+DeployHook.s.sol deploys new LPLocker.  
  
