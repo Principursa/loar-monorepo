@@ -14,19 +14,20 @@ import ReactFlow, {
   type Connection
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { TimelineEventNode } from '@/components/flow/TimelineNodes';
 import { trpcClient } from '@/utils/trpc';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useReadContract, useChainId, useWriteContract } from 'wagmi';
-import { timelineAbi } from '@/generated';
-import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
-import { type Address } from 'viem';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { useChainId, useWriteContract } from 'wagmi';
 import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
 import { UniverseSidebar } from '@/components/UniverseSidebar';
 import { FlowCreationPanel } from '@/components/FlowCreationPanel';
 import { GovernanceSidebar } from '@/components/GovernanceSidebar';
-import { toast } from 'sonner';
+import { calculateTreeLayout, normalizeNodeId, getEventLabel } from '@/utils/treeLayout';
+import { useUniverseBlockchain } from '@/hooks/useUniverseBlockchain';
+import { useVideoGeneration, type StatusMessage } from '@/hooks/useVideoGeneration';
+import { useCharacterGeneration } from '@/hooks/useCharacterGeneration';
+import { useContractSave } from '@/hooks/useContractSave';
 
 // Register custom node types
 const nodeTypes = {
@@ -63,20 +64,10 @@ function UniverseTimelineEditor() {
   const [imageFormat, setImageFormat] = useState<'landscape_16_9' | 'portrait_16_9' | 'landscape_4_3' | 'portrait_4_3'>('landscape_16_9');
 
   // Status message for sidebar
-  const [statusMessage, setStatusMessage] = useState<{
-    type: 'error' | 'success' | 'info' | 'warning';
-    title: string;
-    description: string;
-    action?: {
-      label: string;
-      onClick: () => void;
-    };
-  } | null>(null);
+  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
 
   // Image generation state
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [showVideoStep, setShowVideoStep] = useState(false);
 
@@ -120,7 +111,6 @@ function UniverseTimelineEditor() {
   const [soundtrackName, setSoundtrackName] = useState<string>("");
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const queryClient = useQueryClient();
 
   // Debug: Log when generatedVideoUrl changes
   useEffect(() => {
@@ -130,43 +120,6 @@ function UniverseTimelineEditor() {
 
   // Contract hooks - we'll use the write contract directly for universe-specific contracts
   const { writeContractAsync } = useWriteContract();
-
-  // Blockchain data fetching hooks
-  const useUniverseLeaves = (contractAddress?: string) => {
-    if (!contractAddress) {
-      console.log('useUniverseLeaves - No contract address provided');
-      return { data: null, isLoading: false, refetch: async () => { } };
-    }
-
-    console.log('useUniverseLeaves - Using address:', contractAddress, 'for universe:', id);
-
-    return useReadContract({
-      abi: timelineAbi,
-      address: contractAddress as Address,
-      functionName: 'getLeaves',
-      query: {
-        enabled: !!contractAddress
-      }
-    });
-  };
-
-  const useUniverseFullGraph = (contractAddress?: string) => {
-    if (!contractAddress) {
-      console.log('useUniverseFullGraph - No contract address provided');
-      return { data: null, isLoading: false, refetch: async () => { } };
-    }
-
-    console.log('useUniverseFullGraph - Using address:', contractAddress, 'for universe:', id);
-
-    return useReadContract({
-      abi: timelineAbi,
-      address: contractAddress as Address,
-      functionName: 'getFullGraph',
-      query: {
-        enabled: !!contractAddress
-      }
-    });
-  };
 
   // Try to get universe data from localStorage (skip for blockchain universes)
   const { data: universeFromStorage } = useQuery({
@@ -213,80 +166,24 @@ function UniverseTimelineEditor() {
   console.log('Timeline Contract Address:', timelineContractAddress);
   console.log('Chain ID:', chainId);
 
-  // Blockchain data fetching hooks - use the universe's own contract address
-  const { data: leavesData, isLoading: isLoadingLeaves, refetch: refetchLeaves } = useUniverseLeaves(timelineContractAddress);
-  const { data: fullGraphData, isLoading: isLoadingFullGraph, refetch: refetchFullGraph } = useUniverseFullGraph(timelineContractAddress);
-
-  // Canon chain data fetching hook
-  const useUniverseCanonChain = (contractAddress?: string) => {
-    if (!contractAddress) {
-      console.log('useUniverseCanonChain - No contract address provided');
-      return { data: null, isLoading: false, refetch: async () => { } };
-    }
-
-    console.log('useUniverseCanonChain - Using address:', contractAddress, 'for universe:', id);
-
-    return useReadContract({
-      abi: timelineAbi,
-      address: contractAddress as Address,
-      functionName: 'getCanonChain',
-      query: {
-        enabled: !!contractAddress
-      }
-    });
-  };
-
-  const { data: canonChainData, isLoading: isLoadingCanonChain, refetch: refetchCanonChain } = useUniverseCanonChain(timelineContractAddress);
-
-  // Fetch latestNodeId from the contract
-  const { data: latestNodeIdData, refetch: refetchLatestNodeId } = useReadContract({
-    abi: timelineAbi,
-    address: timelineContractAddress as Address,
-    functionName: 'latestNodeId',
-    query: {
-      enabled: !!timelineContractAddress && isBlockchainUniverse
-    }
+  // Blockchain data fetching - using extracted hook
+  const {
+    graphData,
+    latestNodeId,
+    leavesData,
+    isLoadingLeaves,
+    isLoadingFullGraph,
+    isLoadingCanonChain,
+    isLoadingAny,
+    refetchLeaves,
+    refetchFullGraph,
+    refetchCanonChain,
+    refetchLatestNodeId,
+  } = useUniverseBlockchain({
+    universeId: id,
+    contractAddress: timelineContractAddress,
+    isBlockchainUniverse,
   });
-
-  const latestNodeId = latestNodeIdData ? Number(latestNodeIdData) : 0;
-
-  // Get timeline data: use blockchain data if available, otherwise dummy data
-  const graphData = useMemo(() => {
-    console.log('=== GRAPH DATA DEBUG ===');
-    console.log('Is Blockchain Universe:', isBlockchainUniverse);
-    console.log('Timeline Contract Address:', timelineContractAddress);
-    console.log('Full Graph Data:', fullGraphData);
-    console.log('Canon Chain Data:', canonChainData);
-    console.log('=========================');
-
-    if (timelineContractAddress && fullGraphData) {
-      // Convert blockchain data to the expected format
-      const [nodeIds, urls, descriptions, previousIds, nextIds, flags] = fullGraphData;
-
-      console.log('=== BLOCKCHAIN DATA PARSED ===');
-      console.log('Node IDs:', nodeIds);
-      console.log('URLs:', urls);
-      console.log('Descriptions:', descriptions);
-      console.log('Previous IDs:', previousIds);
-      console.log('Canon Chain:', canonChainData);
-      console.log('==============================');
-
-      return {
-        nodeIds: nodeIds || [],
-        urls: urls || [],
-        descriptions: descriptions || [],
-        previousNodes: previousIds || [],
-        children: nextIds || [],
-        flags: flags || [],
-        canonChain: canonChainData || []
-      };
-    }
-
-    // Return empty data structure if no data found
-    return {
-      nodeIds: [], urls: [], descriptions: [], previousNodes: [], children: [], flags: [], canonChain: []
-    };
-  }, [id, isBlockchainUniverse, fullGraphData, canonChainData]);
 
   // Update timeline title when universe data loads
   useEffect(() => {
@@ -376,407 +273,39 @@ function UniverseTimelineEditor() {
     }
   });
 
-  // Image generation mutation using Nano Banana for editing
-  const generateImageMutation = useMutation({
-    mutationFn: async (prompt: string) => {
-      // Check if we have selected characters to edit into the scene
-      if (selectedCharacters.length > 0 && charactersData?.characters) {
-        const selectedChars = charactersData.characters.filter((c: any) => selectedCharacters.includes(c.id));
-
-        if (selectedChars.length > 0) {
-          // Process all selected character images
-          const characterNames = selectedChars.map((c: any) => c.character_name).join(' and ');
-
-          // Create edit prompt that places characters in the scene
-          const editPrompt = `${characterNames} ${prompt}, cinematic scene, high quality, detailed environment`;
-
-          // Use character image URLs directly
-          const processedImageUrls = selectedChars
-            .filter((char: any) => char.image_url && char.image_url.trim())
-            .map((char: any) => char.image_url);
-
-          console.log('🎭 === CHARACTER SCENE EDITING WITH NANO BANANA ===');
-          console.log('Selected characters:', selectedChars.map((c: any) => c.character_name));
-          console.log('Number of characters:', selectedChars.length);
-          console.log('Image URLs:', processedImageUrls);
-          console.log('Scene prompt:', editPrompt);
-          console.log('Image format:', imageFormat);
-          console.log('🚀 Calling Nano Banana Edit...');
-
-          // Validate we have at least one valid image URL
-          if (processedImageUrls.length === 0) {
-            throw new Error('No valid character images found for editing');
-          }
-
-          try {
-            // Use Nano Banana Edit for character frame generation
-            console.log('🎯 Using fal-ai/nano-banana/edit for character frame generation');
-
-            const result = await trpcClient.fal.imageToImage.mutate({
-              prompt: `Create a cinematic frame: ${editPrompt}. Professional photography, detailed environment, high quality composition`,
-              imageUrls: processedImageUrls,
-              imageSize: imageFormat,
-              numImages: 1,
-            });
-
-            console.log('✅ Nano Banana Edit result:', result);
-
-            if (result.status !== 'completed' || !result.imageUrl) {
-              throw new Error(result.error || 'Nano Banana frame generation failed');
-            }
-
-            console.log('🎉 NANO BANANA CHARACTER FRAME GENERATION SUCCESSFUL!');
-            return { success: true, imageUrl: result.imageUrl };
-          } catch (imageToImageError) {
-            console.error('❌ NANO BANANA EDIT FAILED:', imageToImageError);
-            console.error('Error details:', JSON.stringify(imageToImageError, null, 2));
-
-            const errorMessage = imageToImageError instanceof Error
-              ? imageToImageError.message
-              : 'Nano Banana edit failed';
-
-            throw new Error(`Frame generation failed: ${errorMessage}. Please check character images and try again.`);
-          }
-        }
-      }
-
-      // For scenes without characters, generate directly with Nano Banana
-      console.log('🎨 Generating scene without characters using Nano Banana');
-
-      try {
-        const result = await trpcClient.fal.generateImage.mutate({
-          prompt: `${prompt}, cinematic scene, high quality, detailed environment, professional photography, dramatic lighting`,
-          model: 'fal-ai/nano-banana',
-          imageSize: imageFormat,
-          numImages: 1
-        });
-
-        if (result.status !== 'completed' || !result.imageUrl) {
-          throw new Error(result.error || 'Failed to generate scene image');
-        }
-
-        console.log('🎉 NANO BANANA SCENE GENERATION SUCCESSFUL!');
-        return { success: true, imageUrl: result.imageUrl };
-      } catch (error) {
-        console.error('❌ NANO BANANA GENERATION FAILED:', error);
-        throw error;
-      }
-    },
-    onSuccess: (data) => {
-      if (data.imageUrl) {
-        console.log('=== GENERATED IMAGE URL ===');
-        console.log('Image URL:', data.imageUrl);
-        console.log('===========================');
-
-        setGeneratedImageUrl(data.imageUrl);
-        setShowVideoStep(true);
-        
-        setStatusMessage({
-          type: 'success',
-          title: 'Image Generated Successfully!',
-          description: 'Your scene image has been generated. Now you can create a video animation from it.',
-        });
-      }
-    },
-    onError: (error) => {
-      console.error("Error generating image:", error);
-      console.error("Error details:", {
-        message: error.message,
-        stack: error.stack,
-        selectedCharacters,
-        charactersData: charactersData?.characters?.length
-      });
-
-      let errorTitle = "Image Generation Failed";
-      let errorMessage = "Failed to generate image. ";
-      if (selectedCharacters.length > 0) {
-        errorMessage += "Character image editing failed. ";
-      }
-      errorMessage += "Please try again.";
-
-      if (error.message?.includes('FAL_KEY')) {
-        errorTitle = "API Configuration Error";
-        errorMessage = "FAL API key is missing. Please configure FAL_KEY in environment variables.";
-      } else if (error.message?.includes('nano-banana')) {
-        errorTitle = "Nano Banana API Error";
-        errorMessage = "The Nano Banana image generation service encountered an error. Please try again.";
-      }
-
-      setStatusMessage({
-        type: 'error',
-        title: errorTitle,
-        description: errorMessage
-      });
-    }
+  // Character generation - using extracted hook
+  const {
+    isGeneratingImage,
+    generateImageMutation,
+    handleGenerateEventImage,
+    handleGenerateCharacterFrame,
+  } = useCharacterGeneration({
+    selectedCharacters,
+    selectedImageCharacters,
+    charactersData,
+    imageFormat,
+    videoDescription,
+    setGeneratedImageUrl,
+    setShowVideoStep,
+    setStatusMessage,
   });
 
-  // Handle image generation for the event
-  const handleGenerateEventImage = useCallback(async () => {
-    if (!videoDescription.trim()) return;
-
-    setStatusMessage(null); // Clear any previous messages
-    setIsGeneratingImage(true);
-    try {
-      // Use the video description as the image prompt
-      await generateImageMutation.mutateAsync(videoDescription);
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setIsGeneratingImage(false);
-    }
-  }, [videoDescription, generateImageMutation]);
-
-  // Handle character frame generation for image-to-video
-  const handleGenerateCharacterFrame = useCallback(async () => {
-    if (!videoDescription.trim() || selectedImageCharacters.length === 0) return;
-
-    setStatusMessage(null);
-    setIsGeneratingImage(true);
-
-    try {
-      // Get selected character data
-      const selectedChars = charactersData?.characters?.filter((c: any) =>
-        selectedImageCharacters.includes(c.id)
-      ) || [];
-
-      if (selectedChars.length === 0) {
-        setStatusMessage({
-          type: 'error',
-          title: 'No Characters Found',
-          description: 'Please select valid characters.',
-        });
-        return;
-      }
-
-      const characterNames = selectedChars.map((c: any) => c.character_name).join(' and ');
-
-      // Get character image URLs for nano-banana edit
-      const characterImageUrls = selectedChars
-        .filter((char: any) => char.image_url && char.image_url.trim())
-        .map((char: any) => char.image_url);
-
-      if (characterImageUrls.length === 0) {
-        setStatusMessage({
-          type: 'error',
-          title: 'No Character Images',
-          description: 'Selected characters have no valid images.',
-        });
-        return;
-      }
-
-      setStatusMessage({
-        type: 'info',
-        title: 'Generating Character Frame',
-        description: 'Creating frame with nano-banana...',
-      });
-
-      console.log('🎨 Generating character frame:', {
-        selectedImageCharacters,
-        characterNames,
-        characterImageUrls,
-        prompt: videoDescription
-      });
-
-      // Call nano-banana edit directly with the character images
-      const editPrompt = `${characterNames} ${videoDescription}, cinematic scene, high quality, detailed environment`;
-
-      const result = await trpcClient.fal.imageToImage.mutate({
-        prompt: `Create a cinematic frame: ${editPrompt}. Professional photography, detailed environment, high quality composition`,
-        imageUrls: characterImageUrls,
-        imageSize: imageFormat,
-        numImages: 1,
-      });
-
-      if (result.status !== 'completed' || !result.imageUrl) {
-        throw new Error(result.error || 'Character frame generation failed');
-      }
-
-      console.log('✅ Character frame generated:', result.imageUrl);
-      setGeneratedImageUrl(result.imageUrl);
-
-      setStatusMessage({
-        type: 'success',
-        title: 'Frame Generated!',
-        description: 'Your character frame is ready. Now you can generate a video from it.',
-      });
-    } catch (error) {
-      console.error('Character frame generation failed:', error);
-      setStatusMessage({
-        type: 'error',
-        title: 'Frame Generation Failed',
-        description: error instanceof Error ? error.message : 'Failed to generate character frame. Please try again.',
-      });
-    } finally {
-      setIsGeneratingImage(false);
-    }
-  }, [videoDescription, selectedImageCharacters, charactersData, imageFormat, trpcClient, setStatusMessage]);
-
-  // Handle video generation with multiple models
-  const generateVideoMutation = useMutation({
-    mutationFn: async ({ imageUrl, prompt }: { imageUrl: string; prompt?: string }) => {
-      console.log('Generating video with:', {
-        imageUrl,
-        prompt: prompt || videoDescription,
-        model: selectedVideoModel
-      });
-
-      const finalPrompt = videoPrompt.trim() || prompt || videoDescription;
-
-      if (selectedVideoModel === 'fal-veo3') {
-        const result = await trpcClient.fal.generateVideo.mutate({
-          prompt: finalPrompt,
-          imageUrl,
-          model: "fal-ai/veo3.1/fast/image-to-video",
-          duration: selectedVideoDuration,
-          aspectRatio: videoRatio,
-          motionStrength: 127,
-          negativePrompt: negativePrompt || undefined
-        });
-        console.log('Veo3.1 video result:', result);
-        return { videoUrl: result.videoUrl };
-      } else if (selectedVideoModel === 'fal-kling') {
-        const result = await trpcClient.fal.klingVideo.mutate({
-          prompt: finalPrompt,
-          imageUrl,
-          duration: (selectedVideoDuration === 5 || selectedVideoDuration === 10) ? selectedVideoDuration : 5,
-          aspectRatio: videoRatio,
-          negativePrompt: negativePrompt || undefined,
-          cfgScale: 0.5
-        });
-        console.log('Kling video result:', result);
-        return { videoUrl: result.videoUrl }; // Use actual video URL
-      } else if (selectedVideoModel === 'fal-wan25') {
-        const result = await trpcClient.fal.wan25ImageToVideo.mutate({
-          prompt: finalPrompt,
-          imageUrl,
-          duration: (selectedVideoDuration === 5 || selectedVideoDuration === 10) ? selectedVideoDuration : 5,
-          resolution: "1080p",
-          negativePrompt: negativePrompt || undefined,
-          enablePromptExpansion: true
-        });
-        console.log('Wan25 video result:', result);
-        return { videoUrl: result.videoUrl }; // Use actual video URL
-      } else if (selectedVideoModel === 'fal-sora') {
-        const result = await trpcClient.fal.soraImageToVideo.mutate({
-          prompt: finalPrompt,
-          imageUrl,
-          duration: (selectedVideoDuration === 4 || selectedVideoDuration === 8 || selectedVideoDuration === 12) ? selectedVideoDuration : 4,
-          aspectRatio: videoRatio === "1:1" ? "auto" : videoRatio,
-          resolution: "auto",
-        });
-        console.log('Sora video result:', result);
-        return { videoUrl: result.videoUrl }; // Use actual video URL
-      }
-
-      throw new Error('Invalid video model selected');
-    },
-    onSuccess: (data) => {
-      if (data.videoUrl) {
-        setGeneratedVideoUrl(data.videoUrl);
-        
-        const modelNames: Record<string, string> = {
-          'fal-veo3': 'Veo3',
-          'fal-kling': 'Kling 2.5',
-          'fal-wan25': 'Wan 2.5',
-          'fal-sora': 'Sora 2'
-        };
-        const modelName = modelNames[selectedVideoModel] || 'Video';
-        
-        setStatusMessage({
-          type: 'success',
-          title: 'Video Generated Successfully!',
-          description: `Your ${modelName} video animation has been created. You can now save it to the timeline.`,
-        });
-      }
-    },
-    onError: (error) => {
-      console.error("Error generating video:", error);
-      
-      // Extract error message
-      let errorMessage = "Failed to generate video. Please try again.";
-      let errorTitle = "Video Generation Failed";
-      let errorDescription = "";
-      let action = undefined;
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-        
-        // Check for specific error cases to provide better user guidance
-        if (errorMessage.toLowerCase().includes('content checker') || 
-            errorMessage.toLowerCase().includes('flagged')) {
-          errorTitle = "Content Check Failed";
-          
-          // Check if it's Sora and provide specific guidance
-          if (selectedVideoModel === 'fal-sora') {
-            errorDescription = `OpenAI Sora has detected content that violates its usage policies. This often happens with:
-
-• Certain aspect ratios (Sora ONLY supports 16:9 or 9:16, NOT 1:1)
-• Character images that contain copyrighted or unlicensed content
-• Generated images that include recognizable IP
-
-Try switching to Veo3, Kling 2.5, or Wan 2.5 which have more flexible content policies, or ensure all characters are original creations.`;
-            action = {
-              label: 'Switch to Veo3',
-              onClick: () => {
-                setSelectedVideoModel('fal-veo3');
-                setStatusMessage(null);
-              }
-            };
-          } else {
-            errorDescription = "The AI service detected content that violates its usage policies. Try using different characters or switching to another video model.";
-          }
-        } else if (errorMessage.toLowerCase().includes('unlicensed') || 
-            errorMessage.toLowerCase().includes('license')) {
-          errorTitle = "Unlicensed Content Detected";
-          errorDescription = "This request includes unlicensed characters or content. Please ensure all characters in your scene are properly licensed or use different characters.";
-        } else if (errorMessage.toLowerCase().includes('image') && 
-                   errorMessage.toLowerCase().includes('url')) {
-          errorTitle = "Image Access Error";
-          errorDescription = "The character image could not be accessed. Please try regenerating the character or use a different image.";
-        } else if (errorMessage.toLowerCase().includes('quota') || 
-                   errorMessage.toLowerCase().includes('limit')) {
-          errorTitle = "API Quota Exceeded";
-          errorDescription = "You've reached the API usage limit. Please try again later or contact support.";
-        } else if (errorMessage.toLowerCase().includes('validation error') ||
-                   errorMessage.toLowerCase().includes('invalid input')) {
-          errorTitle = "Invalid Input";
-          
-          // Provide Sora-specific guidance for validation errors
-          if (selectedVideoModel === 'fal-sora') {
-            errorDescription = `Sora 2 has STRICT requirements:
-
-• Aspect Ratio: ONLY 16:9 or 9:16 (1:1 is NOT supported!)
-• Duration: ONLY 4, 8, or 12 seconds
-• Resolution: ONLY 720p
-• Image Format: Must be a valid, accessible URL
-
-Current settings: ${videoRatio} aspect ratio, ${selectedVideoDuration || 4}s duration
-
-${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support! Change to 16:9 or 9:16.\n\n" : ""}Try adjusting your settings or use a different video model like Veo3 or Kling 2.5.`;
-            action = {
-              label: 'Switch to Veo3',
-              onClick: () => {
-                setSelectedVideoModel('fal-veo3');
-                setStatusMessage(null);
-              }
-            };
-          } else {
-            errorDescription = errorMessage;
-          }
-        } else {
-          errorDescription = errorMessage;
-        }
-      }
-      
-      // Show inline status message in sidebar
-      setStatusMessage({
-        type: 'error',
-        title: errorTitle,
-        description: errorDescription,
-        action
-      });
-    }
+  // Video generation - using extracted hook
+  const { isGeneratingVideo, handleGenerateVideo: handleGenerateVideoFromHook, generateVideoMutation } = useVideoGeneration({
+    videoDescription,
+    selectedVideoModel,
+    selectedVideoDuration,
+    videoRatio,
+    negativePrompt,
+    videoPrompt,
+    setGeneratedVideoUrl,
+    setStatusMessage,
   });
+
+  // Wrapper to call the hook's handler with the correct parameters
+  const handleGenerateVideo = useCallback(async () => {
+    await handleGenerateVideoFromHook(generatedImageUrl, uploadedUrl);
+  }, [handleGenerateVideoFromHook, generatedImageUrl, uploadedUrl]);
 
   // File upload to tmpfiles.org
   const uploadToTmpfiles = useCallback(async () => {
@@ -820,290 +349,32 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
     }
   }, [generatedImageUrl]);
 
-  const handleGenerateVideo = useCallback(async () => {
-    setStatusMessage(null); // Clear any previous messages
-
-    setIsGeneratingVideo(true);
-    try {
-      const hasImage = uploadedUrl || generatedImageUrl;
-
-      // Determine if we're in text-to-video or image-to-video mode
-      const isTextToVideo = !hasImage;
-
-      if (isTextToVideo) {
-        // Text-to-video mode: Use selected model for text-to-video
-        const modelMap: Record<string, string> = {
-          'fal-veo3': 'fal-ai/veo3.1/fast',
-          'fal-sora': 'fal-ai/sora-2/text-to-video',
-          'fal-kling': 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
-          'fal-wan25': 'fal-ai/wan-25-preview/text-to-video'
-        };
-
-        const modelNames: Record<string, string> = {
-          'fal-veo3': 'Veo 3.1',
-          'fal-kling': 'Kling 2.5',
-          'fal-wan25': 'Wan 2.5',
-          'fal-sora': 'Sora 2'
-        };
-
-        const textToVideoModel = modelMap[selectedVideoModel] || 'fal-ai/veo3.1/fast';
-        const modelName = modelNames[selectedVideoModel] || 'AI';
-
-        console.log('🎬 Text-to-video mode:', {
-          selectedModel: selectedVideoModel,
-          actualModel: textToVideoModel,
-          prompt: videoDescription,
-          duration: selectedVideoDuration,
-          aspectRatio: videoRatio
-        });
-
-        setStatusMessage({
-          type: 'info',
-          title: 'Generating Video',
-          description: `Creating your video with ${modelName}...`,
-        });
-
-        const result = await trpcClient.fal.generateVideo.mutate({
-          prompt: videoDescription,
-          model: textToVideoModel,
-          duration: selectedVideoDuration,
-          aspectRatio: videoRatio,
-          negativePrompt: negativePrompt || undefined
-        });
-
-        if (result.videoUrl) {
-          setGeneratedVideoUrl(result.videoUrl);
-          setStatusMessage({
-            type: 'success',
-            title: 'Video Generated Successfully!',
-            description: `Your ${modelName} video has been created. You can now save it to the timeline.`,
-          });
-        }
-      } else {
-        // Image-to-video mode: Use image-to-video models
-        const imageUrlToUse = uploadedUrl || generatedImageUrl;
-
-        console.log('=== IMAGE-TO-VIDEO GENERATION DEBUG ===');
-        console.log('Image URL:', imageUrlToUse);
-        console.log('Video Description:', videoDescription);
-        console.log('Model:', selectedVideoModel);
-        console.log('===============================');
-
-        setStatusMessage({
-          type: 'info',
-          title: 'Animating Video',
-          description: 'Creating your video animation...',
-        });
-
-        await generateVideoMutation.mutateAsync({
-          imageUrl: imageUrlToUse!,
-          prompt: `Animate this scene: ${videoDescription}`
-        });
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      setStatusMessage({
-        type: 'error',
-        title: 'Generation Failed',
-        description: error instanceof Error ? error.message : 'Failed to generate video',
-      });
-    } finally {
-      setIsGeneratingVideo(false);
-    }
-  }, [generatedImageUrl, uploadedUrl, videoDescription, generateVideoMutation, selectedVideoModel, selectedVideoDuration, videoRatio, negativePrompt, setStatusMessage]);
-
-  // Save to contract function (now includes Filecoin upload)
-  const handleSaveToContract = useCallback(async () => {
-    if (!generatedVideoUrl || !videoTitle || !videoDescription) {
-      alert('Video, title, and description are required to save to contract');
-      return;
-    }
-
-    setIsSavingToContract(true);
-    setIsSavingToStorage(true);
-
-    try {
-      // Step 1: Upload to MinIO S3 storage first
-      console.log('Step 1: Uploading video to MinIO S3. URL being used:', generatedVideoUrl);
-      console.log('Current state - videoTitle:', videoTitle, 'videoDescription:', videoDescription);
-
-      let minioKey: string | null = null;
-      let minioUrl: string | null = null;
-      try {
-        // Generate a clean UUID for the filename
-        const uuid = crypto.randomUUID();
-        const minioResult = await trpcClient.minio.uploadFromUrl.mutate({
-          url: generatedVideoUrl,
-          filename: `${uuid}.mp4`
-        });
-
-        console.log('MinIO upload successful. Key:', minioResult.key);
-        console.log('MinIO public URL:', minioResult.url);
-
-        minioKey = minioResult.key;
-        minioUrl = minioResult.url;
-        setStorageKey(minioResult.key);
-        setStorageSaved(true);
-
-        // Use the MinIO public URL directly
-        setGeneratedVideoUrl(minioUrl);
-        console.log('Updated video display to use MinIO URL:', minioUrl);
-      } catch (minioError) {
-        console.error('MinIO upload failed, proceeding with original URL:', minioError);
-        // Continue with original URL if MinIO fails
-      }
-
-      setIsSavingToStorage(false);
-
-      // Step 2: Determine the previous node based on addition type
-      let previousNodeId: number;
-
-      if (additionType === 'branch' && sourceNodeId) {
-        // For branches, extract numeric part from sourceNodeId (e.g., "4c" -> 4)
-        const numericPart = sourceNodeId.match(/^\d+/);
-        previousNodeId = numericPart ? parseInt(numericPart[0]) : 0;
-        console.log('Creating branch from event:', sourceNodeId, '-> numeric:', previousNodeId);
-      } else {
-        // For linear continuation, find the last node ID (extract numeric parts)
-        const numericIds = graphData.nodeIds.map(id => {
-          const idStr = String(id);
-          const numericPart = idStr.match(/^\d+/);
-          return numericPart ? parseInt(numericPart[0]) : 0;
-        });
-        previousNodeId = Math.max(...(numericIds || [0]), 0);
-        console.log('Creating linear continuation after event:', previousNodeId);
-      }
-
-      // Step 3: Determine the video URL to store - prefer MinIO URL if available
-      const videoUrlForContract = minioUrl || generatedVideoUrl;
-
-      console.log('Step 2: Saving to contract:', {
-        link: videoUrlForContract,
-        originalLink: generatedVideoUrl,
-        minioKey: minioKey,
-        minioUrl: minioUrl,
-        plot: videoDescription,
-        previous: previousNodeId,
-        title: videoTitle,
-        additionType,
-        sourceNodeId
-      });
-
-      // Determine which contract address to use
-      const contractAddressToUse = isBlockchainUniverse
-        ? id as Address  // Use universe ID as contract address
-        : TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address;  // Fallback to default
-
-      console.log('Saving to contract address:', contractAddressToUse);
-
-      // Create new node in the universe's specific smart contract
-      const txHash = await writeContractAsync({
-        abi: timelineAbi,
-        address: contractAddressToUse,
-        functionName: 'createNode',
-        args: [videoUrlForContract, videoDescription, BigInt(previousNodeId)]
-      });
-
-      console.log('Transaction submitted:', txHash);
-      setContractSaved(true);
-
-      // Show success message
-      toast.success('Event Saved to Blockchain & MinIO!', {
-        description: `Your timeline event has been permanently stored.\nTransaction: ${txHash.substring(0, 10)}...${txHash.substring(txHash.length - 8)}`,
-        duration: 8000
-      });
-
-      // Step 4: Generate wiki entry in background (non-blocking)
-      console.log('Step 3: Generating wiki entry in background...');
-
-      // Gather previous events for context (last 2-3 events)
-      const previousEvents = graphData.nodeIds
-        .slice(-3) // Get last 3 events
-        .map((nodeId, idx) => ({
-          title: graphData.descriptions[graphData.nodeIds.length - 3 + idx] || `Event ${nodeId}`,
-          description: graphData.descriptions[graphData.nodeIds.length - 3 + idx] || ''
-        }))
-        .filter(evt => evt.description.length > 0);
-
-      // Determine which character IDs to use based on generation mode
-      // For image-to-video mode, use selectedImageCharacters
-      // For text-to-video mode, use selectedCharacters
-      const characterIdsForWiki = selectedImageCharacters.length > 0
-        ? selectedImageCharacters
-        : (selectedCharacters.length > 0 ? selectedCharacters : undefined);
-
-      console.log('🎭 Characters for wiki generation:', {
-        selectedImageCharacters,
-        selectedCharacters,
-        characterIdsForWiki
-      });
-
-      // Generate wiki in background (non-blocking)
-      // Use latestNodeId + 1 as the new event ID (this is how the Timeline contract assigns IDs)
-      const newEventId = latestNodeId + 1;
-      console.log(`📝 Generating wiki for new event ID: ${newEventId} (latestNodeId: ${latestNodeId})`);
-
-      trpcClient.wiki.generateFromVideo.mutate({
-        universeId: id,
-        eventId: String(newEventId), // Use latestNodeId + 1, not previousNodeId + 1
-        videoUrl: videoUrlForContract,
-        title: videoTitle,
-        description: videoDescription,
-        characterIds: characterIdsForWiki,
-        previousEvents: previousEvents.length > 0 ? previousEvents : undefined
-      }).then((wikiResult) => {
-        console.log('✅ Wiki generated successfully!', wikiResult);
-        toast.success('Wiki Generated!', {
-          description: 'AI-powered wiki entry created for your event.',
-          duration: 4000
-        });
-      }).catch((wikiError) => {
-        console.error('❌ Wiki generation failed:', wikiError);
-        // Don't show error to user - wiki can be generated later
-        console.warn('Event saved but wiki generation failed. Wiki can be regenerated later.');
-      });
-
-      // Refresh the blockchain data to show the new node
-      setTimeout(async () => {
-        if (isBlockchainUniverse) {
-          // Specifically refetch blockchain data
-          await refetchLeaves();
-          await refetchFullGraph();
-          await refetchCanonChain();
-          await refetchLatestNodeId();
-          console.log('Refetched blockchain data after contract save');
-        }
-        // Invalidate all queries as fallback
-        await queryClient.invalidateQueries();
-        console.log('Refreshed blockchain data - new node should appear');
-      }, 5000); // Wait 5 seconds for blockchain to update
-
-    } catch (error) {
-      console.error('Error saving to contract:', error);
-      toast.error('Contract Save Failed', {
-        description: 'Failed to save event to blockchain: ' + (error instanceof Error ? error.message : 'Unknown error'),
-        duration: 5000
-      });
-    } finally {
-      setIsSavingToContract(false);
-      setIsSavingToStorage(false);
-    }
-  }, [generatedVideoUrl, videoTitle, videoDescription, graphData.nodeIds, writeContractAsync, isBlockchainUniverse, id, chainId, latestNodeId]);
-
-  // Manual refresh function
-  const handleRefreshTimeline = useCallback(async () => {
-    console.log('Manually refreshing timeline...');
-    if (isBlockchainUniverse) {
-      // Specifically refetch blockchain data
-      await refetchLeaves();
-      await refetchFullGraph();
-      await refetchCanonChain();
-      await refetchLatestNodeId();
-      console.log('Refetched blockchain data for universe:', id);
-    }
-    // Also invalidate all queries as fallback
-    await queryClient.invalidateQueries();
-  }, [queryClient, isBlockchainUniverse, refetchLeaves, refetchFullGraph, refetchCanonChain, refetchLatestNodeId, id]);
+  // Contract save - using extracted hook
+  const { handleSaveToContract, handleRefreshTimeline } = useContractSave({
+    generatedVideoUrl,
+    videoTitle,
+    videoDescription,
+    additionType,
+    sourceNodeId,
+    selectedCharacters,
+    selectedImageCharacters,
+    graphData,
+    latestNodeId,
+    universeId: id,
+    isBlockchainUniverse,
+    chainId,
+    setGeneratedVideoUrl,
+    setStorageKey,
+    setStorageSaved,
+    setContractSaved,
+    setIsSavingToContract,
+    setIsSavingToStorage,
+    writeContractAsync,
+    refetchLeaves,
+    refetchFullGraph,
+    refetchCanonChain,
+    refetchLatestNodeId,
+  });
 
   // Handle opening governance sidebar
   const handleOpenGovernance = useCallback(() => {
@@ -1431,86 +702,21 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
 
     const blockchainNodes: Node<TimelineNodeData>[] = [];
     const blockchainEdges: Edge[] = [];
-    const horizontalSpacing = 420; // Space between events horizontally
-    const verticalSpacing = 320;   // Vertical space between branches (increased to prevent overlap)
-    const startY = 100; // Start higher on screen
 
     // Colors for different types
     const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-    // First pass: categorize nodes by their parent to detect branches and calculate depths
-    const nodesByParent = new Map<number, number[]>();
-    const nodePositions = new Map<number, { x: number; y: number }>();
-    const nodeDepths = new Map<number, number>(); // Track depth from root
+    // Calculate tree layout using utility
+    const layout = calculateTreeLayout(graphData.nodeIds, graphData.previousNodes, {
+      horizontalSpacing: 420,
+      verticalSpacing: 320,
+      startX: 100,
+      startY: 100,
+    });
 
+    // Create nodes from blockchain data using calculated layout
     graphData.nodeIds.forEach((nodeIdStr, index) => {
-      const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
-      const previousNode = graphData.previousNodes[index] || '';
-      const parentId = (previousNode && String(previousNode) !== '0')
-        ? (typeof previousNode === 'bigint' ? Number(previousNode) : parseInt(String(previousNode)))
-        : 0;
-
-      if (!nodesByParent.has(parentId)) {
-        nodesByParent.set(parentId, []);
-      }
-      nodesByParent.get(parentId)!.push(nodeId);
-
-      // Calculate depth: root nodes are depth 0, their children are depth 1, etc.
-      const parentDepth = nodeDepths.get(parentId) || 0;
-      nodeDepths.set(nodeId, parentDepth + 1);
-    });
-
-    // Sort siblings by node ID to ensure consistent positioning
-    nodesByParent.forEach((siblings) => {
-      siblings.sort((a, b) => a - b);
-    });
-
-    // Calculate the vertical space needed for each subtree
-    const subtreeHeights = new Map<number, number>();
-    const calculateSubtreeHeight = (nodeId: number): number => {
-      if (subtreeHeights.has(nodeId)) return subtreeHeights.get(nodeId)!;
-
-      const children = nodesByParent.get(nodeId) || [];
-      if (children.length === 0) {
-        subtreeHeights.set(nodeId, 1);
-        return 1;
-      }
-
-      // Sum the heights of all children
-      const totalHeight = children.reduce((sum, childId) => {
-        return sum + calculateSubtreeHeight(childId);
-      }, 0);
-
-      subtreeHeights.set(nodeId, totalHeight);
-      return totalHeight;
-    };
-
-    // Calculate heights for all nodes
-    graphData.nodeIds.forEach((nodeIdStr) => {
-      const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
-      calculateSubtreeHeight(nodeId);
-    });
-
-    // Generate proper event labels based on branching structure
-    const getEventLabel = (nodeId: number, parentId: number): string => {
-      if (parentId === 0) return nodeId.toString(); // Root nodes keep numeric ID
-
-      const siblings = nodesByParent.get(parentId) || [];
-      const siblingIndex = siblings.indexOf(nodeId);
-
-      if (siblingIndex === 0) {
-        // First child continues the main timeline
-        return nodeId.toString();
-      } else {
-        // Additional children are branches with letter suffixes
-        const branchLetter = String.fromCharCode(97 + siblingIndex); // 'b', 'c', 'd', etc.
-        return `${parentId}${branchLetter}`;
-      }
-    };
-
-    // Create nodes from blockchain data with proper branching layout
-    graphData.nodeIds.forEach((nodeIdStr, index) => {
-      const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
+      const nodeId = normalizeNodeId(nodeIdStr);
       const url = graphData.urls[index] || '';
 
       // Handle description which might be an object {timestamp, description} or a string
@@ -1522,56 +728,20 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       const previousNode = graphData.previousNodes[index] || '';
       const isCanon = graphData.flags[index] || false;
       const parentId = (previousNode && String(previousNode) !== '0')
-        ? (typeof previousNode === 'bigint' ? Number(previousNode) : parseInt(String(previousNode)))
+        ? normalizeNodeId(previousNode)
         : 0;
 
       // Check if this node is in the canon chain
       const isInCanonChain = graphData.canonChain && graphData.canonChain.some((canonId: any) => {
-        const canonNodeId = typeof canonId === 'bigint' ? Number(canonId) : parseInt(String(canonId));
+        const canonNodeId = normalizeNodeId(canonId);
         return canonNodeId === nodeId;
       });
 
+      // Get position from layout calculation
+      const position = layout.nodePositions.get(nodeId) || { x: 100, y: 100 };
+
       // Generate proper event label
-      const eventLabel = getEventLabel(nodeId, parentId);
-
-      // Calculate position based on depth and branching structure
-      let x: number, y: number;
-      const depth = nodeDepths.get(nodeId) || 0;
-
-      if (parentId === 0) {
-        // Root node
-        x = 100;
-        y = startY;
-      } else {
-        const siblings = nodesByParent.get(parentId) || [];
-        const siblingIndex = siblings.indexOf(nodeId);
-
-        // X position is based on depth (distance from root)
-        x = 100 + (depth * horizontalSpacing);
-
-        // Y position - allocate space based on subtree heights
-        if (siblingIndex === 0) {
-          // Main timeline continuation - stays at parent's Y level
-          const parentPos = nodePositions.get(parentId);
-          y = parentPos ? parentPos.y : startY;
-        } else {
-          // Branch - allocate space based on previous siblings' subtree heights
-          const parentPos = nodePositions.get(parentId);
-          const baseY = parentPos ? parentPos.y : startY;
-
-          // Calculate Y offset by summing the heights of all previous siblings
-          let yOffset = 0;
-          for (let i = 0; i < siblingIndex; i++) {
-            const prevSiblingId = siblings[i];
-            const prevSiblingHeight = subtreeHeights.get(prevSiblingId) || 1;
-            yOffset += prevSiblingHeight * verticalSpacing;
-          }
-
-          y = baseY + yOffset;
-        }
-      }
-
-      nodePositions.set(nodeId, { x, y });
+      const eventLabel = getEventLabel(nodeId, parentId, layout.nodesByParent);
 
       const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
 
@@ -1583,13 +753,13 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
         description,
         previousNode,
         parentId,
-        position: { x, y }
+        position
       });
 
       blockchainNodes.push({
         id: `blockchain-node-${nodeId}`,
         type: 'timelineEvent',
-        position: { x, y },
+        position,
         data: {
           label: description && description.length > 0 && description !== `Timeline event ${nodeId}`
             ? description.substring(0, 50) + (description.length > 50 ? '...' : '')
@@ -1612,11 +782,11 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
 
     // Create edges based on previous node relationships
     graphData.nodeIds.forEach((nodeIdStr, index) => {
-      const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
+      const nodeId = normalizeNodeId(nodeIdStr);
       const previousNodeStr = graphData.previousNodes[index];
 
       if (previousNodeStr && String(previousNodeStr) !== '0') {
-        const previousNodeId = typeof previousNodeStr === 'bigint' ? Number(previousNodeStr) : parseInt(String(previousNodeStr));
+        const previousNodeId = normalizeNodeId(previousNodeStr);
         const color = graphData.flags[index] ? colors[0] : colors[(index + 1) % colors.length];
 
         blockchainEdges.push({
@@ -1641,7 +811,7 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       blockchainNodes.push({
         id: addNodeId,
         type: 'timelineEvent',
-        position: { x: lastNode.position.x + horizontalSpacing, y: lastNode.position.y },
+        position: { x: lastNode.position.x + 420, y: lastNode.position.y },
         data: {
           label: '',
           description: '',
@@ -1733,8 +903,6 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       );
     }
   }, [selectedNode, selectedEventTitle, selectedEventDescription, setNodes]);
-
-  const isLoadingAny = isLoadingLeaves || isLoadingFullGraph || isLoadingUniverse || isLoadingCanonChain;
 
   // Not found state - only for non-blockchain universes
   if (!isBlockchainUniverse && !finalUniverse) {
