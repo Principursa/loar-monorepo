@@ -305,8 +305,35 @@ export const appRouter = router({
         }
       }),
 
-    // Improve video prompt with AI
-    improvePrompt: publicProcedure
+    // Improve image prompt with AI (for single-frame descriptions)
+    improveImagePrompt: publicProcedure
+      .input(z.object({
+        prompt: z.string(),
+        characters: z.array(z.object({
+          name: z.string(),
+          description: z.string(),
+        })).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        console.log("🎨 Received improveImagePrompt request:", JSON.stringify(input, null, 2));
+        try {
+          const improvedPrompt = await geminiService.improveImagePrompt(
+            input.prompt,
+            input.characters
+          );
+
+          return {
+            success: true,
+            improvedPrompt,
+          };
+        } catch (error) {
+          console.error("Failed to improve image prompt:", error);
+          throw new Error(`Image prompt improvement failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }),
+
+    // Improve video prompt with AI (for shot sequences with cuts)
+    improveVideoPrompt: publicProcedure
       .input(z.object({
         prompt: z.string(),
         characters: z.array(z.object({
@@ -332,8 +359,8 @@ export const appRouter = router({
             improvedPrompt,
           };
         } catch (error) {
-          console.error("Failed to improve prompt:", error);
-          throw new Error(`Prompt improvement failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          console.error("Failed to improve video prompt:", error);
+          throw new Error(`Video prompt improvement failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }),
   }),

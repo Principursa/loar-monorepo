@@ -128,6 +128,9 @@ app.use(
     createContext: (_opts, context) => {
       return createContext({ context });
     },
+    onError: ({ path, error }) => {
+      console.error(`❌ tRPC Error on ${path}:`, error);
+    },
   })
 );
 
