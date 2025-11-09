@@ -9,6 +9,9 @@ export const universe = onchainTable(
     universeId: t.integer(), // universe ID from UniverseManager (if trackable)
     creator: t.hex().notNull(),
     createdAt: t.integer().notNull(),
+    name: t.text().notNull(), // universe name from contract
+    description: t.text().notNull(), // universe description from contract
+    imageURL: t.text().notNull(), // universe image URL from contract
     tokenAddress: t.hex(), // set when token is created
     governorAddress: t.hex(), // set when token is created
     nodeCount: t.integer().notNull().default(0), // track number of nodes

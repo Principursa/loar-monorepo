@@ -23,7 +23,7 @@ export default createConfig({
     sepolia: {
       id: 11155111,
       rpc: process.env.PONDER_RPC_URL_2!,
-      maxRequestsPerSecond: 5,
+      maxRequestsPerSecond: 2,
     }
   },
   contracts: {
@@ -40,8 +40,9 @@ export default createConfig({
         address: address,
         event: universeCreatedEvent,
         parameter: "universe",
+        startBlock: startBlock, // Scan for factory children from this block
       }),
-      startBlock: startBlock,
+      startBlock: startBlock, // Index child contracts from this block
     },
     UniverseGovernor: {
       chain: "sepolia",
@@ -50,6 +51,7 @@ export default createConfig({
         address: address,
         event: tokenCreatedEvent,
         parameter: "governor",
+        startBlock: startBlock,
       }),
       startBlock: startBlock,
     },
@@ -60,6 +62,7 @@ export default createConfig({
         address: address,
         event: tokenCreatedEvent,
         parameter: "tokenAddress",
+        startBlock: startBlock,
       }),
       startBlock: startBlock,
     },

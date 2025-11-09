@@ -14,6 +14,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@loar/abis/addresses": path.resolve(__dirname, "../../packages/abis/src/addresses.ts"),
+      "@loar/abis/generated": path.resolve(__dirname, "../../packages/abis/src/generated.ts"),
     },
   },
   server: {

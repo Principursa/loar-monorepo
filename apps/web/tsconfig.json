@@ -4,9 +4,13 @@
     "esModuleInterop": true,
     "jsx": "react-jsx",
     "target": "ESNext",
+
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "types": [
       "vite/client"
@@ -16,6 +20,10 @@
     ],
     "baseUrl": ".",
     "paths": {
+      "@loar/abis/addresses": ["../../packages/abis/src/addresses.ts"],
+      "@loar/abis/generated": ["../../packages/abis/src/generated.ts"],
+
+
       "@/*": [
         "./src/*"
       ]
