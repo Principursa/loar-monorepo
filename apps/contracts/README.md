@@ -27,7 +27,7 @@ function deployUniverseToken(DeploymentConfig memory deploymentConfig,uint id) r
 calls UniverseTokenDeployer.sol and sets hook, fee and LP locker used
 
 ### Universe
-At it's core the universe contract is a directed acyclic graph in which any user can call createNode.
+At it's core the universe contract is a directed acyclic graph in which any user can contribute to universe by calling createNode.
 ```solidity
     function createNode(
         string memory _link,
