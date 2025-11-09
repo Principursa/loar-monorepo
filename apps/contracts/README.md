@@ -35,7 +35,7 @@ At it's core the universe contract is a directed acyclic graph in which any user
         uint _previous
     ) public returns (uint) {
 ```
-A given node is then given the status of 'canon', all previous nodes from that 'canon' node are thus considered 'canon'.
+A given node is then granted the status of 'canon', all previous nodes from that 'canon' node are thus considered 'canon'.
 There are plans to have the creation and visibility options be subject to user discretion (WIP).
 When it's deployed the contract is owned by a single user, who then has the choice whether to democratize his universe and launch a token.
 At this point a UniverseGovernor is given ownership of the Universe contract and the deployed token represents votes for the governor.
