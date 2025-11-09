@@ -1460,6 +1460,37 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       nodeDepths.set(nodeId, parentDepth + 1);
     });
 
+    // Sort siblings by node ID to ensure consistent positioning
+    nodesByParent.forEach((siblings) => {
+      siblings.sort((a, b) => a - b);
+    });
+
+    // Calculate the vertical space needed for each subtree
+    const subtreeHeights = new Map<number, number>();
+    const calculateSubtreeHeight = (nodeId: number): number => {
+      if (subtreeHeights.has(nodeId)) return subtreeHeights.get(nodeId)!;
+
+      const children = nodesByParent.get(nodeId) || [];
+      if (children.length === 0) {
+        subtreeHeights.set(nodeId, 1);
+        return 1;
+      }
+
+      // Sum the heights of all children
+      const totalHeight = children.reduce((sum, childId) => {
+        return sum + calculateSubtreeHeight(childId);
+      }, 0);
+
+      subtreeHeights.set(nodeId, totalHeight);
+      return totalHeight;
+    };
+
+    // Calculate heights for all nodes
+    graphData.nodeIds.forEach((nodeIdStr) => {
+      const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
+      calculateSubtreeHeight(nodeId);
+    });
+
     // Generate proper event labels based on branching structure
     const getEventLabel = (nodeId: number, parentId: number): string => {
       if (parentId === 0) return nodeId.toString(); // Root nodes keep numeric ID
@@ -1518,16 +1549,25 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
         // X position is based on depth (distance from root)
         x = 100 + (depth * horizontalSpacing);
 
-        // Y position depends on whether this is the main continuation or a branch
+        // Y position - allocate space based on subtree heights
         if (siblingIndex === 0) {
           // Main timeline continuation - stays at parent's Y level
           const parentPos = nodePositions.get(parentId);
           y = parentPos ? parentPos.y : startY;
         } else {
-          // Branch - offset vertically from parent
+          // Branch - allocate space based on previous siblings' subtree heights
           const parentPos = nodePositions.get(parentId);
           const baseY = parentPos ? parentPos.y : startY;
-          y = baseY + (siblingIndex * verticalSpacing);
+
+          // Calculate Y offset by summing the heights of all previous siblings
+          let yOffset = 0;
+          for (let i = 0; i < siblingIndex; i++) {
+            const prevSiblingId = siblings[i];
+            const prevSiblingHeight = subtreeHeights.get(prevSiblingId) || 1;
+            yOffset += prevSiblingHeight * verticalSpacing;
+          }
+
+          y = baseY + yOffset;
         }
       }
 
