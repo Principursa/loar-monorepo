@@ -78,7 +78,7 @@ services:
       caddy: loartech.xyz
       caddy.3_route: /indexer/*
       caddy.3_route.reverse_proxy: "{{upstreams 42069}}"
-      caddy.3_route.strip_prefix: /indexer
+      caddy.3_route.uri: strip_prefix /indexer
 
 
 
