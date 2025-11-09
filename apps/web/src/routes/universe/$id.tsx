@@ -1237,25 +1237,45 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       referenceNode: referenceNode ? { id: referenceNode.id, position: referenceNode.position } : null
     });
 
-    // Calculate position based on addition type
+    // Calculate position based on addition type and depth in tree
     let newEventPosition;
     let newAddPosition;
 
+    const horizontalSpacing = 420;
+    const verticalSpacing = 320; // Match blockchain node spacing
+
     if (additionType === 'branch' && sourceNode) {
-      // Create branch: forward and below the source node - increased spacing
-      const branchY = sourceNode.position.y + 350; // Increased from 220 to 350
-      newEventPosition = { x: sourceNode.position.x + 480, y: branchY };
-      newAddPosition = { x: sourceNode.position.x + 960, y: branchY };
+      // Create branch: same X depth as if it were a linear continuation, but offset vertically
+      // Count how many children the source node already has to position this branch correctly
+      const sourceChildren = nodes.filter((n: any) => {
+        const parentMatch = edges.find(e => e.source === sourceNode.id && e.target === n.id);
+        return parentMatch && n.data.nodeType === 'scene';
+      });
+
+      const branchIndex = sourceChildren.length; // 0-based index for this new branch
+      const branchY = sourceNode.position.y + (branchIndex * verticalSpacing);
+
+      // Use same X as linear continuation would use
+      newEventPosition = { x: sourceNode.position.x + horizontalSpacing, y: branchY };
+      newAddPosition = { x: sourceNode.position.x + (horizontalSpacing * 2), y: branchY };
+
+      console.log('Branch positioning:', {
+        sourceNodeX: sourceNode.position.x,
+        sourceChildren: sourceChildren.length,
+        branchIndex,
+        newX: newEventPosition.x,
+        newY: branchY
+      });
     } else {
       // Linear addition to the right of the reference node (or source node)
       if (referenceNode) {
-        // Place after the specific reference/source node
-        newEventPosition = { x: referenceNode.position.x + 480, y: referenceNode.position.y };
-        newAddPosition = { x: referenceNode.position.x + 960, y: referenceNode.position.y };
+        // Place after the specific reference/source node at same depth
+        newEventPosition = { x: referenceNode.position.x + horizontalSpacing, y: referenceNode.position.y };
+        newAddPosition = { x: referenceNode.position.x + (horizontalSpacing * 2), y: referenceNode.position.y };
       } else {
         // No reference node, start fresh
-        newEventPosition = { x: 100, y: 200 };
-        newAddPosition = { x: 580, y: 200 };
+        newEventPosition = { x: 100, y: 100 };
+        newAddPosition = { x: 100 + horizontalSpacing, y: 100 };
       }
     }
 
@@ -1411,16 +1431,17 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
 
     const blockchainNodes: Node<TimelineNodeData>[] = [];
     const blockchainEdges: Edge[] = [];
-    const horizontalSpacing = 480; // Space between events horizontally
-    const verticalSpacing = 350;   // Increased from 220 to 350 for much more space between branches
-    const startY = 200;
+    const horizontalSpacing = 420; // Space between events horizontally
+    const verticalSpacing = 320;   // Vertical space between branches (increased to prevent overlap)
+    const startY = 100; // Start higher on screen
 
     // Colors for different types
     const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-    // First pass: categorize nodes by their parent to detect branches
+    // First pass: categorize nodes by their parent to detect branches and calculate depths
     const nodesByParent = new Map<number, number[]>();
     const nodePositions = new Map<number, { x: number; y: number }>();
+    const nodeDepths = new Map<number, number>(); // Track depth from root
 
     graphData.nodeIds.forEach((nodeIdStr, index) => {
       const nodeId = typeof nodeIdStr === 'bigint' ? Number(nodeIdStr) : parseInt(String(nodeIdStr));
@@ -1433,6 +1454,10 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
         nodesByParent.set(parentId, []);
       }
       nodesByParent.get(parentId)!.push(nodeId);
+
+      // Calculate depth: root nodes are depth 0, their children are depth 1, etc.
+      const parentDepth = nodeDepths.get(parentId) || 0;
+      nodeDepths.set(nodeId, parentDepth + 1);
     });
 
     // Generate proper event labels based on branching structure
@@ -1478,8 +1503,9 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       // Generate proper event label
       const eventLabel = getEventLabel(nodeId, parentId);
 
-      // Calculate position based on branching structure
+      // Calculate position based on depth and branching structure
       let x: number, y: number;
+      const depth = nodeDepths.get(nodeId) || 0;
 
       if (parentId === 0) {
         // Root node
@@ -1488,18 +1514,20 @@ ${videoRatio === "1:1" ? "❌ ISSUE: You selected 1:1 which Sora doesn't support
       } else {
         const siblings = nodesByParent.get(parentId) || [];
         const siblingIndex = siblings.indexOf(nodeId);
-        const parentIndex = graphData.nodeIds.findIndex(id =>
-          (typeof id === 'bigint' ? Number(id) : parseInt(String(id))) === parentId
-        );
 
+        // X position is based on depth (distance from root)
+        x = 100 + (depth * horizontalSpacing);
+
+        // Y position depends on whether this is the main continuation or a branch
         if (siblingIndex === 0) {
-          // Main timeline continuation
-          x = 100 + ((parentIndex + 1) * horizontalSpacing);
-          y = startY;
+          // Main timeline continuation - stays at parent's Y level
+          const parentPos = nodePositions.get(parentId);
+          y = parentPos ? parentPos.y : startY;
         } else {
-          // Branch - much more vertical space
-          x = 100 + ((parentIndex + 1) * horizontalSpacing);
-          y = startY + (siblingIndex * verticalSpacing);
+          // Branch - offset vertically from parent
+          const parentPos = nodePositions.get(parentId);
+          const baseY = parentPos ? parentPos.y : startY;
+          y = baseY + (siblingIndex * verticalSpacing);
         }
       }
 
