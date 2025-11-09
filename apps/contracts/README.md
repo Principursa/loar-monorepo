@@ -1,66 +1,52 @@
-## Foundry Turborepo Template
+## Loar.Fun Protocol Contracts 
+Built from Turborepo compatible template with personally preferred defaults for foundry
 
-Turborepo compatible template with personally preferred defaults for foundry
+Loar.fun is a launchpad for AI generated cinematic universes.
 
-Foundry consists of:
+## Contracts 
+### UniverseManager
+Manager entrypoint for protocol
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
-
-## Documentation
-
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
-
-```shell
-$ forge build
+Creating Universes
+```solidity
+function createUniverse(
+    string memory name,
+    string memory imageUrl,
+    string memory description,
+    NodeCreationOptions nodeCreationsOptions,
+    NodeVisibilityOptions nodeVisibilityOptions,
+    address initialOwner
+) public returns (uint256 _id, address)
 ```
+creates a Universe.sol contract
 
-### Test
-
-```shell
-$ forge test
+Deploying tokens
+```solidity
+function deployUniverseToken(DeploymentConfig memory deploymentConfig,uint id) returns (address tokenAddress)
 ```
+calls UniverseTokenDeployer.sol and sets hook, fee and LP locker used
 
-### Format
-
-```shell
-$ forge fmt
+### Universe
+At it's core the universe contract is a directed acyclic graph in which any user can call createNode.
+```solidity
+    function createNode(
+        string memory _link,
+        string memory _plot,
+        uint _previous
+    ) public returns (uint) {
 ```
+A given node is then given the status of 'canon', all previous nodes from that 'canon' node are thus considered 'canon'.
+There are plans to have the creation and visibility options be subject to user discretion (WIP).
+When it's deployed the contract is owned by a single user, who then has the choice whether to democratize his universe and launch a token.
+At this point a UniverseGovernor is given ownership of the Universe contract and the deployed token represents votes for the governor.
+### LoarHookStaticFee
+At the moment there's only one hook which places a static fee on top of every trade through the protocol.
+There are plans to research into more hooks which have rather interesting features like anti-MEV mechanics, BidWalls and so on.
 
-### Gas Snapshots
 
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+## Scripts
+DeployProtocol.s.sol deploys the entire protocol given a poolmanager address
+DeployUniverse.s.sol deploys a universe given universeManager, name, description, hook and lp locker.
+DeployHook.s.sol deploys new hook.
+DeployHook.s.sol deploys new LPLocker.
+ 
