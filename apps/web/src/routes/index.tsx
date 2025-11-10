@@ -19,10 +19,22 @@ import {
   ChevronLeft,
   ChevronRight,
   Wallet,
+  Rocket,
+  Loader2,
+  AlertCircle,
+  ExternalLink,
 } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
 import { usePonderQuery } from "@ponder/react";
-import { desc, eq } from "@ponder/client";
+import { useUniverseManager, useDefaultDeploymentConfig } from "@/hooks/useUniverseManager";
+import { useMutation } from "@tanstack/react-query";
+import { trpcClient } from "@/utils/trpc";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { desc } from "@ponder/client";
+import { parseEther } from "viem";
+import { UniverseManager } from "@loar/abis/addresses";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   universe,
   token,
@@ -33,7 +45,6 @@ import {
   tokenHolder,
   pool,
 } from "../../../indexer/ponder.schema";
-import { useMemo, useState, useEffect, useRef } from "react";
 
 export const Route = createFileRoute("/")({
   component: HomeComponent,
@@ -680,10 +691,75 @@ function TrendingUniverses({ universes }: { universes: any[] }) {
 }
 
 function HomeComponent() {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const navigate = Route.useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  // Create Universe form state
+  const [universeName, setUniverseName] = useState("");
+  const [tokenSymbol, setTokenSymbol] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [description, setDescription] = useState("");
+  const [deploymentStep, setDeploymentStep] = useState<'idle' | 'creating_universe' | 'universe_created' | 'deploying_token' | 'completed'>('idle');
+  const [createdUniverseAddress, setCreatedUniverseAddress] = useState<`0x${string}` | null>(null);
+  const [universeId, setUniverseId] = useState<bigint | null>(null);
+
+  // Blockchain hooks
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
+  const { createUniverse, deployUniverseToken, hash, isPending, isConfirming, error } = useUniverseManager();
+  const defaultConfig = useDefaultDeploymentConfig();
+  const { data: txReceipt, isSuccess: txSuccess } = useWaitForTransactionReceipt({
+    hash: hash as `0x${string}` | undefined,
+    query: { enabled: !!hash }
+  });
+
+  // Query the highest universe ID from the indexer to know what ID the next universe will get
+  const { data: latestUniverseData } = usePonderQuery({
+    queryFn: (db) =>
+      db
+        .select()
+        .from(universe as any)
+        .orderBy(desc((universe as any).universeId))
+        .limit(1),
+  });
+
+  // Calculate the next universe ID
+  const nextUniverseId = useMemo(() => {
+    if (!latestUniverseData || latestUniverseData.length === 0) {
+      return BigInt(0); // First universe
+    }
+    const latestUniverse = latestUniverseData[0];
+    if (latestUniverse.universeId !== null && latestUniverse.universeId !== undefined) {
+      return BigInt(latestUniverse.universeId) + BigInt(1);
+    }
+    return BigInt(0);
+  }, [latestUniverseData]);
+
+  // Debug: Log nextUniverseId when it changes
+  useEffect(() => {
+    console.log("nextUniverseId:", nextUniverseId?.toString());
+  }, [nextUniverseId]);
+
+  // AI Cover generation
+  const generateCoverMutation = useMutation({
+    mutationFn: async () => {
+      const prompt = `Epic cinematic universe cover art for "${universeName}". ${description}. Professional movie poster style, high quality, dramatic lighting`;
+      const result = await trpcClient.fal.generateImage.mutate({
+        prompt,
+        model: "fal-ai/nano-banana",
+        imageSize: "landscape_16_9",
+      });
+      return result;
+    },
+    onSuccess: (data) => {
+      if (data?.imageUrl) {
+        setImageUrl(data.imageUrl);
+      }
+    },
+  });
 
   // Query universes
   const { data: universesData } = usePonderQuery({
@@ -792,10 +868,169 @@ function HomeComponent() {
     });
   }, [universes, searchQuery]);
 
+  // Handle create universe submission
+  const handleCreateUniverse = async () => {
+    if (!isConnected || !address) {
+      alert("Please connect your wallet first");
+      return;
+    }
+
+    if (chainId !== 11155111) {
+      alert("Please switch to Sepolia network");
+      return;
+    }
+
+    if (!universeName || !description || !imageUrl || !tokenSymbol) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    try {
+      setDeploymentStep('creating_universe');
+
+      // Create universe with required parameters
+      createUniverse({
+        name: universeName,
+        imageURL: imageUrl,
+        description: description,
+        nodeCreationOptions: 0, // OPEN - anyone can create nodes
+        nodeVisibilityOptions: 0, // PUBLIC - all nodes visible
+        initialOwner: address,
+      });
+    } catch (err) {
+      console.error("Universe creation failed:", err);
+      setDeploymentStep('idle');
+    }
+  };
+
+  // Watch for transaction success
+  useEffect(() => {
+    if (!txSuccess || !createOpen) return;
+
+    if (deploymentStep === 'creating_universe') {
+      // Universe creation succeeded
+      console.log("Universe created successfully! Transaction:", txReceipt);
+
+      // Parse UniverseCreated event from receipt to get universe address
+      if (txReceipt?.logs) {
+        const contractAddress = UniverseManager[11155111];
+
+        for (const log of txReceipt.logs) {
+          if (log.address.toLowerCase() === contractAddress?.toLowerCase()) {
+            try {
+              // Decode the log data - universe address is the first 20 bytes after padding
+              const universeAddress = `0x${log.data.slice(26, 66)}` as `0x${string}`;
+              console.log("Extracted universe address from event:", universeAddress);
+              setCreatedUniverseAddress(universeAddress);
+
+              // The universe ID is the next sequential ID calculated from the indexer
+              // Our universe should have this ID since we just created it
+              console.log("Setting universe ID to:", nextUniverseId.toString());
+              setUniverseId(nextUniverseId);
+
+              setDeploymentStep('universe_created');
+              break;
+            } catch (err) {
+              console.error("Error parsing universe address from log:", err);
+            }
+          }
+        }
+      }
+    } else if (deploymentStep === 'deploying_token') {
+      // Token deployment succeeded
+      console.log("Token deployed successfully! Transaction:", txReceipt);
+      setDeploymentStep('completed');
+
+      // Close modal after showing success
+      setTimeout(() => {
+        handleCloseCreate();
+      }, 3000);
+    }
+  }, [txSuccess, deploymentStep, createOpen, txReceipt, nextUniverseId]);
+
+  // Handle token deployment (step 2)
+  const handleDeployToken = async () => {
+    if (!isConnected || !address) {
+      alert("Please connect your wallet first");
+      return;
+    }
+
+    if (!universeId) {
+      alert("Universe ID not available. Please try creating the universe again.");
+      return;
+    }
+
+    if (!tokenSymbol) {
+      alert("Please enter a token symbol");
+      return;
+    }
+
+    try {
+      setDeploymentStep('deploying_token');
+
+      // Deploy token with full configuration
+      deployUniverseToken(
+        {
+          tokenConfig: {
+            tokenAdmin: address,
+            name: universeName,
+            symbol: tokenSymbol,
+            imageURL: imageUrl,
+            metadata: `Token for ${universeName}`,
+            context: description,
+          },
+          poolConfig: {
+            hook: defaultConfig.defaultHook,
+            pairedToken: defaultConfig.defaultPairedToken,
+            tickIfToken0IsLoar: defaultConfig.defaultTickIfToken0IsLoar,
+            tickSpacing: defaultConfig.defaultTickSpacing,
+            poolData: "0x" as `0x${string}`,
+          },
+          lockerConfig: {
+            locker: defaultConfig.defaultLocker,
+            rewardAdmins: [address],
+            rewardRecipients: [address],
+            rewardBps: [1000],
+            tickLower: [-887220],
+            tickUpper: [887220],
+            positionBps: [10000],
+            lockerData: "0x" as `0x${string}`,
+          },
+        },
+        universeId,
+        parseEther("0.01") // Initial liquidity - 0.01 ETH
+      );
+    } catch (err) {
+      console.error("Token deployment failed:", err);
+      alert(`Token deployment failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+      setDeploymentStep('universe_created');
+    }
+  };
+
+  const handleCloseCreate = () => {
+    setCreateOpen(false);
+    setUniverseName("");
+    setTokenSymbol("");
+    setImageUrl("");
+    setDescription("");
+    setDeploymentStep('idle');
+    setCreatedUniverseAddress(null);
+    setUniverseId(null);
+  };
+
+  // Handle switch network
+  const handleSwitchNetwork = async () => {
+    try {
+      await switchChain({ chainId: 11155111 });
+    } catch (error) {
+      console.error("Failed to switch network:", error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Top Navigation Bar */}
-      <div className={`sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 ${searchOpen ? 'pointer-events-none' : ''}`}>
+      <div className={`sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 ${searchOpen || createOpen ? 'pointer-events-none' : ''}`}>
         <div className="container mx-auto max-w-[1800px] px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Left: Logo */}
@@ -816,12 +1051,13 @@ function HomeComponent() {
               </Button>
 
               {/* Launch Button */}
-              <Link to="/cinematicUniverseCreate" className="flex-shrink-0">
-                <Button className="rounded-full bg-primary hover:bg-primary/90 font-medium px-6">
-                  Launch Now
-                  <Play className="h-4 w-4 ml-2" />
-                </Button>
-              </Link>
+              <Button
+                className="rounded-full bg-primary hover:bg-primary/90 font-medium px-6"
+                onClick={() => setCreateOpen(true)}
+              >
+                Launch Now
+                <Play className="h-4 w-4 ml-2" />
+              </Button>
             </div>
           </div>
         </div>
@@ -974,8 +1210,356 @@ function HomeComponent() {
         </>
       )}
 
+      {/* Create Universe Modal */}
+      {createOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-[100] bg-black/60"
+            onClick={handleCloseCreate}
+          />
+
+          {/* Modal Content */}
+          <div className="fixed inset-0 z-[101] flex items-center justify-center px-4 py-8 pointer-events-none overflow-y-auto">
+            <div className="w-full max-w-2xl bg-background border border-border rounded-2xl shadow-2xl pointer-events-auto my-auto overflow-hidden">
+              {/* Header */}
+              <div className="bg-background/95 backdrop-blur-xl border-b border-border px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Rocket className="h-6 w-6 text-primary" />
+                  <h2 className="text-2xl font-bold">Create Your Universe</h2>
+                </div>
+                <button
+                  onClick={handleCloseCreate}
+                  className="hover:bg-muted rounded-lg p-2 transition-colors"
+                  aria-label="Close"
+                >
+                  <Plus className="h-5 w-5 rotate-45" />
+                </button>
+              </div>
+
+              {/* Form Content */}
+              <div className="p-6 space-y-4">
+                {/* Progress Steps */}
+                {(deploymentStep === 'creating_universe' || deploymentStep === 'universe_created' || deploymentStep === 'deploying_token' || deploymentStep === 'completed') && (
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <div className={`flex items-center gap-2 ${deploymentStep === 'creating_universe' || deploymentStep === 'universe_created' || deploymentStep === 'deploying_token' || deploymentStep === 'completed' ? 'text-primary' : 'text-muted-foreground'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${deploymentStep === 'creating_universe' || deploymentStep === 'universe_created' || deploymentStep === 'deploying_token' || deploymentStep === 'completed' ? 'bg-primary text-white' : 'bg-muted'}`}>
+                        {deploymentStep === 'universe_created' || deploymentStep === 'deploying_token' || deploymentStep === 'completed' ? <Check className="h-4 w-4" /> : '1'}
+                      </div>
+                      <span className="text-sm font-medium">Create Universe</span>
+                    </div>
+                    <div className={`h-px w-12 ${deploymentStep === 'universe_created' || deploymentStep === 'deploying_token' || deploymentStep === 'completed' ? 'bg-primary' : 'bg-muted'}`} />
+                    <div className={`flex items-center gap-2 ${deploymentStep === 'deploying_token' || deploymentStep === 'completed' ? 'text-primary' : 'text-muted-foreground'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${deploymentStep === 'deploying_token' || deploymentStep === 'completed' ? 'bg-primary text-white' : 'bg-muted'}`}>
+                        {deploymentStep === 'completed' ? <Check className="h-4 w-4" /> : '2'}
+                      </div>
+                      <span className="text-sm font-medium">Deploy Token</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Wallet & Network Check */}
+                {!isConnected ? (
+                  <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-yellow-500">Wallet Not Connected</p>
+                      <p className="text-sm text-muted-foreground mt-1">Please connect your wallet to create a universe</p>
+                      <WalletConnectButton className="mt-3" />
+                    </div>
+                  </div>
+                ) : chainId !== 11155111 ? (
+                  <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-yellow-500">Wrong Network</p>
+                      <p className="text-sm text-muted-foreground mt-1">Please switch to Sepolia testnet</p>
+                      <Button onClick={handleSwitchNetwork} className="mt-3" size="sm">
+                        Switch to Sepolia
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Step 1: Universe Creation Fields */}
+                {(deploymentStep === 'idle' || deploymentStep === 'creating_universe') && (
+                  <>
+                    {/* Universe Name */}
+                    <div className="space-y-2">
+                      <Label htmlFor="universeName" className="text-sm font-medium">
+                        Universe Name <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="universeName"
+                        value={universeName}
+                        onChange={(e) => setUniverseName(e.target.value)}
+                        placeholder="e.g., Marvel Cinematic Universe"
+                        className="h-11"
+                        disabled={deploymentStep !== 'idle'}
+                      />
+                    </div>
+
+                    {/* Token Symbol */}
+                    <div className="space-y-2">
+                      <Label htmlFor="tokenSymbol" className="text-sm font-medium">
+                        Token Symbol <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="tokenSymbol"
+                        value={tokenSymbol}
+                        onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
+                        placeholder="e.g., MCU"
+                        className="h-11"
+                        maxLength={6}
+                        disabled={deploymentStep !== 'idle'}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Maximum 6 characters
+                      </p>
+                    </div>
+
+                    {/* Cover Image */}
+                    <div className="space-y-2">
+                      <Label htmlFor="imageUrl" className="text-sm font-medium">
+                        Cover Image <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="imageUrl"
+                          value={imageUrl}
+                          onChange={(e) => setImageUrl(e.target.value)}
+                          placeholder="https://..."
+                          className="h-11 flex-1"
+                          disabled={deploymentStep !== 'idle'}
+                        />
+                        <Button
+                          onClick={() => generateCoverMutation.mutate()}
+                          disabled={!universeName || generateCoverMutation.isPending || deploymentStep !== 'idle'}
+                          variant="outline"
+                          className="flex-shrink-0"
+                        >
+                          {generateCoverMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-4 w-4 mr-2" />
+                              AI Generate
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      {imageUrl && (
+                        <div className="mt-2 rounded-lg overflow-hidden border border-border bg-muted">
+                          <img
+                            src={imageUrl}
+                            alt="Universe cover preview"
+                            className="w-full h-32 object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-2">
+                      <Label htmlFor="description" className="text-sm font-medium">
+                        Description <span className="text-red-500">*</span>
+                      </Label>
+                      <Textarea
+                        id="description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Describe your cinematic universe... This will be used for AI generation and token metadata"
+                        className="min-h-[60px] resize-none"
+                        disabled={deploymentStep !== 'idle'}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {description.length} characters
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {/* Step 2: Token Deployment - Success Message */}
+                {deploymentStep === 'universe_created' && (
+                  <div className="space-y-3">
+                    <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-green-500">Universe Created Successfully!</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Enter the Universe ID to continue with token deployment
+                          </p>
+                          {hash && (
+                            <a
+                              href={`https://sepolia.etherscan.io/tx/${hash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-primary hover:underline mt-2 inline-flex items-center gap-1"
+                            >
+                              View transaction on Etherscan
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Universe ID Display */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">
+                        Universe Details
+                      </Label>
+                      <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          <div className="text-sm font-medium text-green-500">Universe Created</div>
+                        </div>
+                        {universeId !== null && (
+                          <div className="text-xs text-muted-foreground">
+                            Universe ID: <span className="font-mono font-medium text-foreground">{universeId.toString()}</span>
+                          </div>
+                        )}
+                        {createdUniverseAddress && (
+                          <div className="text-xs text-muted-foreground">
+                            Contract: <span className="font-mono font-medium text-foreground">{createdUniverseAddress.slice(0, 6)}...{createdUniverseAddress.slice(-4)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Display */}
+                {error && (
+                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-red-500">Transaction Failed</p>
+                      <p className="text-sm text-muted-foreground mt-1">{error.message}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Transaction Status */}
+                {(isPending || isConfirming || (deploymentStep !== 'idle' && deploymentStep !== 'universe_created' && deploymentStep !== 'completed')) && (
+                  <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-3">
+                    <Loader2 className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0 animate-spin" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-500">
+                        {isPending && deploymentStep === 'creating_universe' && "Confirm universe creation in wallet..."}
+                        {isPending && deploymentStep === 'deploying_token' && "Confirm token deployment in wallet..."}
+                        {isConfirming && deploymentStep === 'creating_universe' && "Creating universe..."}
+                        {isConfirming && deploymentStep === 'deploying_token' && "Deploying token & liquidity pool..."}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {isPending && "Please confirm the transaction in your wallet"}
+                        {isConfirming && "Waiting for transaction confirmation on the blockchain"}
+                      </p>
+                      {deploymentStep === 'deploying_token' && (
+                        <p className="text-xs text-blue-400 mt-2">
+                          This will deploy your token, governor contract, and create a liquidity pool with 0.01 ETH
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Success Status */}
+                {deploymentStep === 'completed' && (
+                  <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg flex items-start gap-3">
+                    <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-green-500">Universe Fully Deployed!</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Your universe with token, governance, and liquidity pool is now live. Start creating stories!
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleCloseCreate}
+                    disabled={deploymentStep === 'creating_universe' || deploymentStep === 'deploying_token'}
+                    className="flex-1"
+                  >
+                    {deploymentStep === 'completed' ? 'Close' : 'Cancel'}
+                  </Button>
+
+                  {/* Step 1 Button: Create Universe */}
+                  {(deploymentStep === 'idle' || deploymentStep === 'creating_universe') && (
+                    <Button
+                      onClick={handleCreateUniverse}
+                      disabled={
+                        !isConnected ||
+                        chainId !== 11155111 ||
+                        !universeName ||
+                        !description ||
+                        !imageUrl ||
+                        !tokenSymbol ||
+                        deploymentStep === 'creating_universe' ||
+                        isPending ||
+                        isConfirming
+                      }
+                      className="flex-1"
+                    >
+                      {deploymentStep === 'creating_universe' || isPending || isConfirming ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Creating Universe...
+                        </>
+                      ) : (
+                        <>
+                          <Rocket className="h-4 w-4 mr-2" />
+                          Create Universe
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {/* Step 2 Button: Deploy Token */}
+                  {deploymentStep === 'universe_created' && (
+                    <Button
+                      onClick={handleDeployToken}
+                      disabled={
+                        !isConnected ||
+                        chainId !== 11155111 ||
+                        !universeId ||
+                        !tokenSymbol
+                      }
+                      className="flex-1"
+                      title={!universeId ? "Universe ID is required to deploy token" : ""}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Deploy Token & Pool
+                    </Button>
+                  )}
+
+                  {/* Deploying State */}
+                  {deploymentStep === 'deploying_token' && (
+                    <Button disabled className="flex-1">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Deploying Token...
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Main Content */}
-      <main className={`container mx-auto max-w-[1600px] py-8 px-4 transition-all ${searchOpen ? 'pointer-events-none blur-sm' : ''}`}>
+      <main className={`container mx-auto max-w-[1600px] py-8 px-4 transition-all ${searchOpen || createOpen ? 'pointer-events-none blur-sm' : ''}`}>
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 items-start">
           {/* Left - Main Content */}
           <div className="min-w-0">
