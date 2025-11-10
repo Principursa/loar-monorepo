@@ -133,9 +133,9 @@ function EventPage() {
             <p className="text-muted-foreground mb-4">
               Please provide both universe and event parameters.
             </p>
-            <Button onClick={() => navigate({ to: "/universes" })}>
+            <Button onClick={() => navigate({ to: "/" })}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Universes
+              Back to Home
             </Button>
           </CardContent>
         </Card>

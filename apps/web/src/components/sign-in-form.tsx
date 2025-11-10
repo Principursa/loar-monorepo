@@ -32,7 +32,7 @@ export default function SignInForm({
 				{
 					onSuccess: () => {
 						navigate({
-							to: "/universes",
+							to: "/",
 						});
 						toast.success("Sign in successful");
 					},
