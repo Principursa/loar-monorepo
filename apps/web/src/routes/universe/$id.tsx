@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useAccount } from "wagmi";
 import { usePonderQuery } from "@ponder/react";
 import { desc, eq } from "@ponder/client";
@@ -11,7 +11,31 @@ import { Play, Plus, ArrowLeft, RefreshCw, Video, Sparkles } from "lucide-react"
 import { useUniverse } from "@/hooks/useUniverse";
 import { FlowCreationPanel } from "@/components/FlowCreationPanel";
 import { trpcClient } from "@/utils/trpc";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import ReactFlow, {
+  Background,
+  Controls,
+  useNodesState,
+  useEdgesState,
+  ReactFlowProvider,
+  Panel,
+  MarkerType,
+  addEdge,
+  type Node,
+  type Edge,
+  type Connection
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import { TimelineEventNode } from '@/components/flow/TimelineNodes';
+import type { TimelineNodeData } from '@/components/flow/TimelineNodes';
+import { UniverseSidebar } from '@/components/UniverseSidebar';
+import { GovernanceSidebar } from '@/components/GovernanceSidebar';
+import { toast } from 'sonner';
+
+// Register custom node types
+const nodeTypes = {
+  timelineEvent: TimelineEventNode,
+};
 
 export const Route = createFileRoute("/universe/$id")({
   component: UniverseDetailPage,
@@ -56,6 +80,20 @@ function UniverseDetailPage() {
   const [selectedNodeForBranch, setSelectedNodeForBranch] = useState<bigint>(BigInt(0));
   const [isPolling, setIsPolling] = useState(false);
 
+  // ReactFlow state
+  const [flowNodes, setFlowNodes, onNodesChange] = useNodesState([]);
+  const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState([]);
+  const [selectedNode, setSelectedNode] = useState<Node<TimelineNodeData> | null>(null);
+  const [eventCounter, setEventCounter] = useState(1);
+  const [additionType, setAdditionType] = useState<'after' | 'branch'>('after');
+  const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
+
+  // Governance state
+  const [showGovernanceSidebar, setShowGovernanceSidebar] = useState(false);
+
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
   // Query universe data from Ponder
   const { data: universeData, isLoading: isLoadingUniverse } = usePonderQuery({
     queryFn: (db) =>
@@ -78,13 +116,20 @@ function UniverseDetailPage() {
 
   // Query nodes for this universe
   const { data: nodesData, isLoading: isLoadingNodes, refetch: refetchNodes } = usePonderQuery({
-    queryFn: (db) =>
-      db
+    queryFn: (db) => {
+      console.log('🔍 Querying nodes for universe:', universeAddress.toLowerCase());
+      return db
         .select()
         .from(node as any)
         .where(eq((node as any).universeAddress, universeAddress.toLowerCase()))
-        .orderBy(desc((node as any).createdAt)),
+        .orderBy(desc((node as any).createdAt));
+    },
   });
+
+  // Log when nodesData changes
+  useEffect(() => {
+    console.log('📦 nodesData updated:', nodesData?.length, 'nodes');
+  }, [nodesData]);
 
   // Query node content
   const { data: nodeContentData } = usePonderQuery({
@@ -96,7 +141,10 @@ function UniverseDetailPage() {
 
   // Combine nodes with their content
   const nodes = useMemo(() => {
-    if (!nodesData || !nodeContentData) return [];
+    if (!nodesData || !nodeContentData) {
+      console.log('⚠️ No node data:', { nodesData: !!nodesData, nodeContentData: !!nodeContentData });
+      return [];
+    }
 
     type NodeRow = typeof node.$inferSelect;
     type NodeContentRow = typeof nodeContent.$inferSelect;
@@ -106,13 +154,16 @@ function UniverseDetailPage() {
       contentMap.set(c.id, c);
     });
 
-    return (nodesData as NodeRow[]).map((n) => {
+    const combinedNodes = (nodesData as NodeRow[]).map((n) => {
       const content = contentMap.get(`${n.universeAddress.toLowerCase()}:${n.nodeId}`);
       return {
         ...n,
         content,
       };
     });
+
+    console.log('✅ Combined nodes:', combinedNodes.length, combinedNodes);
+    return combinedNodes;
   }, [nodesData, nodeContentData]);
 
   const universeInfo = universeData && universeData.length > 0 ? universeData[0] : null;
@@ -129,9 +180,211 @@ function UniverseDetailPage() {
   } = useUniverse(universeAddress as `0x${string}`);
 
   // Read universe metadata from contract
-  const { data: universeName } = useName();
+  const { data: universeName} = useName();
   const { data: universeDescription } = useDescription();
   const { data: universeImageURL } = useImageURL();
+
+  // Handle adding events - defined early so it can be used in useEffect
+  const handleAddEvent = useCallback((type: 'after' | 'branch' = 'after', nodeId?: string) => {
+    console.log('🔵 handleAddEvent called:', { type, nodeId });
+    setAdditionType(type);
+    setSourceNodeId(nodeId || null);
+    setVideoTitle("");
+    setVideoDescription("");
+    setGeneratedImageUrl(null);
+    setGeneratedVideoUrl(null);
+    setShowVideoStep(false);
+    setUploadedUrl(null);
+    setContractSaved(false);
+    setIsSavingToContract(false);
+    setSelectedVideoModel('fal-veo3');
+    setSelectedVideoDuration(8);
+    setNegativePrompt("");
+    setVideoPrompt("");
+    setVideoRatio("16:9");
+    setImageFormat('landscape_16_9');
+    setSelectedCharacters([]);
+    setStatusMessage(null);
+    setShowVideoDialog(true);
+  }, []);
+
+  // Convert Ponder nodes to ReactFlow format
+  useEffect(() => {
+    console.log('🔄 useEffect triggered - nodes:', nodes?.length, 'universeAddress:', universeAddress);
+
+    if (!nodes || nodes.length === 0) {
+      console.log('⚠️ No nodes to convert, clearing flow');
+      // Clear flow nodes when no data
+      setFlowNodes([]);
+      setFlowEdges([]);
+      return;
+    }
+
+    console.log('✨ Converting', nodes.length, 'Ponder nodes to ReactFlow format');
+
+    const blockchainNodes: Node<TimelineNodeData>[] = [];
+    const blockchainEdges: Edge[] = [];
+    const horizontalSpacing = 480;
+    const verticalSpacing = 350;
+    const startY = 200;
+
+    // Colors for different types
+    const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+    // Track children of each node for branch detection
+    const nodesByParent = new Map<string, string[]>();
+    nodes.forEach((n) => {
+      const parentId = n.previousNodeId !== null ? n.previousNodeId.toString() : '0';
+      if (!nodesByParent.has(parentId)) {
+        nodesByParent.set(parentId, []);
+      }
+      nodesByParent.get(parentId)!.push(n.nodeId.toString());
+    });
+
+    // Calculate positions for each node
+    const nodePositions = new Map<string, { x: number; y: number }>();
+
+    nodes.forEach((n, index) => {
+      const nodeId = n.nodeId.toString();
+      const parentId = n.previousNodeId !== null ? n.previousNodeId.toString() : '0';
+
+      console.log(`  Node ${nodeId}: previousNodeId=${n.previousNodeId} (parent: ${parentId})`);
+
+      let x: number, y: number;
+
+      if (parentId === '0') {
+        // Root node
+        x = 100;
+        y = startY;
+      } else {
+        const siblings = nodesByParent.get(parentId) || [];
+        const siblingIndex = siblings.indexOf(nodeId);
+        const parentIndex = nodes.findIndex(node => node.nodeId.toString() === parentId);
+
+        if (siblingIndex === 0) {
+          // Main timeline continuation
+          x = 100 + ((parentIndex + 1) * horizontalSpacing);
+          y = startY;
+        } else {
+          // Branch
+          x = 100 + ((parentIndex + 1) * horizontalSpacing);
+          y = startY + (siblingIndex * verticalSpacing);
+        }
+      }
+
+      nodePositions.set(nodeId, { x, y });
+
+      const color = colors[index % colors.length];
+      const isRoot = n.previousNodeId === null || n.previousNodeId === BigInt(0);
+
+      blockchainNodes.push({
+        id: `blockchain-node-${nodeId}`,
+        type: 'timelineEvent',
+        position: { x, y },
+        data: {
+          label: n.content?.plot || `Event ${nodeId}`,
+          description: n.content?.plot || `Timeline event ${nodeId}`,
+          videoUrl: n.content?.videoLink || undefined,
+          timelineColor: color,
+          nodeType: 'scene',
+          eventId: nodeId,
+          blockchainNodeId: Number(nodeId),
+          displayName: `Event ${nodeId}`,
+          timelineId: `timeline-${universeAddress}`,
+          universeId: universeAddress,
+          isRoot: isRoot,
+          onAddScene: handleAddEvent,
+        }
+      });
+
+      // Create edge from parent to this node
+      if (parentId !== '0') {
+        blockchainEdges.push({
+          id: `edge-${parentId}-${nodeId}`,
+          source: `blockchain-node-${parentId}`,
+          target: `blockchain-node-${nodeId}`,
+          animated: true,
+          style: { stroke: color, strokeWidth: 3 },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: color,
+          },
+        });
+      }
+    });
+
+    // Add final + node to continue the timeline
+    if (blockchainNodes.length > 0) {
+      const lastNode = blockchainNodes[blockchainNodes.length - 1];
+      const addNodeId = `add-final`;
+
+      blockchainNodes.push({
+        id: addNodeId,
+        type: 'timelineEvent',
+        position: { x: lastNode.position.x + horizontalSpacing, y: lastNode.position.y },
+        data: {
+          label: '',
+          description: '',
+          nodeType: 'add',
+          onAddScene: handleAddEvent,
+        }
+      });
+
+      blockchainEdges.push({
+        id: `edge-${lastNode.id}-${addNodeId}`,
+        source: lastNode.id,
+        target: addNodeId,
+        animated: true,
+        style: { stroke: '#cbd5e1', strokeDasharray: '8,8' },
+      });
+    }
+
+    console.log('🎨 Setting', blockchainNodes.length, 'ReactFlow nodes and', blockchainEdges.length, 'edges');
+    setFlowNodes(blockchainNodes as any);
+    setFlowEdges(blockchainEdges);
+    setEventCounter(nodes.length + 1);
+    console.log('✅ ReactFlow state updated!');
+  }, [nodes, universeAddress, handleAddEvent]);
+
+  // Handle node click for navigation
+  const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
+    setSelectedNode(node);
+    if (node.data.nodeType === 'scene') {
+      const eventId = node.data.blockchainNodeId || node.data.eventId;
+      if (eventId && universeAddress) {
+        const eventUrl = `/event/${universeAddress}/${eventId}`;
+        console.log('🔗 Navigating to:', eventUrl);
+        window.location.href = eventUrl;
+      }
+    }
+  }, [universeAddress]);
+
+  // Handle connections between nodes
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      setFlowEdges((eds) => addEdge({
+        ...connection,
+        animated: true,
+        style: { stroke: '#10b981' },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: '#10b981',
+        },
+      }, eds));
+    },
+    [setFlowEdges]
+  );
+
+  // Handle opening governance sidebar
+  const handleOpenGovernance = useCallback(() => {
+    setShowGovernanceSidebar(true);
+  }, []);
+
+  // Manual refresh function
+  const handleRefreshTimeline = useCallback(async () => {
+    console.log('Manually refreshing timeline...');
+    await refetchNodes();
+  }, [refetchNodes]);
 
   // Fetch available characters
   const { data: charactersData, isLoading: isLoadingCharacters, refetch: refetchCharacters } = useQuery({
@@ -584,45 +837,39 @@ function UniverseDetailPage() {
     }
 
     setIsSavingToContract(true);
-    setIsSavingToFilecoin(true);
 
     try {
-      // Step 1: Upload to MinIO
-      console.log('Uploading video to MinIO...');
-      let minioUrl: string | null = null;
-      let minioKey: string | null = null;
+      // Calculate the previous node ID based on addition type
+      let previousNodeId: bigint;
 
-      try {
-        const uuid = crypto.randomUUID();
-        const minioResult = await trpcClient.minio.uploadFromUrl.mutate({
-          url: generatedVideoUrl,
-          filename: `${uuid}.mp4`
-        });
-
-        console.log('MinIO upload successful:', minioResult);
-        minioKey = minioResult.key;
-        minioUrl = minioResult.url;
-        setPieceCid(minioResult.key);
-        setFilecoinSaved(true);
-      } catch (minioError) {
-        console.error('MinIO upload failed:', minioError);
+      if (additionType === 'branch' && sourceNodeId) {
+        // For branches, use the source node ID
+        previousNodeId = BigInt(sourceNodeId);
+        console.log('Creating branch from node:', sourceNodeId);
+      } else {
+        // For linear continuation, find the highest node ID
+        if (nodes && nodes.length > 0) {
+          const maxNodeId = Math.max(...nodes.map(n => Number(n.nodeId)));
+          previousNodeId = BigInt(maxNodeId);
+          console.log('Creating linear continuation after node:', maxNodeId);
+        } else {
+          // First node
+          previousNodeId = BigInt(0);
+          console.log('Creating first node (root)');
+        }
       }
 
-      setIsSavingToFilecoin(false);
-
-      // Step 2: Save to blockchain
-      const videoUrlForContract = minioUrl || generatedVideoUrl;
-
-      console.log('Saving to contract:', {
-        link: videoUrlForContract,
+      // Use the fal video URL directly
+      console.log('Saving to contract with fal URL:', {
+        link: generatedVideoUrl,
         plot: videoDescription,
-        previous: selectedNodeForBranch,
+        previous: previousNodeId.toString(),
       });
 
       await createNode({
-        link: videoUrlForContract,
+        link: generatedVideoUrl,
         plot: videoDescription,
-        previousNodeId: selectedNodeForBranch,
+        previousNodeId: previousNodeId,
       });
 
       setContractSaved(true);
@@ -649,8 +896,11 @@ function UniverseDetailPage() {
 
       // Aggressively poll for new nodes - check every 5 seconds for 30 seconds
       const pollInterval = setInterval(async () => {
-        console.log('Polling for new nodes...');
-        await refetchNodes();
+        console.log('📊 Polling for new nodes...');
+        const result = await refetchNodes();
+        console.log('📊 Refetch result:', result?.data?.length, 'nodes');
+        // Also invalidate all queries to force a full refresh
+        await queryClient.invalidateQueries();
       }, 5000);
 
       // Stop polling after 30 seconds
@@ -670,7 +920,7 @@ function UniverseDetailPage() {
       setIsSavingToContract(false);
       setIsSavingToFilecoin(false);
     }
-  }, [generatedVideoUrl, videoDescription, selectedNodeForBranch, createNode, refetchNodes]);
+  }, [generatedVideoUrl, videoDescription, additionType, sourceNodeId, nodes, createNode, refetchNodes, queryClient]);
 
   const handleCreateEvent = () => {
     handleSaveToContract();
@@ -854,115 +1104,79 @@ function UniverseDetailPage() {
     );
   }
 
-  // Main content with nodes
+  // Prepare universe data for sidebar
+  const finalUniverse = {
+    id: universeAddress,
+    name: universeName || tokenInfo?.name || `Universe ${universeAddress.slice(0, 8)}`,
+    description: universeDescription || tokenInfo?.metadata || "A collaborative narrative universe",
+    address: universeAddress,
+    tokenAddress: tokenInfo?.address || null,
+    governanceAddress: null, // TODO: Add governance address from universe data
+  };
+
+  // Prepare graph data for sidebar
+  const graphData = {
+    nodeIds: nodes.map(n => n.nodeId),
+  };
+
+  const isLoadingAny = isLoadingUniverse || isLoadingNodes;
+
+  // Main content with ReactFlow graph
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b border-border bg-muted/30">
-        <div className="container mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <Button variant="ghost" size="sm" asChild className="mb-4">
-                <Link to="/universes">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Universes
-                </Link>
-              </Button>
-              <h1 className="text-4xl font-bold mb-2">
-                {universeName || tokenInfo?.name || `Universe ${universeAddress.slice(0, 8)}`}
-              </h1>
-              <p className="text-muted-foreground text-lg">
-                {universeDescription || tokenInfo?.metadata || "A collaborative narrative universe"}
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              {tokenInfo && (
-                <Badge className="text-lg px-4 py-2">${tokenInfo.symbol}</Badge>
-              )}
-              {isConnected && (
-                <Button onClick={() => setShowVideoDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Event
-                </Button>
-              )}
-            </div>
-          </div>
+    <div className="flex h-full bg-background overflow-hidden">
+      {/* Left Sidebar Component */}
+      <UniverseSidebar
+        finalUniverse={finalUniverse}
+        graphData={graphData}
+        leavesData={null}
+        nodes={flowNodes}
+        isLoadingAny={isLoadingAny}
+        selectedNode={selectedNode}
+        handleAddEvent={handleAddEvent}
+        handleRefreshTimeline={handleRefreshTimeline}
+        onOpenGovernance={handleOpenGovernance}
+      />
 
-          {/* Stats */}
-          <div className="flex gap-6 mt-6">
-            <div>
-              <p className="text-sm text-muted-foreground">Timeline Events</p>
-              <p className="text-2xl font-bold">{nodes.length}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Universe Address</p>
-              <p className="text-sm font-mono">
-                {universeAddress.slice(0, 6)}...{universeAddress.slice(-4)}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ease-in-out">
+        <ReactFlowProvider>
+          <div className="flex-1 relative overflow-hidden" ref={reactFlowWrapper}>
+            <ReactFlow
+              nodes={flowNodes}
+              edges={flowEdges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={onNodeClick}
+              nodeTypes={nodeTypes}
+              fitView
+              className="bg-gradient-to-br from-background via-background/95 to-muted/20"
+              minZoom={0.1}
+              maxZoom={2}
+            >
+              <Background />
+              <Controls />
 
-      {/* Timeline Grid */}
-      <div className="container mx-auto px-6 py-12">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold">Timeline Events</h2>
-          <Button
-            variant={isPolling ? "default" : "outline"}
-            size="sm"
-            onClick={() => refetchNodes()}
-            disabled={isPolling}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isPolling ? 'animate-spin' : ''}`} />
-            {isPolling ? 'Auto-refreshing...' : 'Refresh'}
-          </Button>
-        </div>
+              <Panel position="top-center" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
+                <h2 className="text-lg font-semibold">
+                  {universeName || tokenInfo?.name || `Universe ${universeAddress.slice(0, 8)}`}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {universeDescription || tokenInfo?.metadata || "A collaborative narrative universe"}
+                </p>
+              </Panel>
 
-        {isLoadingNodes ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading events...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {nodes.map((nodeItem: any) => (
-              <Card key={nodeItem.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <CardContent className="p-0">
-                  {/* Video/Image Preview */}
-                  {nodeItem.content?.videoLink && (
-                    <div className="aspect-video bg-black">
-                      <video
-                        className="w-full h-full object-cover"
-                        controls
-                        preload="metadata"
-                      >
-                        <source src={nodeItem.content.videoLink} type="video/mp4" />
-                      </video>
-                    </div>
-                  )}
-
-                  {/* Content */}
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <Badge variant="outline">Node #{nodeItem.nodeId.toString()}</Badge>
-                    </div>
-                    <h3 className="font-bold mb-2 line-clamp-2">
-                      {nodeItem.content?.plot || `Event #${nodeItem.nodeId}`}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {new Date(nodeItem.createdAt * 1000).toLocaleDateString()}
-                    </p>
-                    <Button variant="ghost" size="sm" className="w-full">
-                      <Play className="h-4 w-4 mr-2" />
-                      View Details
-                    </Button>
+              {isLoadingAny && (
+                <Panel position="top-right" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                    Loading blockchain data...
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </Panel>
+              )}
+            </ReactFlow>
           </div>
-        )}
+        </ReactFlowProvider>
       </div>
 
       {/* FlowCreationPanel */}
@@ -1036,6 +1250,15 @@ function UniverseDetailPage() {
         setSelectedImageCharacters={setSelectedImageCharacters}
         handleGenerateCharacterFrame={handleGenerateCharacterFrame}
         refetchCharacters={refetchCharacters}
+      />
+
+      {/* Governance Sidebar */}
+      <GovernanceSidebar
+        isOpen={showGovernanceSidebar}
+        onClose={() => setShowGovernanceSidebar(false)}
+        finalUniverse={finalUniverse}
+        nodes={flowNodes}
+        onRefresh={handleRefreshTimeline}
       />
     </div>
   );
