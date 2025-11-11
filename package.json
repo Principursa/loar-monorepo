@@ -26,6 +26,7 @@
     "sc:test:integration": "turbo run sc:test:integration"
   },
   "dependencies": {
+    "@ethersproject/wordlists": "^5.8.0",
     "@langchain/openai": "^0.6.7",
     "@modelcontextprotocol/sdk": "^1.17.3",
     "@openai/agents": "^0.0.17",

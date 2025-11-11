@@ -33,19 +33,19 @@ contract DeployUniverseScript is Script {
     UniverseManager public universeManager;
 
     // Required addresses - SET THESE BEFORE DEPLOYING
-    address public universeManagerAddress = address(0); // TODO: Fill in UniverseManager
-    address public hookAddress = address(0); // TODO: Fill in Hook
-    address public lockerAddress = address(0); // TODO: Fill in Locker
-    address public pairedToken = address(0); // TODO: Fill in WETH or other paired token
+    address public universeManagerAddress = address(0xAbDb2f18a4Fe97B105B221b8337C2Fa7F8DF9D5E); // TODO: Fill in UniverseManager
+    address public hookAddress = address(0xd054f8C814A9F742A0ca003923d46a4895FdE8CC); // TODO: Fill in Hook
+    address public lockerAddress = address(0x6a94ce65c55CC769FB0cA586677F8eCcF736b17E); // TODO: Fill in Locker
+    address public pairedToken = address(0x4200000000000000000000000000000000000006); // TODO: Fill in WETH or other paired token
 
     // Configuration
-    string public universeName = "My Universe";
-    string public universeImage = "https://example.com/universe.png";
-    string public universeDescription = "A universe for my community";
-    string public tokenName = "Universe Token";
-    string public tokenSymbol = "UNI";
-    string public tokenImage = "https://example.com/token.png";
-    int24 public startingTick = -230400;
+    string public universeName = "Naruto";
+    string public universeImage = "https://cdn.mos.cms.futurecdn.net/Hpq4NZjKWjHRRyH9bt3Z2e-1200-80.jpg.webp";
+    string public universeDescription = "Naruto, born with a sealed demon fox, becomes a ninja alongside friend Sasuke";
+    string public tokenName = "Naruto";
+    string public tokenSymbol = "NTO";
+    string public tokenImage = "https://cdn.mos.cms.futurecdn.net/Hpq4NZjKWjHRRyH9bt3Z2e-1200-80.jpg.webp";
+    int24 public startingTick = -115000;
     int24 public tickSpacing = 200;
     uint24 public loarFee = 3000; // 0.3%
     uint24 public pairedFee = 3000; // 0.3%

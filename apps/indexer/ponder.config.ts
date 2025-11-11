@@ -3,12 +3,18 @@ import { parseAbiItem } from "viem";
 import { universeManagerAbi, universeAbi, universeGovernorAbi } from "@loar/abis/generated"
 import { PoolManagerAbi } from "./abis/PoolManager";
 import { ERC20Abi } from "./abis/ERC20Abi";
-import { sepolia } from "viem/chains";
-import UniverseManagerDeploy from "../contracts/broadcast/DeployProtocol.s.sol/11155111/run-latest.json"
+import { sepolia, baseSepolia } from "viem/chains";
+import UniverseManagerDeploySepolia from "../contracts/broadcast/DeployProtocol.s.sol/11155111/run-latest.json"
+import UniverseManagerDeployBaseSepolia from "../contracts/broadcast/DeployProtocol.s.sol/84532/run-latest.json"
 import { getAddress, hexToNumber } from "viem/utils";
 
-const address = getAddress(UniverseManagerDeploy.transactions[0]!.contractAddress);
-const startBlock = hexToNumber(UniverseManagerDeploy.receipts[0]!.blockNumber);
+// Sepolia config
+const sepoliaAddress = getAddress(UniverseManagerDeploySepolia.transactions[0]!.contractAddress);
+const sepoliaStartBlock = hexToNumber(UniverseManagerDeploySepolia.receipts[0]!.blockNumber);
+
+// Base Sepolia config
+const baseSepoliaAddress = getAddress(UniverseManagerDeployBaseSepolia.transactions[0]!.contractAddress);
+const baseSepoliaStartBlock = hexToNumber(UniverseManagerDeployBaseSepolia.receipts[0]!.blockNumber);
 
 const universeCreatedEvent = parseAbiItem(
   "event UniverseCreated(address universe, address creator)"
@@ -20,6 +26,11 @@ const tokenCreatedEvent = parseAbiItem(
 
 export default createConfig({
   chains: {
+    baseSepolia: {
+      id: 84532,
+      rpc: process.env.BASE_SEPOLIA_RPC_URL!,
+      maxRequestsPerSecond: 10,
+    },
     sepolia: {
       id: 11155111,
       rpc: process.env.PONDER_RPC_URL_2!,
@@ -28,49 +39,99 @@ export default createConfig({
   },
   contracts: {
     UniverseManager: {
-      chain: "sepolia",
+      chain: {
+        baseSepolia: {
+          address: baseSepoliaAddress,
+          startBlock: baseSepoliaStartBlock,
+        },
+        sepolia: {
+          address: sepoliaAddress,
+          startBlock: sepoliaStartBlock,
+        },
+      },
       abi: universeManagerAbi,
-      address: address,
-      startBlock: startBlock,
     },
     Universe: {
-      chain: "sepolia",
+      chain: {
+        baseSepolia: {
+          address: factory({
+            address: baseSepoliaAddress,
+            event: universeCreatedEvent,
+            parameter: "universe",
+            startBlock: baseSepoliaStartBlock,
+          }),
+          startBlock: baseSepoliaStartBlock,
+        },
+        sepolia: {
+          address: factory({
+            address: sepoliaAddress,
+            event: universeCreatedEvent,
+            parameter: "universe",
+            startBlock: sepoliaStartBlock,
+          }),
+          startBlock: sepoliaStartBlock,
+        },
+      },
       abi: universeAbi,
-      address: factory({
-        address: address,
-        event: universeCreatedEvent,
-        parameter: "universe",
-        startBlock: startBlock, // Scan for factory children from this block
-      }),
-      startBlock: startBlock, // Index child contracts from this block
     },
     UniverseGovernor: {
-      chain: "sepolia",
+      chain: {
+        baseSepolia: {
+          address: factory({
+            address: baseSepoliaAddress,
+            event: tokenCreatedEvent,
+            parameter: "governor",
+            startBlock: baseSepoliaStartBlock,
+          }),
+          startBlock: baseSepoliaStartBlock,
+        },
+        sepolia: {
+          address: factory({
+            address: sepoliaAddress,
+            event: tokenCreatedEvent,
+            parameter: "governor",
+            startBlock: sepoliaStartBlock,
+          }),
+          startBlock: sepoliaStartBlock,
+        },
+      },
       abi: universeGovernorAbi,
-      address: factory({
-        address: address,
-        event: tokenCreatedEvent,
-        parameter: "governor",
-        startBlock: startBlock,
-      }),
-      startBlock: startBlock,
     },
     GovernanceToken: {
-      chain: "sepolia",
+      chain: {
+        baseSepolia: {
+          address: factory({
+            address: baseSepoliaAddress,
+            event: tokenCreatedEvent,
+            parameter: "tokenAddress",
+            startBlock: baseSepoliaStartBlock,
+          }),
+          startBlock: baseSepoliaStartBlock,
+        },
+        sepolia: {
+          address: factory({
+            address: sepoliaAddress,
+            event: tokenCreatedEvent,
+            parameter: "tokenAddress",
+            startBlock: sepoliaStartBlock,
+          }),
+          startBlock: sepoliaStartBlock,
+        },
+      },
       abi: ERC20Abi,
-      address: factory({
-        address: address,
-        event: tokenCreatedEvent,
-        parameter: "tokenAddress",
-        startBlock: startBlock,
-      }),
-      startBlock: startBlock,
     },
     PoolManager: {
-      chain: "sepolia",
+      chain: {
+        baseSepolia: {
+          address: "0x7Da1D65F8B249183667cdE74C5CBD46dD38AA829", // Base Sepolia PoolManager
+          startBlock: baseSepoliaStartBlock,
+        },
+        sepolia: {
+          address: "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
+          startBlock: sepoliaStartBlock,
+        },
+      },
       abi: PoolManagerAbi,
-      address: "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
-      startBlock: startBlock,
     },
   },
 });

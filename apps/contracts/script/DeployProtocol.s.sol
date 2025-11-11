@@ -31,10 +31,10 @@ contract DeployProtocolScript is Script {
     LoarHookStaticFee public hook;
 
     // Sepolia addresses - SET THESE BEFORE DEPLOYING
-    address public poolManager = address(0xE03A1074c86CFeDd5C142C4F04F1a1536e203543);
-    address public positionManager = address(0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4);
+    address public poolManager = address(0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408);
+    address public positionManager = address(0x4B2C77d209D3405F41a037Ec6c77F7F5b8e2ca80);
     address public permit2 = address(0x000000000022D473030F116dDEE9F6B43aC78BA3);
-    address public weth = address(0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9); 
+    address public weth = address(0x4200000000000000000000000000000000000006); 
 
     function setUp() public {}
 

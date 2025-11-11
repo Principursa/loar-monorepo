@@ -13,12 +13,15 @@ via_ir=true
 [rpc_endpoints]
 mainnet = "${RPC_1}"
 sepolia = "${RPC_11155111}"
+base_sepolia = "${RPC_84532}"
+
 
 [fmt]
 line_length = 100
 
 [etherscan]
 sepolia = { key = "${VERIFICATION_KEY_1}" }
+base_sepolia = { key = "${VERIFICATION_KEY_1}"}
 
 [dependencies]
 forge-std = "1.10.0"

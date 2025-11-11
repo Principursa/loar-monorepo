@@ -11,110 +11,15 @@ import { universe, token } from "../../../indexer/ponder.schema";
 import { ArrowLeft, ArrowRightLeft, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { parseUnits, formatUnits } from 'viem';
-import { Actions, V4Planner } from '@uniswap/v4-sdk';
-import { CommandType, RoutePlanner } from '@uniswap/universal-router-sdk';
 import { useEffect } from 'react';
+import { trpcClient } from '@/utils/trpc';
 
 export const Route = createFileRoute("/markets")({
   component: MarketsPage,
 });
 
-// Contract addresses on Sepolia
-const UNIVERSAL_ROUTER_ADDRESS = "0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b";
-const QUOTER_ADDRESS = "0x61b3f2011a92d183c7dbadbda940a7555ccf9227";
-const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
-
-const UNIVERSAL_ROUTER_ABI = [
-  {
-    inputs: [
-      { internalType: "bytes", name: "commands", type: "bytes" },
-      { internalType: "bytes[]", name: "inputs", type: "bytes[]" },
-      { internalType: "uint256", name: "deadline", type: "uint256" },
-    ],
-    name: "execute",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function",
-  },
-];
-
-const QUOTER_ABI = [
-  {
-    inputs: [
-      {
-        components: [
-          {
-            components: [
-              { internalType: "address", name: "currency0", type: "address" },
-              { internalType: "address", name: "currency1", type: "address" },
-              { internalType: "uint24", name: "fee", type: "uint24" },
-              { internalType: "int24", name: "tickSpacing", type: "int24" },
-              { internalType: "address", name: "hooks", type: "address" },
-            ],
-            internalType: "struct PoolKey",
-            name: "poolKey",
-            type: "tuple",
-          },
-          { internalType: "bool", name: "zeroForOne", type: "bool" },
-          { internalType: "uint128", name: "exactAmount", type: "uint128" },
-          { internalType: "bytes", name: "hookData", type: "bytes" },
-        ],
-        internalType: "struct IQuoter.QuoteExactSingleParams",
-        name: "params",
-        type: "tuple",
-      },
-    ],
-    name: "quoteExactInputSingle",
-    outputs: [
-      { internalType: "int128[]", name: "deltaAmounts", type: "int128[]" },
-      { internalType: "uint160", name: "sqrtPriceX96After", type: "uint160" },
-      { internalType: "uint32", name: "initializedTicksLoaded", type: "uint32" },
-    ],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-];
-
-const PERMIT2_ABI = [
-  {
-    inputs: [
-      { internalType: "address", name: "token", type: "address" },
-      { internalType: "address", name: "spender", type: "address" },
-      { internalType: "uint160", name: "amount", type: "uint160" },
-      { internalType: "uint48", name: "expiration", type: "uint48" },
-    ],
-    name: "approve",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-];
-
-const ERC20_ABI = [
-  {
-    inputs: [
-      { internalType: "address", name: "spender", type: "address" },
-      { internalType: "uint256", name: "amount", type: "uint256" },
-    ],
-    name: "approve",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      { internalType: "address", name: "owner", type: "address" },
-      { internalType: "address", name: "spender", type: "address" },
-    ],
-    name: "allowance",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-];
-
 function MarketsPage() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chain } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
 
@@ -122,6 +27,66 @@ function MarketsPage() {
   const [swapAmount, setSwapAmount] = useState("");
   const [isSwapping, setIsSwapping] = useState(false);
   const [estimatedOutput, setEstimatedOutput] = useState<string>("");
+  const [wethBalance, setWethBalance] = useState<bigint>(0n);
+  const [wethAllowance, setWethAllowance] = useState<bigint>(0n);
+  const [isWrapping, setIsWrapping] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+
+  // Network-specific addresses
+  const NETWORK_CONFIG = {
+    // Sepolia
+    11155111: {
+      weth: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+      universalRouter: "0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b",
+    },
+    // Base Sepolia
+    84532: {
+      weth: "0x4200000000000000000000000000000000000006",
+      universalRouter: "0x492e6456d9528771018deb9e87ef7750ef184104",
+    },
+  } as const;
+
+  const chainId = chain?.id || 84532; // Default to Base Sepolia
+  const config = NETWORK_CONFIG[chainId as keyof typeof NETWORK_CONFIG] || NETWORK_CONFIG[84532];
+  const WETH_ADDRESS = config.weth;
+  const UNIVERSAL_ROUTER = config.universalRouter;
+
+  const WETH_ABI = [
+    {
+      inputs: [{ name: 'account', type: 'address' }],
+      name: 'balanceOf',
+      outputs: [{ name: '', type: 'uint256' }],
+      stateMutability: 'view',
+      type: 'function',
+    },
+    {
+      inputs: [
+        { name: 'owner', type: 'address' },
+        { name: 'spender', type: 'address' },
+      ],
+      name: 'allowance',
+      outputs: [{ name: '', type: 'uint256' }],
+      stateMutability: 'view',
+      type: 'function',
+    },
+    {
+      inputs: [
+        { name: 'spender', type: 'address' },
+        { name: 'amount', type: 'uint256' },
+      ],
+      name: 'approve',
+      outputs: [{ name: '', type: 'bool' }],
+      stateMutability: 'nonpayable',
+      type: 'function',
+    },
+    {
+      inputs: [],
+      name: 'deposit',
+      outputs: [],
+      stateMutability: 'payable',
+      type: 'function',
+    },
+  ] as const;
 
   // Query universes with tokens
   const { data: universesData } = usePonderQuery({
@@ -152,62 +117,154 @@ function MarketsPage() {
       }));
   }, [universesData, tokensData]);
 
+  // Check WETH balance and allowance when user connects or amount changes
+  useEffect(() => {
+    const checkWETH = async () => {
+      if (!address || !publicClient || !swapAmount) {
+        setWethBalance(0n);
+        setWethAllowance(0n);
+        return;
+      }
+
+      try {
+        const amountWei = parseUnits(swapAmount, 18);
+
+        // Check WETH balance
+        const balance = await publicClient.readContract({
+          address: WETH_ADDRESS as `0x${string}`,
+          abi: WETH_ABI,
+          functionName: 'balanceOf',
+          args: [address],
+        }) as bigint;
+
+        // Check WETH allowance for Universal Router
+        const allowance = await publicClient.readContract({
+          address: WETH_ADDRESS as `0x${string}`,
+          abi: WETH_ABI,
+          functionName: 'allowance',
+          args: [address, UNIVERSAL_ROUTER as `0x${string}`],
+        }) as bigint;
+
+        setWethBalance(balance);
+        setWethAllowance(allowance);
+      } catch (error) {
+        console.error('Failed to check WETH:', error);
+      }
+    };
+
+    checkWETH();
+  }, [address, publicClient, swapAmount]);
+
   // Get quote when amount or token changes
   useEffect(() => {
     const getQuote = async () => {
-      if (!swapAmount || !selectedToken || !publicClient) {
+      if (!swapAmount || !selectedToken) {
         setEstimatedOutput("");
         return;
       }
 
       try {
-        const WETH_ADDRESS = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9";
-        const amountIn = parseUnits(swapAmount, 18);
+        const quote = await trpcClient.swap.getQuote.mutate({
+          tokenAddress: selectedToken.id,
+          amountIn: swapAmount,
+          tokenInfo: {
+            id: selectedToken.id,
+            poolHook: selectedToken.poolHook,
+            startingTick: !!selectedToken.startingTick,
+          },
+        });
 
-        const isWETHCurrency0 = WETH_ADDRESS.toLowerCase() < selectedToken.id.toLowerCase();
-        const currency0 = isWETHCurrency0 ? WETH_ADDRESS : selectedToken.id;
-        const currency1 = isWETHCurrency0 ? selectedToken.id : WETH_ADDRESS;
-
-        const poolKey = {
-          currency0,
-          currency1,
-          fee: selectedToken.startingTick ? 8388608 : 3000,
-          tickSpacing: 200,
-          hooks: selectedToken.poolHook,
-        };
-
-        const quoteParams = {
-          poolKey,
-          zeroForOne: isWETHCurrency0,
-          exactAmount: amountIn,
-          hookData: "0x00",
-        };
-
-        // Use callStatic to simulate the call
-        const result = await publicClient.readContract({
-          address: QUOTER_ADDRESS as `0x${string}`,
-          abi: QUOTER_ABI,
-          functionName: 'quoteExactInputSingle',
-          args: [quoteParams],
-        }) as any;
-
-        // result is [deltaAmounts, sqrtPriceX96After, initializedTicksLoaded]
-        const deltaAmounts = result[0];
-        // deltaAmounts[1] is the output amount (negative because it's being removed)
-        const outputAmount = deltaAmounts[1] < 0 ? -deltaAmounts[1] : deltaAmounts[1];
-        setEstimatedOutput(formatUnits(outputAmount, 18));
+        setEstimatedOutput(quote.amountOut);
       } catch (error) {
         console.error('Quote failed:', error);
-        setEstimatedOutput("~");
+        // Don't show error, just show that quotes aren't available
+        setEstimatedOutput("Quote unavailable - swap to see actual output");
       }
     };
 
     const debounce = setTimeout(getQuote, 500);
     return () => clearTimeout(debounce);
-  }, [swapAmount, selectedToken, publicClient]);
+  }, [swapAmount, selectedToken]);
+
+  const wrapETH = async () => {
+    if (!walletClient || !address || !swapAmount) return;
+
+    setIsWrapping(true);
+    try {
+      const amountWei = parseUnits(swapAmount, 18);
+
+      const hash = await walletClient.writeContract({
+        address: WETH_ADDRESS as `0x${string}`,
+        abi: WETH_ABI,
+        functionName: 'deposit',
+        value: amountWei,
+        account: address,
+      });
+
+      toast.success('Wrapping ETH to WETH...', {
+        description: `Transaction: ${hash.slice(0, 10)}...${hash.slice(-8)}`,
+      });
+
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash });
+        toast.success('ETH wrapped to WETH!');
+
+        // Refresh WETH balance
+        const balance = await publicClient.readContract({
+          address: WETH_ADDRESS as `0x${string}`,
+          abi: WETH_ABI,
+          functionName: 'balanceOf',
+          args: [address],
+        }) as bigint;
+        setWethBalance(balance);
+      }
+    } catch (error: any) {
+      console.error('Wrap failed:', error);
+      toast.error('Failed to wrap ETH', {
+        description: error.message || 'Unknown error',
+      });
+    } finally {
+      setIsWrapping(false);
+    }
+  };
+
+  const approveWETH = async () => {
+    if (!walletClient || !address) return;
+
+    setIsApproving(true);
+    try {
+      // Approve max amount for convenience
+      const maxAmount = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+
+      const hash = await walletClient.writeContract({
+        address: WETH_ADDRESS as `0x${string}`,
+        abi: WETH_ABI,
+        functionName: 'approve',
+        args: [UNIVERSAL_ROUTER as `0x${string}`, maxAmount],
+        account: address,
+      });
+
+      toast.success('Approving WETH...', {
+        description: `Transaction: ${hash.slice(0, 10)}...${hash.slice(-8)}`,
+      });
+
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash });
+        toast.success('WETH approved!');
+        setWethAllowance(maxAmount);
+      }
+    } catch (error: any) {
+      console.error('Approval failed:', error);
+      toast.error('Failed to approve WETH', {
+        description: error.message || 'Unknown error',
+      });
+    } finally {
+      setIsApproving(false);
+    }
+  };
 
   const executeSwap = async () => {
-    if (!selectedToken || !swapAmount || !walletClient || !address || !publicClient) {
+    if (!selectedToken || !swapAmount || !walletClient || !address) {
       toast.error("Please connect wallet and enter swap amount");
       return;
     }
@@ -215,81 +272,47 @@ function MarketsPage() {
     setIsSwapping(true);
 
     try {
-      const WETH_ADDRESS = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9";
-      const amountIn = parseUnits(swapAmount, 18);
-
-      const isWETHCurrency0 = WETH_ADDRESS.toLowerCase() < selectedToken.id.toLowerCase();
-      const currency0 = isWETHCurrency0 ? WETH_ADDRESS : selectedToken.id;
-      const currency1 = isWETHCurrency0 ? selectedToken.id : WETH_ADDRESS;
-
-      const poolKey = {
-        currency0,
-        currency1,
-        fee: selectedToken.startingTick ? 8388608 : 3000,
-        tickSpacing: 200,
-        hooks: selectedToken.poolHook,
-      };
-
-      const swapConfig = {
-        poolKey,
-        zeroForOne: isWETHCurrency0,
-        amountIn: amountIn.toString(),
+      // Build swap transaction on backend
+      const txData = await trpcClient.swap.buildSwap.mutate({
+        tokenAddress: selectedToken.id,
+        amountIn: swapAmount,
         amountOutMinimum: "0", // Accept any amount for testing
-        hookData: '0x00'
-      };
-
-      console.log('Swap config:', swapConfig);
-
-      // Setup V4 Planner and Route Planner
-      const v4Planner = new V4Planner();
-      const routePlanner = new RoutePlanner();
-
-      // Set deadline (1 hour from now)
-      const deadline = Math.floor(Date.now() / 1000) + 3600;
-
-      // Add actions to V4 planner
-      v4Planner.addAction(Actions.SWAP_EXACT_IN_SINGLE, [swapConfig]);
-      v4Planner.addAction(Actions.SETTLE_ALL, [swapConfig.poolKey.currency0, swapConfig.amountIn]);
-      v4Planner.addAction(Actions.TAKE_ALL, [swapConfig.poolKey.currency1, swapConfig.amountOutMinimum]);
-
-      const encodedActions = v4Planner.finalize();
-
-      // Add V4_SWAP command to route planner with actions and params
-      routePlanner.addCommand(CommandType.V4_SWAP, [v4Planner.actions, v4Planner.params]);
-
-      console.log('Route planner commands:', routePlanner.commands);
-      console.log('Encoded actions:', encodedActions);
-
-      // Execute swap via Universal Router
-      const txOptions = {
-        value: amountIn, // Send ETH/WETH with the transaction
-      };
-
-      const { request } = await publicClient.simulateContract({
-        address: UNIVERSAL_ROUTER_ADDRESS as `0x${string}`,
-        abi: UNIVERSAL_ROUTER_ABI,
-        functionName: 'execute',
-        args: [routePlanner.commands, [encodedActions], BigInt(deadline)],
-        value: amountIn,
-        account: address,
+        tokenInfo: {
+          id: selectedToken.id,
+          poolHook: selectedToken.poolHook,
+          startingTick: !!selectedToken.startingTick,
+        },
       });
 
-      const hash = await walletClient.writeContract(request);
+      console.log('Transaction data from backend:', txData);
+
+      // Execute transaction using wallet
+      const hash = await walletClient.sendTransaction({
+        to: txData.to as `0x${string}`,
+        data: txData.data as `0x${string}`,
+        value: BigInt(txData.value),
+        account: address,
+      });
 
       toast.success('Swap submitted!', {
         description: `Transaction: ${hash.slice(0, 10)}...${hash.slice(-8)}`,
       });
 
       // Wait for transaction
-      await publicClient.waitForTransactionReceipt({ hash });
+      if (publicClient) {
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status === 'reverted') {
+          throw new Error('Transaction reverted on-chain');
+        }
+        toast.success('Swap completed!');
+      }
 
-      toast.success('Swap completed!');
       setSwapAmount("");
       setEstimatedOutput("");
     } catch (error: any) {
       console.error('Swap failed:', error);
       toast.error('Swap failed', {
-        description: error.shortMessage || error.message || 'Unknown error occurred',
+        description: error.message || 'Unknown error occurred',
       });
     } finally {
       setIsSwapping(false);
@@ -393,14 +416,21 @@ function MarketsPage() {
                 ) : (
                   <>
                     <div>
-                      <Label>From</Label>
-                      <div className="flex items-center gap-2 mt-2">
+                      <div className="flex justify-between items-center mb-2">
+                        <Label>From</Label>
+                        {address && wethBalance > 0n && (
+                          <span className="text-xs text-muted-foreground">
+                            Balance: {formatUnits(wethBalance, 18).slice(0, 8)} WETH
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
                         <Input
                           type="number"
                           placeholder="0.0"
                           value={swapAmount}
                           onChange={(e) => setSwapAmount(e.target.value)}
-                          disabled={isSwapping}
+                          disabled={isSwapping || isWrapping || isApproving}
                         />
                         <Badge>WETH</Badge>
                       </div>
@@ -417,10 +447,16 @@ function MarketsPage() {
                           type="text"
                           placeholder="0.0"
                           disabled
-                          value={estimatedOutput || "~"}
+                          value={estimatedOutput || "Quote unavailable"}
+                          className={estimatedOutput?.includes("unavailable") ? "text-muted-foreground text-sm" : ""}
                         />
                         <Badge>${selectedToken.symbol}</Badge>
                       </div>
+                      {estimatedOutput?.includes("unavailable") && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Quotes may not work with this pool's hook. Try swapping to see actual output.
+                        </p>
+                      )}
                     </div>
 
                     <div className="pt-4 space-y-2">
@@ -439,11 +475,31 @@ function MarketsPage() {
                       <Button className="w-full" disabled>
                         Connect Wallet
                       </Button>
+                    ) : !swapAmount ? (
+                      <Button className="w-full" disabled>
+                        Enter Amount
+                      </Button>
+                    ) : wethBalance < parseUnits(swapAmount, 18) ? (
+                      <Button
+                        className="w-full"
+                        onClick={wrapETH}
+                        disabled={isWrapping}
+                      >
+                        {isWrapping ? 'Wrapping...' : `Wrap ${swapAmount} ETH to WETH`}
+                      </Button>
+                    ) : wethAllowance < parseUnits(swapAmount, 18) ? (
+                      <Button
+                        className="w-full"
+                        onClick={approveWETH}
+                        disabled={isApproving}
+                      >
+                        {isApproving ? 'Approving...' : 'Approve WETH'}
+                      </Button>
                     ) : (
                       <Button
                         className="w-full"
                         onClick={executeSwap}
-                        disabled={!swapAmount || isSwapping}
+                        disabled={isSwapping}
                       >
                         {isSwapping ? 'Swapping...' : 'Swap'}
                       </Button>

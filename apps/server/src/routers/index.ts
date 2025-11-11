@@ -13,6 +13,7 @@ import { falService } from "../services/fal";
 
 import { cinematicUniversesRouter } from "./cinematicUniverses/cinematicUniverses.index";
 import { falRouter } from "./fal/fal.routes";
+import { swapRouter } from "./swap/swap.routes";
 import { synapseService } from "../services/synapse";
 import { wikiaService } from "../services/wikia";
 import { minioService } from "../services/minio";
@@ -32,6 +33,7 @@ export const appRouter = router({
   }),
   cinematicUniverses: cinematicUniversesRouter,
   fal: falRouter,
+  swap: swapRouter,
   wiki: router({
     characters: publicProcedure.query(async () => {
       try {
