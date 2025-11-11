@@ -2,12 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Play, Sparkles, Database, Users, GitBranch, ChevronRight } from "lucide-react";
+import { Play, Sparkles, Database, Users, GitBranch, ChevronRight, ArrowRightLeft, TrendingUp } from "lucide-react";
 import { useAccount } from "wagmi";
 import { usePonderQuery } from "@ponder/react";
 import { desc } from "@ponder/client";
-import { universe, token, node, nodeContent } from "../../../indexer/ponder.schema";
+import { universe, token, node, nodeContent, swap, pool } from "../../../indexer/ponder.schema";
 import { useMemo, useState } from "react";
+import { formatUnits } from "viem";
 
 export const Route = createFileRoute("/")({
   component: HomeComponent,
@@ -112,6 +113,182 @@ function TimelineEventsSection() {
                 </div>
               </div>
             </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Recent Swaps Section - fetches swaps from Uniswap v4 pools
+function RecentSwapsSection() {
+  // Query recent swaps from Ponder
+  const { data: swapsData } = usePonderQuery({
+    queryFn: (db) =>
+      db
+        .select()
+        .from(swap as any)
+        .orderBy(desc((swap as any).timestamp))
+        .limit(10),
+  });
+
+  // Query pools to get currency info
+  const { data: poolsData } = usePonderQuery({
+    queryFn: (db) => db.select().from(pool as any),
+  });
+
+  // Query tokens to get universe token names
+  const { data: tokensData } = usePonderQuery({
+    queryFn: (db) => db.select().from(token as any),
+  });
+
+  const swaps = useMemo(() => {
+    if (!swapsData || !poolsData || !tokensData) {
+      console.log('🔍 Swaps data:', { swaps: !!swapsData, pools: !!poolsData, tokens: !!tokensData });
+      return [];
+    }
+
+    type SwapRow = typeof swap.$inferSelect;
+    type PoolRow = typeof pool.$inferSelect;
+    type TokenRow = typeof token.$inferSelect;
+
+    console.log('📊 Processing swaps:', {
+      swapsCount: (swapsData as SwapRow[]).length,
+      poolsCount: (poolsData as PoolRow[]).length,
+      tokensCount: (tokensData as TokenRow[]).length,
+    });
+
+    // Create maps for quick lookups
+    const poolMap = new Map<string, PoolRow>();
+    (poolsData as PoolRow[]).forEach((p) => {
+      poolMap.set(p.poolId.toLowerCase(), p);
+    });
+
+    console.log('🏊 Pool IDs in map (first 5):',
+      Array.from(poolMap.keys()).slice(0, 5)
+    );
+
+    const tokenMap = new Map<string, TokenRow>();
+    const tokenByPoolId = new Map<string, TokenRow>();
+    (tokensData as TokenRow[]).forEach((t) => {
+      console.log('  Universe token:', t.id.toLowerCase(), t.symbol, 'poolId:', t.poolId);
+      tokenMap.set(t.id.toLowerCase(), t);
+      tokenByPoolId.set(t.poolId.toLowerCase(), t);
+    });
+
+    console.log('🎯 Universe token pool IDs:', Array.from(tokenByPoolId.keys()));
+
+    // Combine swaps with pool and token data - filter by universe token poolIds
+    const filteredSwaps = (swapsData as SwapRow[])
+      .map((s, index) => {
+        // Check if this swap is for a universe token pool
+        const universeToken = tokenByPoolId.get(s.poolId.toLowerCase());
+
+        if (!universeToken) {
+          if (index < 3) console.log(`  ⚠️ Swap ${index}: Not a universe token pool (${s.poolId.toLowerCase()})`);
+          return null;
+        }
+
+        if (index < 3) console.log(`  ✅ Swap ${index}: Found universe token swap for ${universeToken.symbol}!`);
+
+        // Get pool data for this swap
+        const poolData = poolMap.get(s.poolId.toLowerCase());
+        if (!poolData) {
+          console.warn(`  ⚠️ Pool data not found for ${universeToken.symbol} pool, using token info`);
+        }
+
+        const isToken0Universe = poolData ? poolData.currency0.toLowerCase() === universeToken.id.toLowerCase() : true;
+
+        // Parse amounts
+        const amount0 = BigInt(s.amount0);
+        const amount1 = BigInt(s.amount1);
+
+        // Determine swap direction and amounts
+        const isBuying = isToken0Universe ? amount0 > 0 : amount1 > 0;
+        const tokenAmount = isToken0Universe ? amount0 : amount1;
+        const otherAmount = isToken0Universe ? amount1 : amount0;
+
+        return {
+          id: s.id,
+          poolId: s.poolId,
+          sender: s.sender,
+          universeToken: universeToken!,
+          isBuying,
+          tokenAmount: formatUnits(tokenAmount < 0 ? -tokenAmount : tokenAmount, 18),
+          otherAmount: formatUnits(otherAmount < 0 ? -otherAmount : otherAmount, 18),
+          timestamp: s.timestamp,
+          tick: s.tick,
+        };
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null)
+      .slice(0, 5); // Show top 5 recent swaps
+
+    console.log('✅ Filtered swaps result:', filteredSwaps.length, 'universe token swaps found');
+    return filteredSwaps;
+  }, [swapsData, poolsData, tokensData]);
+
+  if (!swaps || swaps.length === 0) {
+    return null; // Don't show section if no swaps
+  }
+
+  return (
+    <section className="py-20 px-4">
+      <div className="container mx-auto max-w-7xl">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/20 mb-6">
+            <TrendingUp className="w-4 h-4 text-green-500" />
+            <span className="text-sm font-medium text-green-500">Live Trading Activity</span>
+          </div>
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">Recent Universe Token Swaps</h2>
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            See what's happening on Uniswap v4 with universe governance tokens
+          </p>
+        </div>
+
+        <div className="max-w-4xl mx-auto space-y-3">
+          {swaps.map((swapItem) => (
+            <Card key={swapItem.id} className="border-2 hover:border-primary/50 transition-all hover:shadow-lg">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        swapItem.isBuying ? "bg-green-500/10" : "bg-red-500/10"
+                      }`}
+                    >
+                      <ArrowRightLeft
+                        className={`w-6 h-6 ${swapItem.isBuying ? "text-green-500" : "text-red-500"}`}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={swapItem.isBuying ? "default" : "destructive"} className="text-xs">
+                          {swapItem.isBuying ? "BUY" : "SELL"}
+                        </Badge>
+                        <span className="font-bold text-lg">${swapItem.universeToken.symbol}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{swapItem.universeToken.name}</p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="font-mono text-lg font-bold">
+                      {Number(swapItem.tokenAmount).toFixed(2)} tokens
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(swapItem.timestamp * 1000).toLocaleTimeString()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="font-mono">
+                    Trader: {swapItem.sender.slice(0, 6)}...{swapItem.sender.slice(-4)}
+                  </span>
+                  <span>Tick: {swapItem.tick}</span>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>
@@ -275,6 +452,17 @@ function HomeComponent() {
                   Explore Universes
                 </Link>
               </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="text-lg px-10 h-14 font-semibold border-2"
+                asChild
+              >
+                <Link to="/markets">
+                  <ArrowRightLeft className="w-5 h-5 mr-2" />
+                  Trade Tokens
+                </Link>
+              </Button>
               {isConnected && (
                 <Button
                   variant="outline"
@@ -323,6 +511,9 @@ function HomeComponent() {
 
       {/* Timeline Events Examples Section */}
       <TimelineEventsSection />
+
+      {/* Recent Swaps Section */}
+      <RecentSwapsSection />
 
       {/* How It Works Section */}
       <section className="py-24 px-4">
