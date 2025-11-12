@@ -103,6 +103,8 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             poolData
         );
 
+        locker[poolKey.toId()] = _locker;
+
 
         emit PoolCreatedFactory({
             pairedToken: pairedToken,
