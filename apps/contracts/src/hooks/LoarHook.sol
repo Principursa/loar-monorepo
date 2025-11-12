@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-//import {ILoarLpLocker} from "../interfaces/ILoarLpLocker.sol";
-//import {ILoarMevModule} from "../interfaces/ILoarMevModule.sol";
 import {ILoarHook} from "../interfaces/ILoarHook.sol";
 import {GovernanceERC20} from "../GovernanceERC20.sol";
 import {IUniverseManager} from "../interfaces/IUniverseManager.sol";
