@@ -317,13 +317,25 @@ abstract contract LoarHook is BaseHook, Ownable, ILoarHook {
             return;
         }
 
+        // Skip fee claims if pool is new (less than 1 hour old)
+        // This prevents issues on first swaps when there are no fees to collect yet
+        if (block.timestamp < poolCreationTimestamp[poolKey.toId()] + 1 hours) {
+            return;
+        }
+
         // determine the token
         address token = loarIsToken0[poolKey.toId()]
             ? Currency.unwrap(poolKey.currency0)
             : Currency.unwrap(poolKey.currency1);
 
-        // trigger the fee claim
-        ILoarLpLocker(locker[poolKey.toId()]).collectRewardsWithoutUnlock(token);
+        // trigger the fee claim with try-catch to prevent reverts from blocking swaps
+        // This is needed on Sepolia where PositionManager reverts when collecting 0 fees
+        try ILoarLpLocker(locker[poolKey.toId()]).collectRewardsWithoutUnlock(token) {
+            // Success - fees collected
+        } catch {
+            // Failed to collect fees, but don't block the swap
+            // This can happen if there are no fees to collect yet or during quote simulations
+        }
     }
 
 
