@@ -5,8 +5,7 @@ import { ModeToggle } from "./mode-toggle";
 export default function Header() {
   const links = [
     { to: "/", label: "Home" },
-    { to: "/universes", label: "Universes" },
-    { to: "/cinematicuniversecreate", label: "Create Universe" },
+    { to: "/cinematicUniverseCreate", label: "Create Universe" },
   ];
 
   return (

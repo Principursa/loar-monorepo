@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as UniversesRouteImport } from './routes/universes'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -18,11 +17,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as UniverseIdRouteImport } from './routes/universe/$id'
 import { Route as EventUniverseEventRouteImport } from './routes/event.$universe.$event'
 
-const UniversesRoute = UniversesRouteImport.update({
-  id: '/universes',
-  path: '/universes',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MarketRoute = MarketRouteImport.update({
   id: '/market',
   path: '/market',
@@ -65,7 +59,6 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
-  '/universes': typeof UniversesRoute
   '/universe/$id': typeof UniverseIdRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
 }
@@ -75,7 +68,6 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
-  '/universes': typeof UniversesRoute
   '/universe/$id': typeof UniverseIdRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
 }
@@ -86,7 +78,6 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/market': typeof MarketRoute
-  '/universes': typeof UniversesRoute
   '/universe/$id': typeof UniverseIdRoute
   '/event/$universe/$event': typeof EventUniverseEventRoute
 }
@@ -98,7 +89,6 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/market'
-    | '/universes'
     | '/universe/$id'
     | '/event/$universe/$event'
   fileRoutesByTo: FileRoutesByTo
@@ -108,7 +98,6 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/market'
-    | '/universes'
     | '/universe/$id'
     | '/event/$universe/$event'
   id:
@@ -118,7 +107,6 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/market'
-    | '/universes'
     | '/universe/$id'
     | '/event/$universe/$event'
   fileRoutesById: FileRoutesById
@@ -129,20 +117,12 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
   MarketRoute: typeof MarketRoute
-  UniversesRoute: typeof UniversesRoute
   UniverseIdRoute: typeof UniverseIdRoute
   EventUniverseEventRoute: typeof EventUniverseEventRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/universes': {
-      id: '/universes'
-      path: '/universes'
-      fullPath: '/universes'
-      preLoaderRoute: typeof UniversesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/market': {
       id: '/market'
       path: '/market'
@@ -201,7 +181,6 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
   MarketRoute: MarketRoute,
-  UniversesRoute: UniversesRoute,
   UniverseIdRoute: UniverseIdRoute,
   EventUniverseEventRoute: EventUniverseEventRoute,
 }

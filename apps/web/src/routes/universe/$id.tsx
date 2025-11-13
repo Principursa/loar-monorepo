@@ -699,9 +699,9 @@ function UniverseDetailPage() {
               This universe hasn't been indexed yet or doesn't exist.
             </p>
             <Button asChild>
-              <Link to="/universes">
+              <Link to="/">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Universes
+                Back to Home
               </Link>
             </Button>
           </CardContent>
@@ -720,9 +720,9 @@ function UniverseDetailPage() {
             <div className="flex items-center justify-between">
               <div>
                 <Button variant="ghost" size="sm" asChild className="mb-4">
-                  <Link to="/universes">
+                  <Link to="/">
                     <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Universes
+                    Back to Home
                   </Link>
                 </Button>
                 <h1 className="text-4xl font-bold mb-2">
@@ -863,9 +863,9 @@ function UniverseDetailPage() {
           <div className="flex items-center justify-between">
             <div>
               <Button variant="ghost" size="sm" asChild className="mb-4">
-                <Link to="/universes">
+                <Link to="/">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Universes
+                  Back to Home
                 </Link>
               </Button>
               <h1 className="text-4xl font-bold mb-2">

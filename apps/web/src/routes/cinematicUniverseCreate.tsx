@@ -305,7 +305,7 @@ function CinematicUniverseCreate() {
               )}
             </div>
 
-            <Button size="lg" onClick={() => (window.location.href = "/universes")}>
+            <Button size="lg" onClick={() => (window.location.href = "/")}>
               <ArrowLeft className="h-5 w-5 mr-2" />
               View All Universes
             </Button>

@@ -81,15 +81,15 @@ export function UniverseSidebar({
         <div className="space-y-4">
           {/* Enhanced Back Button */}
           <div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              asChild 
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
               className="hover:bg-primary/10 hover:text-primary transition-all duration-300 group w-full justify-start"
             >
-              <Link to="/universes">
+              <Link to="/">
                 <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform duration-300" />
-                Back to Universes
+                Back to Home
               </Link>
             </Button>
           </div>
