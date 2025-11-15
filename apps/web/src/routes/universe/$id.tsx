@@ -27,9 +27,7 @@ import { calculateTreeLayout, normalizeNodeId, getEventLabel } from '@/utils/tre
 import { useVideoGeneration, type StatusMessage } from '@/hooks/useVideoGeneration';
 import { useCharacterGeneration } from '@/hooks/useCharacterGeneration';
 import { useContractSave } from '@/hooks/useContractSave';
-import { usePonderQuery } from "@ponder/react";
-import { desc, eq } from "@ponder/client";
-import { universe as universeSchema, node as nodeSchema, nodeContent as nodeContentSchema } from "../../../../indexer/ponder.schema";
+import { useUniverseBlockchain } from '@/hooks/useUniverseBlockchain';
 
 // Register custom node types
 const nodeTypes = {
@@ -168,105 +166,24 @@ function UniverseTimelineEditor() {
   console.log('Timeline Contract Address:', timelineContractAddress);
   console.log('Chain ID:', chainId);
 
-  // Fetch nodes from Ponder indexer
-  const { data: nodesData, isLoading: isLoadingNodes, refetch: refetchNodes } = usePonderQuery({
-    queryFn: (db) =>
-      db
-        .select()
-        .from(nodeSchema as any)
-        .where(eq((nodeSchema as any).universeAddress, id.toLowerCase()))
-        .orderBy(desc((nodeSchema as any).createdAt)),
+  // Blockchain data fetching - using extracted hook
+  const {
+    graphData,
+    latestNodeId,
+    leavesData,
+    isLoadingLeaves,
+    isLoadingFullGraph,
+    isLoadingCanonChain,
+    isLoadingAny,
+    refetchLeaves,
+    refetchFullGraph,
+    refetchCanonChain,
+    refetchLatestNodeId,
+  } = useUniverseBlockchain({
+    universeId: id,
+    contractAddress: timelineContractAddress,
+    isBlockchainUniverse,
   });
-
-  // Fetch node content (video URLs and descriptions) from Ponder indexer
-  const { data: nodeContentData, refetch: refetchNodeContent } = usePonderQuery({
-    queryFn: (db) =>
-      db
-        .select()
-        .from(nodeContentSchema as any),
-  });
-
-  // Helper function to extract numeric node ID from composite ID (e.g., "0xabc:1" -> 1)
-  const extractNodeId = (compositeId: string): bigint => {
-    const parts = compositeId.split(':');
-    return BigInt(parts[parts.length - 1] || '0');
-  };
-
-  // Transform Ponder data to graph data format
-  const graphData = useMemo(() => {
-    if (!nodesData || nodesData.length === 0) {
-      return {
-        nodeIds: [],
-        urls: [],
-        descriptions: [],
-        previousNodes: [],
-        children: [] as bigint[][],
-        flags: [],
-        canonChain: [],
-      };
-    }
-
-    // Create a map of node content by composite ID for quick lookup
-    const contentMap = new Map<string, { videoLink: string; plot: string }>();
-    if (nodeContentData) {
-      nodeContentData.forEach((content: any) => {
-        contentMap.set(content.id, {
-          videoLink: content.videoLink || '',
-          plot: content.plot || '',
-        });
-      });
-    }
-
-    const result = {
-      nodeIds: nodesData.map((n: any) => extractNodeId(n.id)),
-      urls: nodesData.map((n: any) => {
-        const content = contentMap.get(n.id);
-        return content?.videoLink || '';
-      }),
-      descriptions: nodesData.map((n: any) => {
-        const content = contentMap.get(n.id);
-        return content?.plot || '';
-      }),
-      previousNodes: nodesData.map((n: any) => BigInt(n.previousNodeId || 0)),
-      children: [] as bigint[][],
-      flags: nodesData.map(() => true),
-      canonChain: nodesData.map((n: any) => extractNodeId(n.id)),
-    };
-
-    // Debug: Log the joined data
-    console.log('🎬 GraphData with joined content:', {
-      nodeCount: result.nodeIds.length,
-      urls: result.urls,
-      descriptions: result.descriptions,
-      contentMapSize: contentMap.size,
-      nodeContentData: nodeContentData?.length || 0,
-    });
-
-    return result;
-  }, [nodesData, nodeContentData]);
-
-  const latestNodeId = nodesData && nodesData.length > 0
-    ? Math.max(...nodesData.map((n: any) => parseInt(n.id.split(':')[1] || '0')))
-    : 0;
-
-  // Loading states for compatibility
-  const isLoadingLeaves = isLoadingNodes;
-  const isLoadingFullGraph = isLoadingNodes;
-  const isLoadingCanonChain = isLoadingNodes;
-  const isLoadingAny = isLoadingNodes;
-
-  // Refetch functions for compatibility - refetch both nodes and content
-  const refetchFullGraph = useCallback(async () => {
-    await refetchNodes();
-    await refetchNodeContent();
-  }, [refetchNodes, refetchNodeContent]);
-
-  const refetchLeaves = refetchFullGraph;
-  const refetchCanonChain = refetchFullGraph;
-  const refetchLatestNodeId = refetchFullGraph;
-
-  // leavesData for compatibility
-  const leavesData = nodesData;
 
   // Update timeline title when universe data loads
   useEffect(() => {
@@ -821,10 +738,10 @@ function UniverseTimelineEditor() {
       });
 
       // Get position from layout calculation
-      const position = layout.get(nodeId) || { x: 100, y: 100 };
+      const position = layout.nodePositions.get(nodeId) || { x: 100, y: 100 };
 
       // Generate proper event label
-      const eventLabel = getEventLabel(nodeId);
+      const eventLabel = getEventLabel(nodeId, parentId, layout.nodesByParent);
 
       const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
 
