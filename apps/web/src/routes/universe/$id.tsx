@@ -14,7 +14,7 @@ import ReactFlow, {
   type Connection
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { TimelineEventNode } from '@/components/flow/TimelineNodes';
 import { trpcClient } from '@/utils/trpc';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -24,10 +24,12 @@ import { UniverseSidebar } from '@/components/UniverseSidebar';
 import { FlowCreationPanel } from '@/components/FlowCreationPanel';
 import { GovernanceSidebar } from '@/components/GovernanceSidebar';
 import { calculateTreeLayout, normalizeNodeId, getEventLabel } from '@/utils/treeLayout';
-import { useUniverseBlockchain } from '@/hooks/useUniverseBlockchain';
 import { useVideoGeneration, type StatusMessage } from '@/hooks/useVideoGeneration';
 import { useCharacterGeneration } from '@/hooks/useCharacterGeneration';
 import { useContractSave } from '@/hooks/useContractSave';
+import { usePonderQuery } from "@ponder/react";
+import { desc, eq } from "@ponder/client";
+import { universe as universeSchema, node as nodeSchema, nodeContent as nodeContentSchema } from "../../../../indexer/ponder.schema";
 
 // Register custom node types
 const nodeTypes = {
@@ -166,24 +168,105 @@ function UniverseTimelineEditor() {
   console.log('Timeline Contract Address:', timelineContractAddress);
   console.log('Chain ID:', chainId);
 
-  // Blockchain data fetching - using extracted hook
-  const {
-    graphData,
-    latestNodeId,
-    leavesData,
-    isLoadingLeaves,
-    isLoadingFullGraph,
-    isLoadingCanonChain,
-    isLoadingAny,
-    refetchLeaves,
-    refetchFullGraph,
-    refetchCanonChain,
-    refetchLatestNodeId,
-  } = useUniverseBlockchain({
-    universeId: id,
-    contractAddress: timelineContractAddress,
-    isBlockchainUniverse,
+  // Fetch nodes from Ponder indexer
+  const { data: nodesData, isLoading: isLoadingNodes, refetch: refetchNodes } = usePonderQuery({
+    queryFn: (db) =>
+      db
+        .select()
+        .from(nodeSchema as any)
+        .where(eq((nodeSchema as any).universeAddress, id.toLowerCase()))
+        .orderBy(desc((nodeSchema as any).createdAt)),
   });
+
+  // Fetch node content (video URLs and descriptions) from Ponder indexer
+  const { data: nodeContentData, refetch: refetchNodeContent } = usePonderQuery({
+    queryFn: (db) =>
+      db
+        .select()
+        .from(nodeContentSchema as any),
+  });
+
+  // Helper function to extract numeric node ID from composite ID (e.g., "0xabc:1" -> 1)
+  const extractNodeId = (compositeId: string): bigint => {
+    const parts = compositeId.split(':');
+    return BigInt(parts[parts.length - 1] || '0');
+  };
+
+  // Transform Ponder data to graph data format
+  const graphData = useMemo(() => {
+    if (!nodesData || nodesData.length === 0) {
+      return {
+        nodeIds: [],
+        urls: [],
+        descriptions: [],
+        previousNodes: [],
+        children: [] as bigint[][],
+        flags: [],
+        canonChain: [],
+      };
+    }
+
+    // Create a map of node content by composite ID for quick lookup
+    const contentMap = new Map<string, { videoLink: string; plot: string }>();
+    if (nodeContentData) {
+      nodeContentData.forEach((content: any) => {
+        contentMap.set(content.id, {
+          videoLink: content.videoLink || '',
+          plot: content.plot || '',
+        });
+      });
+    }
+
+    const result = {
+      nodeIds: nodesData.map((n: any) => extractNodeId(n.id)),
+      urls: nodesData.map((n: any) => {
+        const content = contentMap.get(n.id);
+        return content?.videoLink || '';
+      }),
+      descriptions: nodesData.map((n: any) => {
+        const content = contentMap.get(n.id);
+        return content?.plot || '';
+      }),
+      previousNodes: nodesData.map((n: any) => BigInt(n.previousNodeId || 0)),
+      children: [] as bigint[][],
+      flags: nodesData.map(() => true),
+      canonChain: nodesData.map((n: any) => extractNodeId(n.id)),
+    };
+
+    // Debug: Log the joined data
+    console.log('🎬 GraphData with joined content:', {
+      nodeCount: result.nodeIds.length,
+      urls: result.urls,
+      descriptions: result.descriptions,
+      contentMapSize: contentMap.size,
+      nodeContentData: nodeContentData?.length || 0,
+    });
+
+    return result;
+  }, [nodesData, nodeContentData]);
+
+  const latestNodeId = nodesData && nodesData.length > 0
+    ? Math.max(...nodesData.map((n: any) => parseInt(n.id.split(':')[1] || '0')))
+    : 0;
+
+  // Loading states for compatibility
+  const isLoadingLeaves = isLoadingNodes;
+  const isLoadingFullGraph = isLoadingNodes;
+  const isLoadingCanonChain = isLoadingNodes;
+  const isLoadingAny = isLoadingNodes;
+
+  // Refetch functions for compatibility - refetch both nodes and content
+  const refetchFullGraph = useCallback(async () => {
+    await refetchNodes();
+    await refetchNodeContent();
+  }, [refetchNodes, refetchNodeContent]);
+
+  const refetchLeaves = refetchFullGraph;
+  const refetchCanonChain = refetchFullGraph;
+  const refetchLatestNodeId = refetchFullGraph;
+
+  // leavesData for compatibility
+  const leavesData = nodesData;
 
   // Update timeline title when universe data loads
   useEffect(() => {
@@ -738,10 +821,10 @@ function UniverseTimelineEditor() {
       });
 
       // Get position from layout calculation
-      const position = layout.nodePositions.get(nodeId) || { x: 100, y: 100 };
+      const position = layout.get(nodeId) || { x: 100, y: 100 };
 
       // Generate proper event label
-      const eventLabel = getEventLabel(nodeId, parentId, layout.nodesByParent);
+      const eventLabel = getEventLabel(nodeId);
 
       const color = isCanon ? colors[0] : colors[(index + 1) % colors.length];
 
@@ -912,7 +995,7 @@ function UniverseTimelineEditor() {
           <h1 className="text-2xl font-bold mb-4">Universe Not Found</h1>
           <p className="text-muted-foreground mb-6">The universe with ID "{id}" could not be found.</p>
           <Button asChild>
-            <Link to="/universes">← Back to Universes</Link>
+            <Link to="/market">← Back to Market</Link>
           </Button>
         </div>
       </div>
