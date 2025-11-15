@@ -329,7 +329,187 @@ Generate a detailed visual description in plain text (no JSON, no formatting).`;
   }
 }
 
+/**
+ * Improve image prompt with detailed visual description
+ */
+export async function improveImagePrompt(
+  userPrompt: string,
+  characterContext?: Array<{ name: string; description: string }>
+): Promise<string> {
+  console.log(`🎨 Improving image prompt with Gemini...`);
+
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+
+  let characterInfo = "";
+  if (characterContext && characterContext.length > 0) {
+    characterInfo = "\n\nCHARACTERS IN THIS SCENE:\n";
+    characterContext.forEach((char) => {
+      characterInfo += `- ${char.name}: ${char.description}\n`;
+    });
+  }
+
+  const prompt = `You are a professional visual artist and image generation expert. Your task is to take a simple image description and transform it into a detailed, single-frame visual description perfect for image generation.
+
+USER'S BASIC IDEA:
+${userPrompt}
+${characterInfo}
+
+YOUR TASK:
+Transform this into a detailed single-frame description. Include:
+- Camera angle and framing (e.g., "medium shot", "close-up", "wide shot", "aerial view")
+- Character positions, poses, and expressions
+- Lighting (e.g., "soft golden hour light", "dramatic side lighting", "moonlight")
+- Setting and environment details
+- Mood and atmosphere
+- Colors and visual style
+- Specific details that make the scene vivid
+
+EXAMPLE:
+Medium shot of a king standing on an ancient stone bridge, looking down pensively at the sparkling water below. Golden hour sunlight casts warm amber tones across the weathered stones. In the water, a queen wearing an elegant royal swimming suit with a golden crown relaxes on a pink inflatable swan, her face lit with a joyful smile as she waves up at him. The scene has a whimsical, dreamlike quality with rich colors and soft focus in the background.
+
+RULES:
+- Describe a SINGLE moment, not a sequence
+- Be specific about composition and framing
+- Include atmospheric and lighting details
+- Use vivid, descriptive language
+- Mention colors, textures, and mood
+${characterContext ? "- Use the provided character names and descriptions" : ""}
+- Keep it as one cohesive paragraph (2-4 sentences)
+- Output ONLY the description, no explanations or extra text
+- Do NOT use markdown formatting or code blocks
+
+Generate the improved image prompt now:`;
+
+  try {
+    const result = await model.generateContent([{ text: prompt }]);
+    const response = result.response;
+    const improvedPrompt = response.text().trim();
+
+    // Remove any markdown formatting if present
+    let cleanPrompt = improvedPrompt;
+    if (cleanPrompt.startsWith("```")) {
+      cleanPrompt = cleanPrompt.split("```")[1].trim();
+    }
+
+    // Calculate costs
+    const usage = response.usageMetadata;
+    const inputTokens = usage?.promptTokenCount || 0;
+    const outputTokens = usage?.candidatesTokenCount || 0;
+    const costUsd = ((inputTokens / 1_000_000) * 1.25) + ((outputTokens / 1_000_000) * 10.0);
+
+    console.log(`✅ Image prompt improved!`);
+    console.log(`📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`);
+    console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
+
+    return cleanPrompt;
+  } catch (error) {
+    console.error("❌ Image prompt improvement failed:", error);
+    throw error;
+  }
+}
+
+/**
+ * Improve video prompt with cinematic cuts and shot descriptions
+ */
+export async function improveVideoPrompt(
+  userPrompt: string,
+  characterContext?: Array<{ name: string; description: string }>,
+  previousEventContext?: {
+    title: string;
+    summary: string;
+    plot?: string;
+  }
+): Promise<string> {
+  console.log(`🎬 Improving video prompt with Gemini...`);
+
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+
+  let characterInfo = "";
+  if (characterContext && characterContext.length > 0) {
+    characterInfo = "\n\nCHARACTERS IN THIS SCENE:\n";
+    characterContext.forEach((char) => {
+      characterInfo += `- ${char.name}: ${char.description}\n`;
+    });
+  }
+
+  let previousEventInfo = "";
+  if (previousEventContext) {
+    previousEventInfo = `\n\nPREVIOUS EVENT CONTEXT:\n`;
+    previousEventInfo += `Title: ${previousEventContext.title}\n`;
+    previousEventInfo += `Summary: ${previousEventContext.summary}\n`;
+    if (previousEventContext.plot) {
+      previousEventInfo += `What happened: ${previousEventContext.plot}\n`;
+    }
+    previousEventInfo += `\nNote: This new scene should continue naturally from the previous event.\n`;
+  }
+
+  const prompt = `You are a professional cinematographer and video director. Your task is to take a simple video description and transform it into a detailed shot-by-shot sequence with professional camera angles and cuts.
+
+USER'S BASIC IDEA:
+${userPrompt}
+${characterInfo}${previousEventInfo}
+
+YOUR TASK:
+Transform this into a cinematic sequence with multiple shots/cuts. Use the format:
+- Each shot on a new line
+- Use [cut] to separate different shots
+- Include camera angles (e.g., "close up", "wide shot", "over the shoulder", "aerial view", "POV")
+- Be specific about what's happening in each shot
+- Keep it concise but descriptive
+- Use 3-6 shots total
+- Make it feel like a professional video sequence
+
+EXAMPLE FORMAT:
+Wide shot - a king standing on a stone bridge, looking down at the water below
+
+[cut] Over the shoulder shot - from behind the king - a queen in a royal swimming suit with a golden crown is relaxing on a pink inflatable swan in the sparkling water
+
+[cut] Close up shot of the queen's smiling face as she waves enthusiastically at the king
+
+[cut] Medium shot - the king takes a deep breath and leaps off the bridge into the water with a splash
+
+RULES:
+- Use cinematic language (wide shot, close up, medium shot, tracking shot, etc.)
+- Create visual flow between shots
+- Build narrative tension or emotion
+- Be specific about actions and details
+${characterContext ? "- Use the provided character names and descriptions" : ""}
+- Output ONLY the shot sequence, no explanations or extra text
+- Do NOT use markdown formatting or code blocks
+
+Generate the improved prompt now:`;
+
+  try {
+    const result = await model.generateContent([{ text: prompt }]);
+    const response = result.response;
+    const improvedPrompt = response.text().trim();
+
+    // Remove any markdown formatting if present
+    let cleanPrompt = improvedPrompt;
+    if (cleanPrompt.startsWith("```")) {
+      cleanPrompt = cleanPrompt.split("```")[1].trim();
+    }
+
+    // Calculate costs
+    const usage = response.usageMetadata;
+    const inputTokens = usage?.promptTokenCount || 0;
+    const outputTokens = usage?.candidatesTokenCount || 0;
+    const costUsd = ((inputTokens / 1_000_000) * 1.25) + ((outputTokens / 1_000_000) * 10.0);
+
+    console.log(`✅ Prompt improved!`);
+    console.log(`📊 Tokens: ${inputTokens + outputTokens} (in: ${inputTokens}, out: ${outputTokens})`);
+    console.log(`💰 Cost: $${costUsd.toFixed(6)}`);
+
+    return cleanPrompt;
+  } catch (error) {
+    console.error("❌ Prompt improvement failed:", error);
+    throw error;
+  }
+}
+
 export const geminiService = {
   generateWikiFromVideo,
   analyzeCharacterImage,
+  improveImagePrompt,
+  improveVideoPrompt,
 };

@@ -89,7 +89,7 @@ export function UniverseSidebar({
             >
               <Link to="/">
                 <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform duration-300" />
-                Back to Home
+                Go Back Home
               </Link>
             </Button>
           </div>

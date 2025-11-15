@@ -15,6 +15,7 @@ import {
   Settings2,
   Image as ImageIcon,
   Type,
+  Wand2,
 } from "lucide-react";
 import { useState, useEffect } from 'react';
 import {
@@ -24,6 +25,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { trpcClient } from '@/utils/trpc';
 
 interface FlowCreationPanelProps {
   showVideoDialog: boolean;
@@ -89,6 +91,11 @@ interface FlowCreationPanelProps {
   previousEventVideoUrl?: string | null;
   previousEventDescription?: string | null;
   previousEventTitle?: string | null;
+  previousEventWiki?: {
+    title: string;
+    summary: string;
+    plot?: string;
+  } | null;
   statusMessage?: {
     type: 'error' | 'success' | 'info' | 'warning';
     title: string;
@@ -121,6 +128,7 @@ export function FlowCreationPanel({
   previousEventVideoUrl,
   previousEventDescription,
   previousEventTitle,
+  previousEventWiki,
   handleGenerateEventImage,
   generatedVideoUrl,
   setGeneratedVideoUrl,
@@ -179,6 +187,9 @@ export function FlowCreationPanel({
   // Local state for event description (separate from videoDescription which is for prompts)
   const [eventDescription, setEventDescription] = useState('');
 
+  // AI prompt improvement state
+  const [isImprovingPrompt, setIsImprovingPrompt] = useState(false);
+
   // Extract last frame from previous event video
   const extractLastFrame = async () => {
     if (!previousEventVideoUrl) return;
@@ -213,6 +224,57 @@ export function FlowCreationPanel({
       console.error('Error extracting frame:', error);
     } finally {
       setIsExtractingFrame(false);
+    }
+  };
+
+  // Improve prompt with AI
+  const handleImprovePrompt = async () => {
+    if (!videoDescription.trim()) return;
+
+    setIsImprovingPrompt(true);
+    try {
+      // Build character context if characters are selected
+      let characterContext: Array<{ name: string; description: string }> | undefined;
+      if (selectedImageCharacters.length > 0 && charactersData?.characters) {
+        characterContext = selectedImageCharacters
+          .map((charId) => {
+            const char = charactersData.characters.find((c: any) => c.id === charId);
+            if (!char) return null;
+            const description = char.visual_description || char.user_description || char.character_name || '';
+            // Include character even if description is just the name
+            return {
+              name: char.character_name,
+              description: description.trim()
+            };
+          })
+          .filter((c) => c && c.name) as Array<{ name: string; description: string }>;
+      }
+
+      // Determine if we're improving an image prompt (Step 1) or video prompt (Step 2)
+      const isImprovingImagePrompt =
+        generationMode === 'image-to-video' &&
+        imageSource === 'create-frame' &&
+        !generatedImageUrl;
+
+      // Call video prompt improvement (works for both image and video prompts)
+      const improvedPrompt = await trpcClient.wiki.improveVideoPrompt.mutate({
+        userPrompt: videoDescription,
+        characterContext: characterContext,
+        previousEventContext: previousEventWiki ? {
+          title: previousEventWiki.title || '',
+          summary: previousEventWiki.summary || '',
+          plot: previousEventWiki.plot || undefined,
+        } : undefined,
+      });
+
+      // The result is just a string (the improved prompt)
+      if (improvedPrompt) {
+        setVideoDescription(improvedPrompt);
+      }
+    } catch (error) {
+      console.error('Error improving prompt:', error);
+    } finally {
+      setIsImprovingPrompt(false);
     }
   };
 
@@ -700,11 +762,11 @@ export function FlowCreationPanel({
       </Dialog>
 
       {/* Main Bottom Panel */}
-      <div className="fixed inset-x-0 bottom-0 z-50 pointer-events-none">
-        <div className="max-w-2xl mx-auto px-4 pb-4 pointer-events-auto">
+      <div className="fixed inset-x-0 bottom-0 z-50 pointer-events-none max-h-[80vh] flex flex-col">
+        <div className="max-w-2xl mx-auto px-4 pb-4 pointer-events-auto w-full flex flex-col max-h-[80vh]">
           {/* Status Message - Above the main panel */}
           {statusMessage && (
-            <div className="mb-2 animate-in slide-in-from-bottom-2 duration-300">
+            <div className="mb-2 animate-in slide-in-from-bottom-2 duration-300 flex-shrink-0">
               <div className="rounded border-0 p-2 bg-black/80 backdrop-blur-sm shadow-lg">
                 <div className="flex items-start gap-2">
                   <div className="mt-0.5">
@@ -746,8 +808,8 @@ export function FlowCreationPanel({
 
 
           {/* Compact Main Panel */}
-          <Card className="bg-black/90 backdrop-blur-sm shadow-2xl border-0">
-            <div className="p-3 space-y-2">
+          <Card className="bg-black/90 backdrop-blur-sm shadow-2xl border-0 flex flex-col overflow-hidden">
+            <div className="p-2.5 space-y-1.5 overflow-y-auto max-h-[calc(80vh-8rem)]">
               {/* Top Bar with Tabs and Settings */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -830,7 +892,7 @@ export function FlowCreationPanel({
 
               {/* Content Based on Tab Selection */}
               {generationMode === 'text-to-video' && (
-                <div className="space-y-3">
+                <div className="space-y-1.5">
                   {/* Show video preview if generated */}
                   {generatedVideoUrl && (
                     <div className="space-y-1">
@@ -840,7 +902,7 @@ export function FlowCreationPanel({
                           Video Ready
                         </Label>
                       </div>
-                      <div className="relative rounded-lg overflow-hidden bg-black aspect-video border border-green-500/30">
+                      <div className="relative rounded overflow-hidden bg-black aspect-video border border-green-500/30">
                         <video
                           src={generatedVideoUrl}
                           controls
@@ -856,7 +918,7 @@ export function FlowCreationPanel({
               )}
 
               {generationMode === 'image-to-video' && (
-                <div className="space-y-3">
+                <div className="space-y-1.5">
                   {/* Show video preview if generated, otherwise show extracted frame for Previous Event tab */}
                   {imageSource === 'last-frame' && (
                     generatedVideoUrl ? (
@@ -951,26 +1013,26 @@ export function FlowCreationPanel({
 
                       {/* Character Grid - Hidden when preview is shown */}
                       {!generatedImageUrl && !generatedVideoUrl && (
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-white font-medium">
+                          <div className="flex items-center gap-1.5">
+                            <Label className="text-[10px] text-white/70">
                               Characters ({selectedImageCharacters.length}/2)
                             </Label>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => setShowQuickCharacterDialog(true)}
-                              className="h-5 w-5 p-0 text-white/70 hover:text-white hover:bg-white/20 rounded-full"
+                              className="h-4 w-4 p-0 text-white/70 hover:text-white hover:bg-white/20 rounded-full"
                               title="Create new character"
                             >
-                              <UserPlus className="h-3.5 w-3.5" />
+                              <UserPlus className="h-3 w-3" />
                             </Button>
                           </div>
                           {selectedImageCharacters.length > 0 && (
                             <button
                               onClick={() => setSelectedImageCharacters([])}
-                              className="text-[10px] text-white/70 hover:text-white transition-colors"
+                              className="text-[9px] text-white/60 hover:text-white transition-colors"
                             >
                               Clear
                             </button>
@@ -978,7 +1040,7 @@ export function FlowCreationPanel({
                         </div>
 
                         {charactersData?.characters && charactersData.characters.length > 0 ? (
-                          <div className="grid grid-cols-6 gap-1 p-1 bg-white/5 rounded">
+                          <div className="grid grid-cols-5 gap-2 p-2 bg-gradient-to-br from-white/10 via-white/5 to-transparent rounded-lg border border-white/10 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
                             {charactersData.characters.map((char: any) => {
                               const isSelected = selectedImageCharacters.includes(char.id);
                               const selectionIndex = selectedImageCharacters.indexOf(char.id);
@@ -987,34 +1049,52 @@ export function FlowCreationPanel({
                                 <button
                                   key={char.id}
                                   onClick={() => toggleCharacterSelection(char.id)}
-                                  className={`relative h-20 rounded overflow-hidden border transition-all ${
+                                  className={`group relative aspect-square rounded-lg overflow-hidden transition-all duration-200 ${
                                     isSelected
-                                      ? 'border-purple-500 ring-1 ring-purple-500/50'
-                                      : 'border-white/20 hover:border-white/50'
+                                      ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-black scale-95 shadow-lg shadow-purple-500/50'
+                                      : 'ring-1 ring-white/20 hover:ring-white/40 hover:scale-105'
                                   }`}
                                 >
-                                  <img
-                                    src={char.image_url}
-                                    alt={char.character_name}
-                                    className="w-full h-full object-cover"
-                                  />
+                                  {/* Character Image */}
+                                  <div className="relative w-full h-full">
+                                    <img
+                                      src={char.image_url}
+                                      alt={char.character_name}
+                                      className={`w-full h-full object-cover transition-all ${
+                                        isSelected ? 'brightness-90' : 'brightness-100 group-hover:brightness-110'
+                                      }`}
+                                    />
+                                    {/* Gradient overlay */}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+
+                                  {/* Selection Badge */}
                                   {isSelected && (
-                                    <div className="absolute top-0.5 right-0.5 bg-purple-500 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                                    <div className="absolute top-1 right-1 bg-gradient-to-br from-purple-500 to-purple-600 text-white text-[9px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-purple-300/50">
                                       {selectionIndex + 1}
                                     </div>
                                   )}
-                                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent p-0.5">
-                                    <span className="text-[8px] text-white font-medium line-clamp-1">
+
+                                  {/* Character Name */}
+                                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/90 to-transparent p-1.5 pt-4">
+                                    <span className="text-[9px] text-white font-semibold line-clamp-1 drop-shadow">
                                       {char.character_name}
                                     </span>
                                   </div>
+
+                                  {/* Hover Effect Border */}
+                                  <div className={`absolute inset-0 rounded-lg bg-gradient-to-tr from-purple-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${
+                                    isSelected ? 'opacity-30' : ''
+                                  }`} />
                                 </button>
                               );
                             })}
                           </div>
                         ) : (
-                          <div className="text-center py-3 text-xs text-white/50 bg-white/5 rounded">
-                            No characters available
+                          <div className="text-center py-4 text-xs text-white/50 bg-white/5 rounded-lg border border-white/10">
+                            <UserPlus className="h-6 w-6 mx-auto mb-1 text-white/30" />
+                            <p>No characters available</p>
+                            <p className="text-[10px] mt-0.5">Create one to get started</p>
                           </div>
                         )}
                       </div>
@@ -1048,21 +1128,63 @@ export function FlowCreationPanel({
               )}
 
               {/* Prompt Input */}
-              <textarea
-                value={videoDescription}
-                onChange={(e) => setVideoDescription(e.target.value)}
-                placeholder={
-                  generationMode === 'text-to-video'
-                    ? previousEventDescription
-                      ? "Continue the story..."
-                      : "Describe your scene..."
-                    : imageSource === 'create-frame' && !generatedImageUrl
-                    ? "Describe the scene with your characters..."
-                    : "Describe how the image should animate..."
-                }
-                rows={2}
-                className="w-full rounded border-0 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 resize-none"
-              />
+              <div className="space-y-1.5">
+                {/* Label based on current step */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-[10px] text-white/70">
+                    {generationMode === 'image-to-video' && imageSource === 'create-frame' && !generatedImageUrl
+                      ? 'Step 1: Describe the frame'
+                      : generatedImageUrl && !generatedVideoUrl
+                      ? 'Step 2: Describe the animation'
+                      : 'Describe your scene'}
+                  </Label>
+                </div>
+
+                <textarea
+                  value={videoDescription}
+                  onChange={(e) => setVideoDescription(e.target.value)}
+                  placeholder={
+                    generationMode === 'text-to-video'
+                      ? previousEventDescription
+                        ? "Continue the story..."
+                        : "Describe your scene..."
+                      : imageSource === 'create-frame' && !generatedImageUrl
+                      ? "Describe the scene with your characters..."
+                      : "Describe how the image should animate..."
+                  }
+                  rows={3}
+                  className="w-full rounded border-0 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 resize-none"
+                />
+
+                {/* Improve with AI button - Shows for both image and video prompts */}
+                {videoDescription.trim() && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleImprovePrompt}
+                      disabled={isImprovingPrompt}
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs bg-white/5 border-white/20 hover:bg-white/10 text-white flex-1"
+                    >
+                      {isImprovingPrompt ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                          Improving...
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="h-3 w-3 mr-1.5" />
+                          {generationMode === 'image-to-video' && imageSource === 'create-frame' && !generatedImageUrl
+                            ? 'Improve Frame Prompt'
+                            : generatedImageUrl && !generatedVideoUrl
+                            ? 'Improve Animation Prompt'
+                            : 'Improve with AI'}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
 
               {/* Action Buttons */}
               {!generatedVideoUrl ? (
