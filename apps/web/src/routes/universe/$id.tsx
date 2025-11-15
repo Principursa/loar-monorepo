@@ -971,27 +971,28 @@ function UniverseTimelineEditor() {
                 <p className="text-sm text-muted-foreground">{timelineDescription}</p>
               </Panel>
 
-              <Panel position="top-right" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
-                <div className="flex items-center gap-3">
-                  {isLoadingAny && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                      Loading blockchain data...
-                    </div>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    asChild
-                    className="hover:bg-primary/10 hover:text-primary transition-all duration-300"
-                  >
-                    <Link to="/">
-                      <Home className="h-4 w-4 mr-2" />
-                      Home
-                    </Link>
-                  </Button>
-                </div>
+              <Panel position="top-right">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  asChild
+                  className="hover:bg-primary/10 hover:text-primary transition-all duration-300"
+                >
+                  <Link to="/">
+                    <Home className="h-4 w-4 mr-2" />
+                    Home
+                  </Link>
+                </Button>
               </Panel>
+
+              {isLoadingAny && (
+                <Panel position="bottom-right" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border mb-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                    Loading blockchain data...
+                  </div>
+                </Panel>
+              )}
             </ReactFlow>
           </div>
         </ReactFlowProvider>
