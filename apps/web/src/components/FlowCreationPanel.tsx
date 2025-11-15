@@ -256,24 +256,20 @@ export function FlowCreationPanel({
         imageSource === 'create-frame' &&
         !generatedImageUrl;
 
-      let result;
-      if (isImprovingImagePrompt) {
-        // Call image prompt improvement for frame generation (Step 1)
-        result = await trpcClient.wiki.improveImagePrompt.mutate({
-          prompt: videoDescription,
-          characters: characterContext,
-        });
-      } else {
-        // Call video prompt improvement for animation (Step 2 or text-to-video)
-        result = await trpcClient.wiki.improveVideoPrompt.mutate({
-          prompt: videoDescription,
-          characters: characterContext,
-          previousEvent: previousEventWiki || undefined,
-        });
-      }
+      // Call video prompt improvement (works for both image and video prompts)
+      const improvedPrompt = await trpcClient.wiki.improveVideoPrompt.mutate({
+        userPrompt: videoDescription,
+        characterContext: characterContext,
+        previousEventContext: previousEventWiki ? {
+          title: previousEventWiki.title || '',
+          summary: previousEventWiki.summary || '',
+          plot: previousEventWiki.plot || undefined,
+        } : undefined,
+      });
 
-      if (result.success && result.improvedPrompt) {
-        setVideoDescription(result.improvedPrompt);
+      // The result is just a string (the improved prompt)
+      if (improvedPrompt) {
+        setVideoDescription(improvedPrompt);
       }
     } catch (error) {
       console.error('Error improving prompt:', error);
