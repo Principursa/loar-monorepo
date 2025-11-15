@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { Home } from "lucide-react";
 import ReactFlow, {
   Background,
   Controls,
@@ -970,14 +971,27 @@ function UniverseTimelineEditor() {
                 <p className="text-sm text-muted-foreground">{timelineDescription}</p>
               </Panel>
 
-              {isLoadingAny && (
-                <Panel position="top-right" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                    Loading blockchain data...
-                  </div>
-                </Panel>
-              )}
+              <Panel position="top-right" className="bg-background/80 backdrop-blur-sm p-2 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  {isLoadingAny && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                      Loading blockchain data...
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                    className="hover:bg-primary/10 hover:text-primary transition-all duration-300"
+                  >
+                    <Link to="/">
+                      <Home className="h-4 w-4 mr-2" />
+                      Home
+                    </Link>
+                  </Button>
+                </div>
+              </Panel>
             </ReactFlow>
           </div>
         </ReactFlowProvider>
