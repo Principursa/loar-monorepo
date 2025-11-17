@@ -9,6 +9,8 @@ RUN apk add --no-cache curl
 # Copy package files
 COPY package.json bun.lock ./
 COPY apps/server/package.json ./apps/server/
+COPY apps/web/package.json ./apps/web/
+COPY apps/indexer/package.json ./apps/indexer/
 COPY turbo.json ./
 
 # Development stage - for local dev dependencies
@@ -43,6 +45,8 @@ RUN apk add --no-cache curl
 # Copy package files for production dependencies only
 COPY package.json bun.lock ./
 COPY apps/server/package.json ./apps/server/
+COPY apps/web/package.json ./apps/web/
+COPY apps/indexer/package.json ./apps/indexer/
 
 # Install only production dependencies
 RUN bun install --production --frozen-lockfile && \

@@ -5,6 +5,8 @@ WORKDIR /app
 # Copy package files
 COPY package.json bun.lock ./
 COPY apps/web/package.json ./apps/web/
+COPY apps/server/package.json ./apps/server/
+COPY apps/indexer/package.json ./apps/indexer/
 COPY turbo.json ./
 
 # Install dependencies and clean up in single layer
