@@ -17,6 +17,9 @@ RUN bun install --frozen-lockfile && \
 # Copy source code
 COPY apps/web/ ./apps/web/
 
+# Copy referenced server tsconfig for TypeScript project references
+COPY apps/server/tsconfig.json ./apps/server/tsconfig.json
+
 # Build and clean up
 RUN cd apps/web && \
     bun run build && \
