@@ -56,10 +56,7 @@ RUN bun install --production --frozen-lockfile && \
 # Copy built application from builder stage
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S bun -u 1001
-
+# Use existing bun user from base image
 USER bun
 
 EXPOSE 3000
