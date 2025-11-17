@@ -31,8 +31,8 @@ COPY apps/server/src ./apps/server/src
 COPY apps/server/tsconfig.json ./apps/server/
 COPY apps/server/drizzle.config.ts ./apps/server/
 
-# Build the application
-RUN cd apps/server && bun run build
+# Build the application using bun's native build instead of tsdown
+RUN cd apps/server && bun build src/index.ts --outdir dist --target node
 
 # Production stage
 FROM oven/bun:1.1.8-alpine AS production
