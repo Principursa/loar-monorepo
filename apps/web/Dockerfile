@@ -20,6 +20,10 @@ COPY apps/web/ ./apps/web/
 # Copy referenced server tsconfig for TypeScript project references
 COPY apps/server/tsconfig.json ./apps/server/tsconfig.json
 
+# Copy indexer schema needed by web app
+COPY apps/indexer/ponder.schema.ts ./apps/indexer/ponder.schema.ts
+COPY apps/indexer/ponder.schema.ts ./apps/indexer/ponder.schema
+
 # Build and clean up
 RUN cd apps/web && \
     bun run build && \
