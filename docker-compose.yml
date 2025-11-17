@@ -16,11 +16,11 @@ services:
       - loar-network
 
   app-server:
-    image: oven/bun:1.1.8-alpine
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+      target: production
     container_name: loar-server
-    working_dir: /app
-    volumes:
-      - .:/app
     env_file:
       - ./apps/server/.env
     environment:
@@ -29,7 +29,6 @@ services:
       - CORS_ORIGIN=https://loartech.xyz
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-defaultsecret}
       - BETTER_AUTH_URL=https://loartech.xyz
-    command: ["sh", "-c", "apk add --no-cache curl && bun run apps/server/dist/index.js"]
     depends_on:
       - postgres
     restart: unless-stopped
@@ -44,11 +43,10 @@ services:
 
       
   app-web:
-    image: caddy:2-alpine
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
     container_name: loar-web
-    volumes:
-      - ./apps/web/dist:/usr/share/caddy:ro
-      - ./apps/web/Caddyfile:/etc/caddy/Caddyfile:ro
     restart: unless-stopped
     networks:
       - loar-network

@@ -21,21 +21,21 @@ RUN cd apps/web && \
     rm -rf src node_modules && \
     rm -rf ../node_modules
 
-# Production stage - lightweight nginx
-FROM nginx:alpine
+# Production stage - lightweight caddy
+FROM caddy:2-alpine
 
 # Copy built application
-COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
+COPY --from=builder /app/apps/web/dist /usr/share/caddy
 
-# Copy custom nginx config
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+# Copy custom caddy config
+COPY apps/web/Caddyfile /etc/caddy/Caddyfile
 
 # Install curl for health checks
 RUN apk add --no-cache curl
 
-EXPOSE 3001
+EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3001 || exit 1
+  CMD curl -f http://localhost:80 || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
