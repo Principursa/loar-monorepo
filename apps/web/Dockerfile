@@ -26,7 +26,7 @@ COPY apps/indexer/ponder.schema.ts ./apps/indexer/ponder.schema
 
 # Build and clean up
 RUN cd apps/web && \
-    bun run build && \
+    DEBUG=vite:* bun run build --logLevel=info --debug 2>&1 || (echo "Build failed, checking for more details..." && cat ~/.vite/logs/* 2>/dev/null || echo "No additional logs found" && exit 1) && \
     rm -rf src node_modules && \
     rm -rf ../node_modules
 
