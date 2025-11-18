@@ -18,16 +18,7 @@ export default defineConfig({
       "@loar/abis/generated": path.resolve(__dirname, "../../packages/abis/src/generated.ts"),
     },
   },
-  build: {
-    rollupOptions: {
-      external: ['wagmi/codegen'],
-      output: {
-        globals: {
-          'wagmi/codegen': 'wagmi'
-        }
-      }
-    }
-  },
+  // Remove external wagmi/codegen - let it be bundled properly
   server: {
     port: 3001,
     hmr: {
