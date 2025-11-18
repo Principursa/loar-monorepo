@@ -20,7 +20,12 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: ['wagmi/codegen']
+      external: ['wagmi/codegen'],
+      output: {
+        globals: {
+          'wagmi/codegen': 'wagmi'
+        }
+      }
     }
   },
   server: {

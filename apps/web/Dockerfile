@@ -2,9 +2,6 @@ FROM oven/bun:1.1.8-alpine AS builder
 
 WORKDIR /app
 
-# Install build tools for native modules (needed for @tailwindcss/oxide)
-RUN apk add --no-cache python3 make gcc g++ libc-dev linux-headers
-
 # Copy package files
 COPY package.json bun.lock ./
 COPY apps/web/package.json ./apps/web/
@@ -12,8 +9,8 @@ COPY apps/server/package.json ./apps/server/
 COPY apps/indexer/package.json ./apps/indexer/
 COPY turbo.json ./
 
-# Install dependencies including native modules, clean up in single layer
-RUN bun install --frozen-lockfile && \
+# Install dependencies, skip native modules to avoid build issues
+RUN bun install --frozen-lockfile --ignore-scripts && \
     rm -rf ~/.bun/install/cache && \
     rm -rf /tmp/*
 
