@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from "wagmi";
-import { universeGovernorAbi, governanceErc20Abi, timelineAbi } from "@loar/abis/generated";
+import { universeGovernorAbi, governanceErc20Abi, universeAbi } from "@loar/abis/generated";
 import { type Address } from "viem";
 import { encodeFunctionData, keccak256, encodeAbiParameters } from "viem";
 import type { Node } from 'reactflow';
@@ -413,7 +413,7 @@ export function GovernanceSidebar({
 
       // Encode the setCanon function call properly
       const setCanonCalldata = encodeFunctionData({
-        abi: timelineAbi,
+        abi: universeAbi,
         functionName: 'setCanon',
         args: [BigInt(contractNodeId)]
       });

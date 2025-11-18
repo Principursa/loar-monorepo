@@ -7,7 +7,7 @@
 
 import { useMemo } from 'react';
 import { useReadContract } from 'wagmi';
-import { timelineAbi } from '@loar/abis/generated';
+import { universeAbi } from '@loar/abis/generated';
 import { type Address } from 'viem';
 
 export interface GraphData {
@@ -55,7 +55,7 @@ function useUniverseLeaves(contractAddress?: string) {
   }
 
   return useReadContract({
-    abi: timelineAbi,
+    abi: universeAbi,
     address: contractAddress as Address,
     functionName: 'getLeaves',
     query: {
@@ -74,7 +74,7 @@ function useUniverseFullGraph(contractAddress?: string) {
   }
 
   return useReadContract({
-    abi: timelineAbi,
+    abi: universeAbi,
     address: contractAddress as Address,
     functionName: 'getFullGraph',
     query: {
@@ -93,7 +93,7 @@ function useUniverseCanonChain(contractAddress?: string) {
   }
 
   return useReadContract({
-    abi: timelineAbi,
+    abi: universeAbi,
     address: contractAddress as Address,
     functionName: 'getCanonChain',
     query: {
@@ -117,7 +117,7 @@ export function useUniverseBlockchain({
 
   // Fetch latest node ID
   const { data: latestNodeIdData, refetch: refetchLatestNodeId } = useReadContract({
-    abi: timelineAbi,
+    abi: universeAbi,
     address: contractAddress as Address,
     functionName: 'latestNodeId',
     query: {

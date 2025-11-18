@@ -1,5 +1,5 @@
 import { useReadContract, useWriteContract } from 'wagmi'
-import { timelineAbi } from '@loar/abis/generated'
+import { universeAbi } from '@loar/abis/generated'
 import { useChainId } from 'wagmi'
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test'
 import { TimelineEventNode } from '@/components/flow/TimelineNodes'
@@ -10,7 +10,7 @@ export function useGetNode(id: number) {
   const chainId = useChainId()
 
   return useReadContract({
-    abi: timelineAbi,
+    abi: universeAbi,
     address: TIMELINE_ADDRESSES[chainId as SupportedChainId],
     functionName: "getNode",
     args: [BigInt(id)]
@@ -20,7 +20,7 @@ export function useGetTimeline(id: number) {
   const chainId = useChainId()
   
   return useReadContract({
-    abi: timelineAbi,
+    abi: universeAbi,
     address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
     functionName: 'getTimeline',
     args: [BigInt(id)]
@@ -31,7 +31,7 @@ export function useGetLeaves() {
   const chainId = useChainId()
   
   return useReadContract({
-    abi: timelineAbi,
+    abi: universeAbi,
     address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
     functionName: 'getLeaves'
   })
@@ -41,7 +41,7 @@ export function useGetMedia(id: number) {
   const chainId = useChainId()
   
   return useReadContract({
-    abi: timelineAbi,
+    abi: universeAbi,
     address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
     functionName: 'getMedia',
     args: [BigInt(id)]
@@ -52,7 +52,7 @@ export function useGetCanonChain() {
   const chainId = useChainId()
   
   return useReadContract({
-    abi: timelineAbi,
+    abi: universeAbi,
     address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
     functionName: 'getCanonChain'
   })
@@ -65,7 +65,7 @@ export function useGetFullGraph(timelineAddress?: string) {
   const address = timelineAddress || TIMELINE_ADDRESSES[chainId as SupportedChainId]
   
   return useReadContract({
-    abi: timelineAbi,
+    abi: universeAbi,
     address: address as Address,
     functionName: 'getFullGraph',
     query: {
@@ -82,7 +82,7 @@ export function useSetCanon() {
   
   const writeAsync = (id: number) =>
     contract.writeContractAsync({
-      abi: timelineAbi,
+      abi: universeAbi,
       address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
       functionName: 'setCanon',
       args: [BigInt(id)]
@@ -97,7 +97,7 @@ export function useCreateNode(link: string, plot: string, previous: number) {
 
   const writeAsync = (link: string, plot: string, previous: number) =>
     contract.writeContractAsync({
-      abi: timelineAbi,
+      abi: universeAbi,
       address: TIMELINE_ADDRESSES[11155111], // Explicitly use Sepolia
       functionName: 'createNode',
       args: [link, plot, BigInt(previous)],
@@ -113,7 +113,7 @@ export function useSetMedia() {
   
   const writeAsync = (id: number, link: string) =>
     contract.writeContractAsync({
-      abi: timelineAbi,
+      abi: universeAbi,
       address: TIMELINE_ADDRESSES[chainId as SupportedChainId] as Address,
       functionName: 'setMedia',
       args: [BigInt(id), link]

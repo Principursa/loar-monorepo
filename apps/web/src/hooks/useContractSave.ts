@@ -10,7 +10,7 @@ import { type Address } from 'viem';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
-import { timelineAbi } from '@loar/abis/generated';
+import { universeAbi } from '@loar/abis/generated';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
 import { type GraphData } from '@/hooks/useUniverseBlockchain';
 
@@ -158,7 +158,7 @@ export function useContractSave({
 
       // Create new node in the universe's specific smart contract
       const txHash = await writeContractAsync({
-        abi: timelineAbi,
+        abi: universeAbi,
         address: contractAddressToUse,
         functionName: 'createNode',
         args: [videoUrlForContract, videoDescription, BigInt(previousNodeId)]
