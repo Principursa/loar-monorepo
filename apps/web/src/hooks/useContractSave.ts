@@ -10,7 +10,7 @@ import { type Address } from 'viem';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { trpcClient } from '@/utils/trpc';
-import { timelineAbi } from '@/generated';
+import { timelineAbi } from '@loar/abis/generated';
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test';
 import { type GraphData } from '@/hooks/useUniverseBlockchain';
 

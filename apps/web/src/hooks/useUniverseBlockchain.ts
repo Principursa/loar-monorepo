@@ -7,7 +7,7 @@
 
 import { useMemo } from 'react';
 import { useReadContract } from 'wagmi';
-import { timelineAbi } from '@/generated';
+import { timelineAbi } from '@loar/abis/generated';
 import { type Address } from 'viem';
 
 export interface GraphData {

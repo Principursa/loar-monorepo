@@ -1,5 +1,5 @@
 import { useReadContract, useWriteContract } from 'wagmi'
-import { timelineAbi } from '@/generated'
+import { timelineAbi } from '@loar/abis/generated'
 import { useChainId } from 'wagmi'
 import { TIMELINE_ADDRESSES, type SupportedChainId } from '@/configs/addresses-test'
 import { TimelineEventNode } from '@/components/flow/TimelineNodes'

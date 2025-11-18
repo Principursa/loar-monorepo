@@ -9,8 +9,8 @@ COPY apps/server/package.json ./apps/server/
 COPY apps/indexer/package.json ./apps/indexer/
 COPY turbo.json ./
 
-# Install dependencies and clean up in single layer
-RUN bun install --frozen-lockfile && \
+# Install dependencies with optional native modules, clean up in single layer
+RUN bun install --frozen-lockfile --ignore-scripts && \
     rm -rf ~/.bun/install/cache && \
     rm -rf /tmp/*
 
@@ -24,9 +24,12 @@ COPY apps/server/tsconfig.json ./apps/server/tsconfig.json
 COPY apps/indexer/ponder.schema.ts ./apps/indexer/ponder.schema.ts
 COPY apps/indexer/ponder.schema.ts ./apps/indexer/ponder.schema
 
+# Copy packages needed for vite.config.ts aliases
+COPY packages/abis/src/ ./packages/abis/src/
+
 # Build and clean up
 RUN cd apps/web && \
-    DEBUG=vite:* bun run build --logLevel=info --debug 2>&1 || (echo "Build failed, checking for more details..." && cat ~/.vite/logs/* 2>/dev/null || echo "No additional logs found" && exit 1) && \
+    bun run build && \
     rm -rf src node_modules && \
     rm -rf ../node_modules
 
