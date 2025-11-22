@@ -31,8 +31,8 @@ COPY apps/server/src ./apps/server/src
 COPY apps/server/tsconfig.json ./apps/server/
 COPY apps/server/drizzle.config.ts ./apps/server/
 
-# Build the application using tsdown for better compatibility with ethers.js
-RUN cd apps/server && bun run build
+# Build the application with bun build configured for better compatibility
+RUN cd apps/server && bun build src/index.ts --outdir dist --target node --external ethers --external viem
 
 # Production stage
 FROM oven/bun:1.1.8-alpine AS production
