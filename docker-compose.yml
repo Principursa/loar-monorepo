@@ -67,6 +67,8 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
     command: ["sh", "-c", "cd apps/indexer && bun run start"]
+    ports:
+      - "42069:42069"
     depends_on:
       - postgres
     restart: unless-stopped
