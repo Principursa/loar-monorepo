@@ -56,7 +56,7 @@ services:
       caddy.2_route.reverse_proxy: "{{upstreams 80}}"
 
   indexer:
-    image: oven/bun:1.1.8-alpine
+    image: node:20-alpine
     container_name: loar-indexer
     working_dir: /app
     volumes:
@@ -66,7 +66,7 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/loar-fullstack
-    command: ["sh", "-c", "cd apps/indexer && bun run start"]
+    command: ["sh", "-c", "corepack enable && cd apps/indexer && pnpm install && pnpm start"]
     ports:
       - "42069:42069"
     depends_on:
@@ -76,9 +76,8 @@ services:
       - loar-network
     labels:
       caddy: loartech.xyz
-      caddy.3_route: /indexer/*
-      caddy.3_route.reverse_proxy: "{{upstreams 42069}}"
-      caddy.3_route.uri: strip_prefix /indexer
+      caddy.3_handle_path: /indexer/*
+      caddy.3_handle_path.0_reverse_proxy: "{{upstreams 42069}}"
 
 
 
@@ -118,6 +117,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    # MinIO Caddy routing disabled - will be enabled when we switch from Fal AI to MinIO for video storage
+    # labels:
+    #   caddy: loartech.xyz
+    #   caddy.4_handle: /media/*
+    #   caddy.4_handle.0_uri: strip_prefix /media
+    #   caddy.4_handle.1_reverse_proxy: "{{upstreams 9000}}"
 
 volumes:
   postgres_data:

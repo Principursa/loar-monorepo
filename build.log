@@ -1,0 +1,136 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.38kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/oven/bun:1.1.8-alpine
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/caddy:2-alpine
+#3 DONE 0.2s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 274B done
+#4 DONE 0.0s
+
+#5 [builder  1/13] FROM docker.io/oven/bun:1.1.8-alpine
+#5 DONE 0.0s
+
+#6 [stage-1 1/4] FROM docker.io/library/caddy:2-alpine@sha256:953131cfea8e12bfe1c631a36308e9660e4389f0c3dfb3be957044d3ac92d446
+#6 CACHED
+
+#7 [builder  2/13] WORKDIR /app
+#7 CACHED
+
+#8 [internal] load build context
+#8 transferring context: 9.49MB 0.1s done
+#8 DONE 0.1s
+
+#9 [builder  3/13] COPY package.json bun.lock ./
+#9 DONE 0.0s
+
+#10 [builder  4/13] COPY apps/web/package.json ./apps/web/
+#10 DONE 0.0s
+
+#11 [builder  5/13] COPY apps/server/package.json ./apps/server/
+#11 DONE 0.0s
+
+#12 [builder  6/13] COPY apps/indexer/package.json ./apps/indexer/
+#12 DONE 0.0s
+
+#13 [builder  7/13] COPY turbo.json ./
+#13 DONE 0.0s
+
+#14 [builder  8/13] RUN bun install --frozen-lockfile &&     rm -rf ~/.bun/install/cache &&     rm -rf /tmp/*
+#14 0.230 bun install v1.1.8 (89d25807)
+#14 0.236  Resolving dependencies
+#14 7.093  Resolved, downloaded and extracted [5240]
+#14 7.093 warn: Duplicate dependency: "server" specified in package.json
+#14 7.093    at /app/package.json
+#14 7.093 
+#14 7.093 40 |     "server": "./apps/server",
+#14 7.093                    ^
+#14 7.093 note: "server" originally specified here
+#14 7.093    at /app/package.json:40:15
+#14 7.093 
+#14 7.093 warn: Duplicate dependency: "web" specified in package.json
+#14 7.093    at /app/package.json
+#14 7.093 
+#14 7.093 41 |     "web": "./apps/web",
+#14 7.093                 ^
+#14 7.093 note: "web" originally specified here
+#14 7.093    at /app/package.json:41:12
+#14 12.32 
+#14 12.32  + indexer@workspace:apps/indexer
+#14 12.32  + server@workspace:apps/server
+#14 12.32  + web@workspace:apps/web
+#14 12.32  + @types/jsonwebtoken@9.0.10
+#14 12.32  + turbo@2.6.1
+#14 12.32  + @langchain/openai@0.6.16 (v1.1.1 available)
+#14 12.32  + @modelcontextprotocol/sdk@1.22.0
+#14 12.32  + @openai/agents@0.0.17 (v0.3.2 available)
+#14 12.32  + @tanstack/react-query@5.90.10
+#14 12.32  + @types/node@24.10.1
+#14 12.32  + @wagmi/cli@0.0.0-canary-20251111222130
+#14 12.32  + dotenv@17.2.3
+#14 12.32  + install@0.13.0
+#14 12.32  + jsonwebtoken@9.0.2
+#14 12.32  + mcp-use@0.1.20 (v1.3.2 available)
+#14 12.32  + openai@5.23.2 (v6.9.1 available)
+#14 12.32  + server@workspace:apps/server
+#14 12.32  + web@workspace:apps/web
+#14 12.32  + zod@4.1.12
+#14 12.32 
+#14 12.32  1352 packages installed [12.10s]
+#14 DONE 15.4s
+
+#15 [builder  9/13] COPY apps/web/ ./apps/web/
+#15 DONE 0.2s
+
+#16 [builder 10/13] COPY apps/server/tsconfig.json ./apps/server/tsconfig.json
+#16 DONE 0.0s
+
+#17 [builder 11/13] COPY apps/indexer/ponder.schema.ts ./apps/indexer/ponder.schema.ts
+#17 DONE 0.0s
+
+#18 [builder 12/13] COPY apps/indexer/ponder.schema.ts ./apps/indexer/ponder.schema
+#18 DONE 0.0s
+
+#19 [builder 13/13] RUN cd apps/web &&     bun run build &&     rm -rf src node_modules &&     rm -rf ../node_modules
+#19 0.154 $ vite build
+#19 1.973 vite v6.4.1 building for production...
+#19 2.157 transforming...
+#19 4.330 [plugin vite:resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/app/node_modules/ponder/dist/esm/client/parse.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+#19 4.331 [plugin vite:resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/app/node_modules/ponder/dist/esm/client/parse.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+#19 6.308 [plugin vite:resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/app/node_modules/ponder/dist/esm/graphql/middleware.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+#19 6.308 [plugin vite:resolve] Module "node:path" has been externalized for browser compatibility, imported by "/app/node_modules/ponder/dist/esm/graphql/middleware.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+#19 8.422 ✓ 4192 modules transformed.
+#19 8.424 ✗ Build failed in 6.37s
+#19 8.425 error during build:
+#19 8.425 undefined
+#19 8.512 error: script "build" exited with code 1
+#19 ERROR: process "/bin/sh -c cd apps/web &&     bun run build &&     rm -rf src node_modules &&     rm -rf ../node_modules" did not complete successfully: exit code: 1
+------
+ > [builder 13/13] RUN cd apps/web &&     bun run build &&     rm -rf src node_modules &&     rm -rf ../node_modules:
+2.157 transforming...
+4.330 [plugin vite:resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/app/node_modules/ponder/dist/esm/client/parse.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+4.331 [plugin vite:resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/app/node_modules/ponder/dist/esm/client/parse.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+6.308 [plugin vite:resolve] Module "node:fs" has been externalized for browser compatibility, imported by "/app/node_modules/ponder/dist/esm/graphql/middleware.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+6.308 [plugin vite:resolve] Module "node:path" has been externalized for browser compatibility, imported by "/app/node_modules/ponder/dist/esm/graphql/middleware.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+
+8.424 ✗ Build failed in 6.37s
+8.425 error during build:
+8.425 undefined
+8.512 error: script "build" exited with code 1
+------
+Dockerfile:28
+--------------------
+  27 |     # Build and clean up
+  28 | >>> RUN cd apps/web && \
+  29 | >>>     bun run build && \
+  30 | >>>     rm -rf src node_modules && \
+  31 | >>>     rm -rf ../node_modules
+  32 |     
+--------------------
+ERROR: failed to build: failed to solve: process "/bin/sh -c cd apps/web &&     bun run build &&     rm -rf src node_modules &&     rm -rf ../node_modules" did not complete successfully: exit code: 1

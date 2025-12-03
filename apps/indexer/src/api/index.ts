@@ -90,7 +90,7 @@ app.get("/creator/:address/summary", async (c) => {
 });
 
 app.get("/universe/:address", async (c) => {
-  const address = getAddress(c.req.param("address"));
+  const address = c.req.param("address").toLowerCase();
 
   const [universeData, nodes, tokenData] = await Promise.all([
     db.select().from(universe).where((u) => u.id === address).limit(1),
