@@ -122,38 +122,60 @@ function UniverseTimelineEditor() {
   // Contract hooks - we'll use the write contract directly for universe-specific contracts
   const { writeContractAsync } = useWriteContract();
 
-  // Try to get universe data from localStorage (skip for blockchain universes)
-  const { data: universeFromStorage } = useQuery({
+  // For blockchain universes (addresses starting with 0x), fetch from indexer
+  const isBlockchainUniverse = id?.startsWith('0x');
+
+  // Unified query that checks both localStorage and indexer
+  const { data: universe, isLoading: isLoadingUniverse } = useQuery({
     queryKey: ['universe-metadata', id],
-    queryFn: () => {
+    queryFn: async () => {
+      // First check localStorage
       const stored = localStorage.getItem('createdUniverses');
       const universes = stored ? JSON.parse(stored) : [];
       const found = universes.find((u: any) => u.id === id);
-      console.log('Looking for universe with id:', id);
-      console.log('Found in localStorage:', found);
-      return found;
-    }
+
+      if (found) {
+        console.log('Found universe in localStorage:', found);
+        return found;
+      }
+
+      // If not in localStorage and it's a blockchain universe, fetch from indexer
+      if (isBlockchainUniverse) {
+        try {
+          const response = await fetch(`https://loartech.xyz/indexer/universe/${id}`);
+          if (!response.ok) return null;
+          const data = await response.json();
+          if (data.universe) {
+            console.log('Found universe in indexer:', data.universe);
+            return {
+              id: data.universe.id,
+              name: data.universe.name,
+              description: data.universe.description,
+              imageUrl: data.universe.imageURL,
+              address: data.universe.id,
+              tokenAddress: data.universe.tokenAddress,
+              governanceAddress: data.universe.governorAddress,
+              isDefault: false,
+            };
+          }
+        } catch (error) {
+          console.error('Error fetching from indexer:', error);
+        }
+      }
+
+      return null;
+    },
   });
 
-  // Use localStorage data if available
-  const universe = universeFromStorage || null;
-  const isLoadingUniverse = false;
-
-  // For blockchain universes (addresses starting with 0x), use blockchain data
-  const isBlockchainUniverse = id?.startsWith('0x');
-
-  // For blockchain universes, create a default universe object if not found in localStorage
+  // Fallback for blockchain universes if not found
   const finalUniverse = universe || (isBlockchainUniverse ? {
     id: id,
     name: `Universe ${id.slice(0, 8)}...`,
     description: 'Blockchain-based cinematic universe',
     address: id,
     isDefault: false,
-    // For governance, we need tokenAddress and governanceAddress
-    // These should come from localStorage when the universe was created
-    // If not available, the governance features won't work
-    tokenAddress: universe?.tokenAddress || null,
-    governanceAddress: universe?.governanceAddress || null
+    tokenAddress: null,
+    governanceAddress: null
   } : null);
 
   // Each universe with a 0x address IS its own Timeline contract

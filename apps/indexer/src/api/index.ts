@@ -92,11 +92,15 @@ app.get("/creator/:address/summary", async (c) => {
 app.get("/universe/:address", async (c) => {
   const address = c.req.param("address").toLowerCase();
 
-  const [universeData, nodes, tokenData] = await Promise.all([
-    db.select().from(universe).where((u) => u.id === address).limit(1),
-    db.select().from(node).where((n) => n.universeAddress === address).orderBy((n) => n.createdAt, "asc"),
-    db.select().from(token).where((t) => t.universeAddress === address).limit(1),
+  const [allUniverses, allNodes, allTokens] = await Promise.all([
+    db.select().from(universe),
+    db.select().from(node),
+    db.select().from(token),
   ]);
+
+  const universeData = allUniverses.filter(u => u.id.toLowerCase() === address);
+  const nodes = allNodes.filter(n => n.universeAddress.toLowerCase() === address).sort((a, b) => a.createdAt - b.createdAt);
+  const tokenData = allTokens.filter(t => t.universeAddress.toLowerCase() === address);
 
   if (universeData.length === 0) {
     return c.json({ error: "Universe not found" }, 404);
